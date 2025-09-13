@@ -1,301 +1,357 @@
 "use client"
 
 import DashboardLayout from '@/components/dashboard-layout'
-import QuickActions from './components/QuickActions'
 
 export default function AdminDashboard() {
   return (
     <DashboardLayout role="admin">
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 hover:shadow-indigo-500/10 transition-all duration-300 ease-in-out">
+          <div className="card hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-300">Total Users</p>
-                <p className="text-2xl lg:text-4xl font-bold text-white truncate">1,234</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
+                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">1,234</p>
               </div>
-              <div className="w-12 h-12 lg:w-16 lg:h-16 bg-indigo-600/30 backdrop-blur-sm border border-indigo-500/50 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/25">
-                <span className="text-xl lg:text-3xl">👥</span>
+              <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#1a73e8] dark:bg-[#FF0000] rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="text-xl lg:text-2xl text-white">👥</span>
               </div>
             </div>
             <div className="mt-4 flex items-center text-sm">
-              <span className="text-emerald-400 font-semibold">↗ 12%</span>
-              <span className="ml-2 text-slate-400">vs last month</span>
+              <span className="text-[#34a853] font-medium">↗ 12%</span>
+              <span className="ml-2 text-gray-500 dark:text-gray-400">vs last month</span>
             </div>
           </div>
 
-          <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 hover:shadow-emerald-500/10 transition-all duration-300 ease-in-out">
+          <div className="card hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-300">Active Courses</p>
-                <p className="text-2xl lg:text-4xl font-bold text-white truncate">56</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Courses</p>
+                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">56</p>
               </div>
-              <div className="w-12 h-12 lg:w-16 lg:h-16 bg-emerald-600/30 backdrop-blur-sm border border-emerald-500/50 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/25">
-                <span className="text-xl lg:text-3xl">📚</span>
+              <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#34a853] rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="text-xl lg:text-2xl text-white">📚</span>
               </div>
             </div>
             <div className="mt-4 flex items-center text-sm">
-              <span className="text-emerald-400 font-semibold">↗ 8%</span>
-              <span className="ml-2 text-slate-400">vs last month</span>
+              <span className="text-[#34a853] font-medium">↗ 8%</span>
+              <span className="ml-2 text-gray-500 dark:text-gray-400">vs last month</span>
             </div>
           </div>
 
-          <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 hover:shadow-amber-500/10 transition-all duration-300 ease-in-out cursor-pointer" onClick={() => window.location.href='/admin/approvals'}>
+          <div className="card hover:shadow-lg transition-shadow duration-300 cursor-pointer" onClick={() => window.location.href='/admin/approvals'}>
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-300">Pending Approvals</p>
-                <p className="text-2xl lg:text-4xl font-bold text-white truncate">12</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Approvals</p>
+                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">12</p>
               </div>
-              <div className="w-12 h-12 lg:w-16 lg:h-16 bg-amber-600/30 backdrop-blur-sm border border-amber-500/50 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/25">
-                <span className="text-xl lg:text-3xl">⏳</span>
+              <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#fbbc05] rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="text-xl lg:text-2xl text-white">⏳</span>
               </div>
             </div>
             <div className="mt-4">
-              <span className="px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-400/50 rounded-full backdrop-blur-sm">Needs attention</span>
+              <span className="badge badge-warning">Needs attention</span>
             </div>
           </div>
 
-          <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 hover:shadow-emerald-500/10 transition-all duration-300 ease-in-out">
+          <div className="card hover:shadow-lg transition-shadow duration-300">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-300">System Health</p>
-                <p className="text-2xl lg:text-4xl font-bold text-white truncate">98%</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">System Health</p>
+                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">98%</p>
               </div>
-              <div className="w-12 h-12 lg:w-16 lg:h-16 bg-emerald-600/30 backdrop-blur-sm border border-emerald-500/50 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/25">
-                <span className="text-xl lg:text-3xl">❤️</span>
+              <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#34a853] rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="text-xl lg:text-2xl text-white">❤️</span>
               </div>
             </div>
             <div className="mt-4 flex items-center text-sm">
-              <span className="text-emerald-400 font-semibold">All services online</span>
+              <span className="text-[#34a853] font-medium">All services online</span>
             </div>
           </div>
         </div>
 
-        {/* Analytics & Management */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
-            <div className="pb-4 border-b border-slate-600/50 mb-4">
-              <h3 className="text-lg lg:text-2xl font-bold text-white">Utilization Reports</h3>
-              <p className="text-sm text-slate-300 mt-1">Resource usage analytics</p>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-300 font-medium">Classroom Usage</span>
-                <span className="font-bold text-emerald-400">87%</span>
-              </div>
-              <div className="w-full bg-slate-700/50 rounded-full h-3 shadow-inner">
-                <div className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-3 rounded-full shadow-lg shadow-emerald-500/25" style={{width: '87%'}}></div>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-300 font-medium">Faculty Load</span>
-                <span className="font-bold text-amber-400">73%</span>
-              </div>
-              <div className="w-full bg-slate-700/50 rounded-full h-3 shadow-inner">
-                <div className="bg-gradient-to-r from-amber-500 to-amber-400 h-3 rounded-full shadow-lg shadow-amber-500/25" style={{width: '73%'}}></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
-            <div className="pb-4 border-b border-slate-600/50 mb-4">
-              <h3 className="text-lg lg:text-2xl font-bold text-white">Conflict Detection</h3>
-              <p className="text-sm text-slate-300 mt-1">AI-powered conflict analysis</p>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg backdrop-blur-sm">
-                <div className="w-3 h-3 rounded-full bg-red-400 shadow-lg shadow-red-500/50"></div>
-                <span className="text-sm font-medium text-white">3 Schedule conflicts</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg backdrop-blur-sm">
-                <div className="w-3 h-3 rounded-full bg-amber-400 shadow-lg shadow-amber-500/50"></div>
-                <span className="text-sm font-medium text-white">5 Room overlaps</span>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg backdrop-blur-sm">
-                <div className="w-3 h-3 rounded-full bg-emerald-400 shadow-lg shadow-emerald-500/50"></div>
-                <span className="text-sm font-medium text-white">12 Resolved today</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
-            <div className="pb-4 border-b border-slate-600/50 mb-4">
-              <h3 className="text-lg lg:text-2xl font-bold text-white">System Notifications</h3>
-              <p className="text-sm text-slate-300 mt-1">Alerts and announcements</p>
-            </div>
-            <div className="space-y-3">
-              <div className="p-4 bg-amber-500/10 backdrop-blur-sm border border-amber-500/30 border-l-4 border-l-amber-400 rounded-lg shadow-lg">
-                <p className="text-sm font-semibold text-white">AI Engine Update</p>
-                <p className="text-xs text-slate-300 mt-1">Optimization algorithm improved by 15%</p>
-              </div>
-              <div className="p-4 bg-indigo-500/10 backdrop-blur-sm border border-indigo-500/30 border-l-4 border-l-indigo-400 rounded-lg shadow-lg">
-                <p className="text-sm font-semibold text-white">New Faculty Added</p>
-                <p className="text-xs text-slate-300 mt-1">3 new faculty members registered</p>
-              </div>
-              <div className="p-4 bg-emerald-500/10 backdrop-blur-sm border border-emerald-500/30 border-l-4 border-l-emerald-400 rounded-lg shadow-lg">
-                <p className="text-sm font-semibold text-white">Backup Complete</p>
-                <p className="text-xs text-slate-300 mt-1">Daily system backup successful</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Strategic Control Hub */}
+        {/* System Health & Management */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title text-base sm:text-lg">System Health Monitor</h3>
+              <h3 className="card-title">System Health Monitor</h3>
               <p className="card-description">Real-time service status</p>
             </div>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-emerald-500/20 backdrop-blur-sm rounded-lg border border-emerald-400/30">
+              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-500/50"></div>
-                  <span className="text-sm font-medium text-white">Django API</span>
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Django API</span>
                 </div>
-                <span className="text-sm text-emerald-400 font-medium">Online</span>
+                <span className="badge badge-success">Online</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-emerald-500/20 backdrop-blur-sm rounded-lg border border-emerald-400/30">
+              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-500/50"></div>
-                  <span className="text-sm font-medium text-white">FastAPI AI Service</span>
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">FastAPI AI Service</span>
                 </div>
-                <span className="text-sm text-emerald-400 font-medium">Online</span>
+                <span className="badge badge-success">Online</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-emerald-500/20 backdrop-blur-sm rounded-lg border border-emerald-400/30">
+              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg shadow-emerald-500/50"></div>
-                  <span className="text-sm font-medium text-white">Database Connection</span>
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Database Connection</span>
                 </div>
-                <span className="text-sm text-emerald-400 font-medium">Healthy</span>
+                <span className="badge badge-success">Healthy</span>
               </div>
             </div>
           </div>
 
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title text-base sm:text-lg">Data Management</h3>
+              <h3 className="card-title">Data Management</h3>
               <p className="card-description">Import/Export operations</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button className="p-3 bg-blue-500/20 backdrop-blur-sm rounded-lg hover:bg-blue-500/30 hover:shadow-blue-500/20 border border-blue-400/30 transition-all duration-300 text-left">
+              <button className="btn-secondary text-left p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm">📥</span>
-                  <span className="text-sm font-medium text-white">Import CSV</span>
+                  <span className="text-lg">📥</span>
+                  <span className="text-sm font-medium">Import CSV</span>
                 </div>
-                <p className="text-xs text-slate-300">Bulk upload data</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">Bulk upload data</p>
               </button>
-              <button className="p-3 bg-emerald-500/20 backdrop-blur-sm rounded-lg hover:bg-emerald-500/30 hover:shadow-emerald-500/20 border border-emerald-400/30 transition-all duration-300 text-left">
+              <button className="btn-secondary text-left p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm">📤</span>
-                  <span className="text-sm font-medium text-white">Export PDF</span>
+                  <span className="text-lg">📤</span>
+                  <span className="text-sm font-medium">Export PDF</span>
                 </div>
-                <p className="text-xs text-slate-300">Generate reports</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">Generate reports</p>
               </button>
-              <button className="p-3 bg-purple-500/20 backdrop-blur-sm rounded-lg hover:bg-purple-500/30 hover:shadow-purple-500/20 border border-purple-400/30 transition-all duration-300 text-left">
+              <button className="btn-secondary text-left p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm">💾</span>
-                  <span className="text-sm font-medium text-white">Backup DB</span>
+                  <span className="text-lg">💾</span>
+                  <span className="text-sm font-medium">Backup DB</span>
                 </div>
-                <p className="text-xs text-slate-300">Create snapshot</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">Create snapshot</p>
               </button>
-              <button className="p-3 bg-orange-500/20 backdrop-blur-sm rounded-lg hover:bg-orange-500/30 hover:shadow-orange-500/20 border border-orange-400/30 transition-all duration-300 text-left">
+              <button className="btn-secondary text-left p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm">🔄</span>
-                  <span className="text-sm font-medium text-white">Restore</span>
+                  <span className="text-lg">🔄</span>
+                  <span className="text-sm font-medium">Restore</span>
                 </div>
-                <p className="text-xs text-slate-300">From backup</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">From backup</p>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Audit & Configuration */}
+        {/* Audit Trail & Role Management */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Recent Audit Trail</h3>
+              <p className="card-description">Critical system actions</p>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Timetable Approved</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">priya.patel@sih28.edu</p>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">2 min ago</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">User Role Changed</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">harsh.sharma@sih28.edu</p>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">15 min ago</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Course Updated</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">rajesh.kumar@sih28.edu</p>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">1h ago</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Login Failed</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">unknown</p>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">2h ago</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Role Management</h3>
+              <p className="card-description">Permission control</p>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Admin</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">All Access</p>
+                </div>
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">3</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Staff</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Approvals, Reports</p>
+                </div>
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">8</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Faculty</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Schedule View</p>
+                </div>
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">45</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">HOD</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Dept. Management</p>
+                </div>
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">5</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* System Configuration & Analytics */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title text-base sm:text-lg">Recent Audit Trail</h3>
-              <p className="card-description">Critical system actions</p>
-            </div>
-            <div className="space-y-2">
-              {[
-                { action: 'Timetable Approved', user: 'priya.patel@sih28.edu', time: '2 min ago', type: 'success' },
-                { action: 'User Role Changed', user: 'harsh.sharma@sih28.edu', time: '15 min ago', type: 'warning' },
-                { action: 'Course Updated', user: 'rajesh.kumar@sih28.edu', time: '1h ago', type: 'info' },
-                { action: 'Login Failed', user: 'unknown', time: '2h ago', type: 'error' }
-              ].map((log, index) => (
-                <div key={index} className="flex items-center gap-2 p-3 bg-slate-500/10 backdrop-blur-sm rounded-lg text-sm border border-slate-600/30">
-                  <div className={`w-2 h-2 rounded-full shadow-lg ${
-                    log.type === 'success' ? 'bg-emerald-400 shadow-emerald-500/50' :
-                    log.type === 'warning' ? 'bg-amber-400 shadow-amber-500/50' :
-                    log.type === 'error' ? 'bg-red-400 shadow-red-500/50' : 'bg-blue-400 shadow-blue-500/50'
-                  }`}></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate text-white">{log.action}</p>
-                    <p className="text-slate-300 truncate text-xs">{log.user}</p>
-                  </div>
-                  <span className="text-slate-400 text-xs flex-shrink-0">{log.time}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title text-base sm:text-lg">Role Management</h3>
-              <p className="card-description">Permission control</p>
-            </div>
-            <div className="space-y-2">
-              {[
-                { role: 'Admin', users: 3, permissions: 'All Access' },
-                { role: 'Staff', users: 8, permissions: 'Approvals, Reports' },
-                { role: 'Faculty', users: 45, permissions: 'Schedule View' },
-                { role: 'HOD', users: 5, permissions: 'Dept. Management' }
-              ].map((role, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-slate-500/10 backdrop-blur-sm rounded-lg border border-slate-600/30">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white">{role.role}</p>
-                    <p className="text-xs text-slate-300 truncate">{role.permissions}</p>
-                  </div>
-                  <span className="text-sm font-medium text-white">{role.users}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-header">
-              <h3 className="card-title text-base sm:text-lg">System Configuration</h3>
+              <h3 className="card-title">System Configuration</h3>
               <p className="card-description">Global settings</p>
             </div>
-            <div className="space-y-2">
-              <div className="p-3 bg-slate-500/10 backdrop-blur-sm rounded-lg border border-slate-600/30">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-white">Academic Year</span>
-                  <button className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Edit</button>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Academic Year</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">2024-25</p>
                 </div>
-                <p className="text-xs text-slate-300">2024-25</p>
+                <button className="text-xs text-[#1a73e8] dark:text-[#FF0000] hover:underline">Edit</button>
               </div>
-              <div className="p-3 bg-slate-500/10 backdrop-blur-sm rounded-lg border border-slate-600/30">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-white">Semester Dates</span>
-                  <button className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Edit</button>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Semester Dates</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Jul 1 - Dec 15</p>
                 </div>
-                <p className="text-xs text-slate-300">Jul 1 - Dec 15</p>
+                <button className="text-xs text-[#1a73e8] dark:text-[#FF0000] hover:underline">Edit</button>
               </div>
-              <div className="p-3 bg-slate-500/10 backdrop-blur-sm rounded-lg border border-slate-600/30">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-white">Holiday List</span>
-                  <button className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">Edit</button>
+              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Holiday List</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">15 holidays configured</p>
                 </div>
-                <p className="text-xs text-slate-300">15 holidays configured</p>
+                <button className="text-xs text-[#1a73e8] dark:text-[#FF0000] hover:underline">Edit</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Utilization Reports</h3>
+              <p className="card-description">Resource usage analytics</p>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400 font-medium">Classroom Usage</span>
+                <span className="font-semibold text-[#34a853]">87%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="bg-[#34a853] h-2 rounded-full transition-all duration-300" style={{width: '87%'}}></div>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400 font-medium">Faculty Load</span>
+                <span className="font-semibold text-[#fbbc05]">73%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="bg-[#fbbc05] h-2 rounded-full transition-all duration-300" style={{width: '73%'}}></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Conflict Detection</h3>
+              <p className="card-description">AI-powered conflict analysis</p>
+            </div>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">3 Schedule conflicts</span>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">5 Room overlaps</span>
+              </div>
+              <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">12 Resolved today</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <QuickActions />
+        {/* System Notifications */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">System Notifications</h3>
+            <p className="card-description">Alerts and announcements</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-l-yellow-500 rounded-lg">
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">AI Engine Update</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Optimization algorithm improved by 15%</p>
+            </div>
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500 rounded-lg">
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">New Faculty Added</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">3 new faculty members registered</p>
+            </div>
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 border-l-4 border-l-green-500 rounded-lg">
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Backup Complete</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Daily system backup successful</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Strategic Actions */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Strategic Actions</h3>
+            <p className="card-description">Administrative control center</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
+            <button className="btn-primary flex flex-col items-center gap-2 p-4">
+              <span className="text-2xl">👤</span>
+              <span className="text-xs sm:text-sm font-medium">Add User</span>
+            </button>
+            <button className="btn-secondary flex flex-col items-center gap-2 p-4">
+              <span className="text-2xl">🔐</span>
+              <span className="text-xs sm:text-sm font-medium">Roles</span>
+            </button>
+            <button className="btn-secondary flex flex-col items-center gap-2 p-4">
+              <span className="text-2xl">📊</span>
+              <span className="text-xs sm:text-sm font-medium">Audit</span>
+            </button>
+            <button className="btn-secondary flex flex-col items-center gap-2 p-4">
+              <span className="text-2xl">⚙️</span>
+              <span className="text-xs sm:text-sm font-medium">Config</span>
+            </button>
+            <button className="btn-secondary flex flex-col items-center gap-2 p-4">
+              <span className="text-2xl">💾</span>
+              <span className="text-xs sm:text-sm font-medium">Backup</span>
+            </button>
+            <button className="btn-secondary flex flex-col items-center gap-2 p-4">
+              <span className="text-2xl">📈</span>
+              <span className="text-xs sm:text-sm font-medium">Reports</span>
+            </button>
+          </div>
+        </div>
+
+
       </div>
     </DashboardLayout>
   )

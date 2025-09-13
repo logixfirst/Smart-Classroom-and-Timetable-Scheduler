@@ -7,24 +7,24 @@ export default function StudentDashboard() {
     <DashboardLayout role="student">
       <div className="space-y-4 sm:space-y-6">
         {/* Welcome Section */}
-        <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-8 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
+        <div className="card">
           <div className="flex flex-col gap-4 sm:gap-6">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div className="flex-1">
-                <h2 className="text-lg sm:text-xl lg:text-3xl font-bold text-white">
+                <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">
                   Welcome back, Arjun Singh
                 </h2>
-                <p className="text-sm sm:text-base text-slate-300 mt-2">
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2">
                   Computer Science Engineering • Semester 5 • Roll: CSE21001
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-                <button className="btn-primary text-xs sm:text-sm px-4 py-3 h-10 sm:h-12 shadow-lg shadow-indigo-500/25">
+                <button className="btn-primary btn-primary-light dark:btn-primary-dark text-xs sm:text-sm px-4 py-3">
                   <span className="mr-1 sm:mr-2 text-lg">📅</span>
                   <span className="hidden sm:inline">View Timetable</span>
                   <span className="sm:hidden">Schedule</span>
                 </button>
-                <button className="btn-secondary text-xs sm:text-sm px-4 py-3 h-10 sm:h-12">
+                <button className="btn-secondary text-xs sm:text-sm px-4 py-3">
                   <span className="mr-1 sm:mr-2 text-lg">📚</span>
                   <span className="hidden sm:inline">My Courses</span>
                   <span className="sm:hidden">Courses</span>
@@ -35,9 +35,9 @@ export default function StudentDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
-          <div className="pb-4 border-b border-slate-600/50 mb-4">
-            <h3 className="text-lg lg:text-2xl font-bold text-white">Quick Actions</h3>
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Quick Actions</h3>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 lg:gap-4">
             {[
@@ -50,33 +50,33 @@ export default function StudentDashboard() {
               { icon: '🔍', label: 'Clash Check', sublabel: 'Courses' },
               { icon: '📤', label: 'Export', sublabel: 'Calendar' }
             ].map((action, index) => (
-              <button key={index} className="bg-slate-500/20 hover:bg-slate-500/40 backdrop-blur-sm border border-slate-700 rounded-lg shadow-lg transition-all duration-300 ease-in-out focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-slate-500 flex flex-col items-center justify-center p-3 h-16 sm:h-20">
+              <button key={index} className="btn-secondary flex flex-col items-center justify-center p-3 h-16 sm:h-20 text-xs">
                 <span className="text-lg sm:text-2xl mb-1">{action.icon}</span>
-                <span className="text-xs font-semibold text-white text-center leading-tight">{action.label}</span>
-                <span className="text-xs text-slate-400 text-center hidden sm:block">{action.sublabel}</span>
+                <span className="font-medium text-center leading-tight">{action.label}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 text-center hidden sm:block">{action.sublabel}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Today's Schedule & Course Registration */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
-          <div className="xl:col-span-2 space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
+          <div className="xl:col-span-2 space-y-4 md:space-y-6">
             {/* Today's Classes */}
-            <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
-              <div className="pb-4 border-b border-slate-600/50 mb-4">
+            <div className="card">
+              <div className="card-header">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
-                    <h3 className="text-lg lg:text-2xl font-bold text-white">Today's Classes</h3>
-                    <p className="text-sm text-slate-300 mt-1">Monday, March 18, 2024</p>
+                    <h3 className="card-title">Today's Classes</h3>
+                    <p className="card-description">Monday, March 18, 2024</p>
                   </div>
                   <div className="flex gap-2">
-                    <button className="btn-secondary text-xs px-3 py-2 h-8">
+                    <button className="btn-secondary text-xs px-3 py-2">
                       <span className="mr-1">📅</span>
                       <span className="hidden sm:inline">Calendar View</span>
                       <span className="sm:hidden">Calendar</span>
                     </button>
-                    <button className="btn-secondary text-xs px-3 py-2 h-8">
+                    <button className="btn-secondary text-xs px-3 py-2">
                       <span className="mr-1">📤</span>
                       <span className="hidden sm:inline">Export .ics</span>
                       <span className="sm:hidden">Export</span>
@@ -84,31 +84,31 @@ export default function StudentDashboard() {
                   </div>
                 </div>
               </div>
-              <div className="space-y-2 sm:space-y-3">
+              <div className="space-y-3">
                 {[
                   { time: '09:00 - 10:30', subject: 'Data Structures', code: 'CS301', faculty: 'Dr. Rajesh Kumar', room: 'Lab 1', status: 'upcoming', type: 'Lab' },
                   { time: '11:00 - 12:30', subject: 'Database Systems', code: 'CS302', faculty: 'Prof. Meera Sharma', room: 'Room 205', status: 'current', type: 'Lecture' },
                   { time: '14:00 - 15:30', subject: 'Software Engineering', code: 'CS303', faculty: 'Dr. Vikram Gupta', room: 'Room 301', status: 'upcoming', type: 'Tutorial' },
                 ].map((class_, index) => (
-                  <div key={index} className={`p-3 sm:p-4 rounded-lg border-l-4 backdrop-blur-sm shadow-lg ${
+                  <div key={index} className={`p-3 sm:p-4 rounded-lg border-l-4 ${
                     class_.status === 'current' 
-                      ? 'bg-indigo-500/10 border-indigo-400 shadow-indigo-500/10' 
-                      : 'bg-slate-500/10 border-slate-600 shadow-slate-500/10'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500' 
+                      : 'bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600'
                   }`}>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                          <h4 className="font-semibold text-sm sm:text-base text-white truncate">{class_.subject}</h4>
-                          <span className="text-xs text-slate-400">({class_.code})</span>
+                          <h4 className="font-semibold text-sm sm:text-base text-gray-800 dark:text-gray-200 truncate">{class_.subject}</h4>
+                          <span className="text-xs text-gray-600 dark:text-gray-400">({class_.code})</span>
                           <span className={`badge text-xs ${
                             class_.type === 'Lab' ? 'badge-info' :
                             class_.type === 'Tutorial' ? 'badge-warning' : 'badge-neutral'
                           }`}>{class_.type}</span>
                         </div>
-                        <p className="text-xs sm:text-sm text-slate-300">{class_.faculty} • {class_.room}</p>
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{class_.faculty} • {class_.room}</p>
                       </div>
                       <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2">
-                        <p className="text-xs sm:text-sm font-semibold text-white">{class_.time}</p>
+                        <p className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200">{class_.time}</p>
                         <span className={`badge text-xs ${
                           class_.status === 'current' ? 'badge-success' : 'badge-neutral'
                         }`}>
@@ -126,24 +126,24 @@ export default function StudentDashboard() {
               <div className="card-header">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
-                    <h3 className="card-title text-sm sm:text-base">Current Enrollment</h3>
-                    <p className="card-description text-xs sm:text-sm">Semester 5 • 24 Credits</p>
+                    <h3 className="card-title">Current Enrollment</h3>
+                    <p className="card-description">Semester 5 • 24 Credits</p>
                   </div>
-                  <button className="btn-primary text-xs px-3 py-2 h-8 w-full sm:w-auto">
+                  <button className="btn-primary btn-primary-light dark:btn-primary-dark text-xs px-3 py-2 w-full sm:w-auto">
                     <span className="mr-1">🔍</span>
                     Check Clashes
                   </button>
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm">
-                  <thead>
-                    <tr className="border-b border-neutral-200 dark:border-neutral-700">
-                      <th className="text-left py-2 px-1 sm:px-2 font-medium text-neutral-900 dark:text-neutral-100">Course</th>
-                      <th className="text-left py-2 px-1 sm:px-2 font-medium text-neutral-900 dark:text-neutral-100 hidden sm:table-cell">Code</th>
-                      <th className="text-left py-2 px-1 sm:px-2 font-medium text-neutral-900 dark:text-neutral-100">Credits</th>
-                      <th className="text-left py-2 px-1 sm:px-2 font-medium text-neutral-900 dark:text-neutral-100 hidden md:table-cell">Faculty</th>
-                      <th className="text-left py-2 px-1 sm:px-2 font-medium text-neutral-900 dark:text-neutral-100">Type</th>
+                <table className="table">
+                  <thead className="table-header">
+                    <tr>
+                      <th className="table-header-cell">Course</th>
+                      <th className="table-header-cell hidden sm:table-cell">Code</th>
+                      <th className="table-header-cell">Credits</th>
+                      <th className="table-header-cell hidden md:table-cell">Faculty</th>
+                      <th className="table-header-cell">Type</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -155,12 +155,12 @@ export default function StudentDashboard() {
                       { name: 'Web Development', code: 'CS402', credits: 4, faculty: 'Prof. Suresh Reddy', type: 'Elective' },
                       { name: 'Technical Writing', code: 'EN301', credits: 4, faculty: 'Dr. Kavita Joshi', type: 'General' }
                     ].map((course, index) => (
-                      <tr key={index} className="border-b border-neutral-100 dark:border-neutral-800">
-                        <td className="py-2 px-1 sm:px-2 text-neutral-900 dark:text-neutral-100">{course.name}</td>
-                        <td className="py-2 px-1 sm:px-2 text-neutral-600 dark:text-neutral-400 hidden sm:table-cell">{course.code}</td>
-                        <td className="py-2 px-1 sm:px-2 text-neutral-900 dark:text-neutral-100">{course.credits}</td>
-                        <td className="py-2 px-1 sm:px-2 text-neutral-600 dark:text-neutral-400 hidden md:table-cell">{course.faculty}</td>
-                        <td className="py-2 px-1 sm:px-2">
+                      <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
+                        <td className="table-cell">{course.name}</td>
+                        <td className="table-cell hidden sm:table-cell">{course.code}</td>
+                        <td className="table-cell">{course.credits}</td>
+                        <td className="table-cell hidden md:table-cell">{course.faculty}</td>
+                        <td className="table-cell">
                           <span className={`badge text-xs ${
                             course.type === 'Core' ? 'badge-primary' :
                             course.type === 'Elective' ? 'badge-info' : 'badge-neutral'
@@ -174,30 +174,30 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          <div className="xl:col-span-1 space-y-4 sm:space-y-6">
+          <div className="xl:col-span-1 space-y-4 md:space-y-6">
             {/* Academic Progress */}
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title text-sm sm:text-base">Academic Progress</h3>
+                <h3 className="card-title">Academic Progress</h3>
               </div>
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">Current CGPA</span>
-                    <span className="font-semibold text-sm sm:text-base text-green-600">8.7</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Current CGPA</span>
+                    <span className="font-semibold text-sm sm:text-base text-[#34a853]">8.7</span>
                   </div>
-                  <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-2">
-                    <div className="bg-green-600 h-2 rounded-full transition-all duration-300" style={{ width: '87%' }}></div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div className="bg-[#34a853] h-2 rounded-full transition-all duration-300" style={{ width: '87%' }}></div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-2">
-                  <div className="text-center p-2 sm:p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                    <p className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-neutral-100">6</p>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400">Courses</p>
+                  <div className="text-center p-2 sm:p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200">6</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Courses</p>
                   </div>
-                  <div className="text-center p-2 sm:p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                    <p className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-neutral-100">24</p>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400">Credits</p>
+                  <div className="text-center p-2 sm:p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200">24</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Credits</p>
                   </div>
                 </div>
               </div>

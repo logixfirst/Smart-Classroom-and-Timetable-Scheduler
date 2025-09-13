@@ -24,7 +24,7 @@ export default function AdminLayout({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-[#f9f9f9] dark:bg-[#212121]">
         <div className="loading-spinner w-8 h-8"></div>
       </div>
     )

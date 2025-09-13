@@ -19,31 +19,31 @@ export default function AcademicYearForm() {
       
       <form className="space-y-4">
         <div className="form-group">
-          <label className="block text-sm font-medium text-slate-300">Academic Year</label>
+          <label className="form-label">Academic Year</label>
           <input 
             type="text" 
-            className="input-primary text-sm sm:text-base"
+            className="input-primary"
             value={formData.academicYear}
             onChange={(e) => setFormData({...formData, academicYear: e.target.value})}
           />
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="form-group">
-            <label className="block text-sm font-medium text-slate-300">Semester Start</label>
+            <label className="form-label">Semester Start</label>
             <input 
               type="date" 
-              className="input-primary text-sm sm:text-base"
+              className="input-primary"
               value={formData.semesterStart}
               onChange={(e) => setFormData({...formData, semesterStart: e.target.value})}
             />
           </div>
           
           <div className="form-group">
-            <label className="block text-sm font-medium text-slate-300">Semester End</label>
+            <label className="form-label">Semester End</label>
             <input 
               type="date" 
-              className="input-primary text-sm sm:text-base"
+              className="input-primary"
               value={formData.semesterEnd}
               onChange={(e) => setFormData({...formData, semesterEnd: e.target.value})}
             />
@@ -51,16 +51,16 @@ export default function AcademicYearForm() {
         </div>
         
         <div className="form-group">
-          <label className="block text-sm font-medium text-slate-300">Holiday List</label>
+          <label className="form-label">Holiday List</label>
           <textarea 
-            className="input-primary min-h-16 sm:min-h-20 text-sm sm:text-base"
+            className="input-primary min-h-20"
             placeholder="Enter holidays (one per line)"
             value={formData.holidays}
             onChange={(e) => setFormData({...formData, holidays: e.target.value})}
           />
         </div>
         
-        <button type="submit" className="btn-primary w-full text-sm sm:text-base py-2.5 sm:py-3">
+        <button type="submit" className="btn-primary w-full">
           Save Configuration
         </button>
       </form>

@@ -10,10 +10,10 @@ export default function CoursesPage() {
 
   return (
     <DashboardLayout role="admin">
-      <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 lg:gap-6">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">Course Management</h1>
-          <button className="btn-primary w-full sm:w-auto px-6 py-3 shadow-lg shadow-indigo-500/25">
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">Course Management</h1>
+          <button className="btn-primary btn-primary-light dark:btn-primary-dark w-full sm:w-auto px-6 py-3">
             <span className="mr-2 text-lg">📚</span>
             Add Course
           </button>
@@ -24,7 +24,7 @@ export default function CoursesPage() {
             <h3 className="card-title">Courses</h3>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
               <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400">🔍</span>
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
                 <input 
                   placeholder="Search courses..." 
                   className="input-primary pl-10 w-full" 
@@ -53,21 +53,21 @@ export default function CoursesPage() {
           {/* Mobile Card View */}
           <div className="block sm:hidden space-y-3">
             {courses.map((course) => (
-              <div key={course.id} className="p-4 bg-slate-500/10 backdrop-blur-sm border border-slate-600/30 rounded-xl shadow-lg">
+              <div key={course.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="badge badge-neutral text-xs">{course.code}</span>
-                      <span className="text-xs text-slate-400">{course.credits} credits</span>
+                      <span className="text-xs text-gray-600 dark:text-gray-400">{course.credits} credits</span>
                     </div>
-                    <h4 className="font-semibold text-white text-sm">{course.name}</h4>
-                    <p className="text-xs text-slate-300">{course.department}</p>
+                    <h4 className="font-medium text-sm text-gray-800 dark:text-gray-200">{course.name}</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{course.department}</p>
                   </div>
                   <span className="badge badge-success text-xs ml-2">Sem {course.semester}</span>
                 </div>
                 <div className="flex gap-2">
-                  <button className="bg-slate-500/20 hover:bg-slate-500/40 backdrop-blur-sm border border-slate-700 rounded-lg transition-all duration-300 ease-in-out text-xs px-3 py-1 flex-1 text-white">Edit</button>
-                  <button className="bg-red-500/20 hover:bg-red-500/40 backdrop-blur-sm border border-red-700 rounded-lg transition-all duration-300 ease-in-out text-xs px-3 py-1 flex-1 text-red-400">Delete</button>
+                  <button className="btn-ghost text-xs px-3 py-1 flex-1">Edit</button>
+                  <button className="btn-danger text-xs px-3 py-1 flex-1">Delete</button>
                 </div>
               </div>
             ))}
@@ -75,38 +75,38 @@ export default function CoursesPage() {
           
           {/* Desktop Table View */}
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-neutral-200 dark:border-neutral-700">
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400">Code</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400">Course Name</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400 hidden md:table-cell">Credits</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400 hidden lg:table-cell">Department</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400">Semester</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400">Actions</th>
+            <table className="table">
+              <thead className="table-header">
+                <tr>
+                  <th className="table-header-cell">Code</th>
+                  <th className="table-header-cell">Course Name</th>
+                  <th className="table-header-cell hidden md:table-cell">Credits</th>
+                  <th className="table-header-cell hidden lg:table-cell">Department</th>
+                  <th className="table-header-cell">Semester</th>
+                  <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {courses.map((course) => (
-                  <tr key={course.id} className="border-b border-slate-700/30 hover:bg-slate-500/10 transition-all duration-200">
-                    <td className="p-3 sm:p-4">
-                      <span className="font-semibold text-white">{course.code}</span>
+                  <tr key={course.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
+                    <td className="table-cell">
+                      <span className="font-medium text-gray-800 dark:text-gray-200">{course.code}</span>
                     </td>
-                    <td className="p-3 sm:p-4">
-                      <div className="font-semibold text-white">{course.name}</div>
-                      <div className="text-xs text-slate-400 md:hidden">
+                    <td className="table-cell">
+                      <div className="font-medium text-gray-800 dark:text-gray-200">{course.name}</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 md:hidden">
                         {course.credits} credits • {course.department}
                       </div>
                     </td>
-                    <td className="p-3 sm:p-4 text-slate-300 hidden md:table-cell">{course.credits}</td>
-                    <td className="p-3 sm:p-4 text-slate-300 hidden lg:table-cell">{course.department}</td>
-                    <td className="p-3 sm:p-4">
+                    <td className="table-cell hidden md:table-cell">{course.credits}</td>
+                    <td className="table-cell hidden lg:table-cell">{course.department}</td>
+                    <td className="table-cell">
                       <span className="badge badge-neutral text-xs">Sem {course.semester}</span>
                     </td>
-                    <td className="p-3 sm:p-4">
+                    <td className="table-cell">
                       <div className="flex gap-1 sm:gap-2">
-                        <button className="bg-slate-500/20 hover:bg-slate-500/40 backdrop-blur-sm border border-slate-700 rounded-lg transition-all duration-300 ease-in-out text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2 text-white">Edit</button>
-                        <button className="bg-red-500/20 hover:bg-red-500/40 backdrop-blur-sm border border-red-700 rounded-lg transition-all duration-300 ease-in-out text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2 text-red-400">Del</button>
+                        <button className="btn-ghost text-xs px-2 py-1">Edit</button>
+                        <button className="btn-danger text-xs px-2 py-1">Del</button>
                       </div>
                     </td>
                   </tr>
