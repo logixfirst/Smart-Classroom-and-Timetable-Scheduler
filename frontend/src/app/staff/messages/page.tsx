@@ -14,7 +14,7 @@ export default function MessagesPage() {
     <DashboardLayout role="staff">
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">Inter-Departmental Messages</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-gray-200">Inter-Departmental Messages</h1>
           <button className="btn-primary w-full sm:w-auto text-sm sm:text-base">
             <span className="mr-2">✉️</span>
             New Message
@@ -23,24 +23,24 @@ export default function MessagesPage() {
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           <div className="card p-3 sm:p-4">
-            <h3 className="font-medium text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 mb-2">Unread</h3>
+            <h3 className="font-medium text-xs sm:text-sm text-gray-800 dark:text-gray-200 mb-2">Unread</h3>
             <p className="text-xl sm:text-2xl font-bold text-red-600">2</p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">new messages</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">new messages</p>
           </div>
           <div className="card p-3 sm:p-4">
-            <h3 className="font-medium text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 mb-2">High Priority</h3>
+            <h3 className="font-medium text-xs sm:text-sm text-gray-800 dark:text-gray-200 mb-2">High Priority</h3>
             <p className="text-xl sm:text-2xl font-bold text-orange-600">2</p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">urgent items</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">urgent items</p>
           </div>
           <div className="card p-3 sm:p-4">
-            <h3 className="font-medium text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 mb-2">Today</h3>
+            <h3 className="font-medium text-xs sm:text-sm text-gray-800 dark:text-gray-200 mb-2">Today</h3>
             <p className="text-xl sm:text-2xl font-bold text-blue-600">3</p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">received today</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">received today</p>
           </div>
           <div className="card p-3 sm:p-4">
-            <h3 className="font-medium text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 mb-2">Response Rate</h3>
+            <h3 className="font-medium text-xs sm:text-sm text-gray-800 dark:text-gray-200 mb-2">Response Rate</h3>
             <p className="text-xl sm:text-2xl font-bold text-green-600">94%</p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">avg response</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">avg response</p>
           </div>
         </div>
 
@@ -83,7 +83,7 @@ export default function MessagesPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           {msg.unread && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
-                          <h4 className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100 truncate">{msg.subject}</h4>
+                          <h4 className="font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200 truncate">{msg.subject}</h4>
                           <span className={`badge text-xs ${
                             msg.priority === 'high' ? 'badge-danger' :
                             msg.priority === 'medium' ? 'badge-warning' : 'badge-neutral'
@@ -91,11 +91,11 @@ export default function MessagesPage() {
                             {msg.priority}
                           </span>
                         </div>
-                        <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 mb-1">{msg.from}</p>
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-1">{msg.from}</p>
                       </div>
-                      <span className="text-xs text-neutral-500 dark:text-neutral-400 flex-shrink-0">{msg.time}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">{msg.time}</span>
                     </div>
-                    <p className="text-xs sm:text-sm text-neutral-700 dark:text-neutral-300 mb-3">{msg.message}</p>
+                    <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mb-3">{msg.message}</p>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button className="btn-primary text-xs px-3 py-1.5 flex-1 sm:flex-none">Reply</button>
                       <button className="btn-secondary text-xs px-3 py-1.5 flex-1 sm:flex-none">Forward</button>
@@ -155,19 +155,19 @@ export default function MessagesPage() {
               </div>
               
               <div className="space-y-2">
-                <button className="w-full text-left p-2 sm:p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors">
+                <button className="w-full text-left p-2 sm:p-3 bg-gray-50 dark:bg-[#3c4043] rounded-lg hover:bg-[#f5f5f5] dark:hover:bg-[#5f6368] transition-colors">
                   <div className="flex items-center gap-2">
                     <span className="text-sm">🚨</span>
                     <span className="text-xs sm:text-sm font-medium">Report Conflict</span>
                   </div>
                 </button>
-                <button className="w-full text-left p-2 sm:p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors">
+                <button className="w-full text-left p-2 sm:p-3 bg-gray-50 dark:bg-[#3c4043] rounded-lg hover:bg-[#f5f5f5] dark:hover:bg-[#5f6368] transition-colors">
                   <div className="flex items-center gap-2">
                     <span className="text-sm">🔧</span>
                     <span className="text-xs sm:text-sm font-medium">Maintenance Alert</span>
                   </div>
                 </button>
-                <button className="w-full text-left p-2 sm:p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors">
+                <button className="w-full text-left p-2 sm:p-3 bg-gray-50 dark:bg-[#3c4043] rounded-lg hover:bg-[#f5f5f5] dark:hover:bg-[#5f6368] transition-colors">
                   <div className="flex items-center gap-2">
                     <span className="text-sm">📅</span>
                     <span className="text-xs sm:text-sm font-medium">Schedule Change</span>

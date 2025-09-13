@@ -8,35 +8,39 @@ export default function StaffReports() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100">Reports</h1>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Generate and view system reports</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-gray-200">Reports</h1>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Generate and view system reports</p>
           </div>
-          <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+          <button className="btn-primary w-full sm:w-auto">
+            <span className="mr-2">📈</span>
             Generate Report
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
-            <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">Faculty Utilization</h3>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">Teaching load analysis</p>
-            <button className="w-full px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 rounded-lg transition-colors">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div className="card p-4 sm:p-6">
+            <h3 className="card-title mb-2">Faculty Utilization</h3>
+            <p className="card-description mb-4">Teaching load analysis</p>
+            <button className="btn-ghost w-full">
+              <span className="mr-2">👥</span>
               View Report
             </button>
           </div>
           
-          <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
-            <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">Room Usage</h3>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">Classroom occupancy stats</p>
-            <button className="w-full px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 rounded-lg transition-colors">
+          <div className="card p-4 sm:p-6">
+            <h3 className="card-title mb-2">Room Usage</h3>
+            <p className="card-description mb-4">Classroom occupancy stats</p>
+            <button className="btn-ghost w-full">
+              <span className="mr-2">🏢</span>
               View Report
             </button>
           </div>
           
-          <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
-            <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 mb-2">Attendance</h3>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">Student attendance summary</p>
-            <button className="w-full px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:hover:bg-blue-900/30 rounded-lg transition-colors">
+          <div className="card p-4 sm:p-6">
+            <h3 className="card-title mb-2">Attendance</h3>
+            <p className="card-description mb-4">Student attendance summary</p>
+            <button className="btn-ghost w-full">
+              <span className="mr-2">📅</span>
               View Report
             </button>
           </div>

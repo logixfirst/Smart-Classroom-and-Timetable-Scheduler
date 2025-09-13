@@ -1,6 +1,6 @@
 # SIH28 - Timetable Optimization Platform
 
-A comprehensive timetable optimization platform with AI-powered scheduling, role-based dashboards, and responsive design built for Smart India Hackathon 2028.
+A comprehensive timetable optimization platform with AI-powered scheduling, role-based dashboards, and responsive design.
 
 ## 🚀 Project Overview
 
@@ -404,4 +404,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Backend Developer**: Django, FastAPI, PostgreSQL
 - **AI/ML Engineer**: OR-Tools, Optimization Algorithms
 - **UI/UX Designer**: Responsive Design, User Experience
-git 

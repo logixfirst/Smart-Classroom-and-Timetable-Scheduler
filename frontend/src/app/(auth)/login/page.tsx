@@ -37,35 +37,35 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-neutral-50 dark:bg-neutral-900">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-[#f9f9f9] dark:bg-[#212121]">
       <div className="card w-full max-w-sm sm:max-w-md">
-        <div className="text-center mb-6">
+        <div className="text-center mb-6 lg:mb-8">
           <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-600 rounded-xl flex items-center justify-center text-white font-bold text-lg sm:text-xl shadow-lg">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#1a73e8] dark:bg-[#1a73e8] rounded-xl flex items-center justify-center text-white font-bold text-xl sm:text-2xl shadow-sm">
               S
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">SIH28</h1>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">SIH28</h1>
           </div>
-          <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-2 text-neutral-900 dark:text-neutral-100">Welcome Back</h2>
-          <p className="text-sm sm:text-base text-neutral-600 dark:text-neutral-400">Sign in to your account</p>
+          <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Welcome Back</h2>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Sign in to your account</p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {error && (
-            <div className="p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg text-xs sm:text-sm">
+            <div className="p-3 sm:p-4 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg text-xs sm:text-sm">
               {error}
             </div>
           )}
           
           <div className="form-group">
-            <label htmlFor="username" className="form-label text-sm sm:text-base">
+            <label htmlFor="username" className="form-label">
               Username
             </label>
             <input 
               id="username" 
               type="text" 
               placeholder="Try: admin, staff, faculty, or student"
-              className="input-primary text-sm sm:text-base"
+              className="input-primary"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
@@ -73,14 +73,14 @@ export default function LoginPage() {
           </div>
           
           <div className="form-group">
-            <label htmlFor="password" className="form-label text-sm sm:text-base">
+            <label htmlFor="password" className="form-label">
               Password
             </label>
             <input 
               id="password" 
               type="password" 
               placeholder="Any password"
-              className="input-primary text-sm sm:text-base"
+              className="input-primary"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -89,15 +89,15 @@ export default function LoginPage() {
           
           <button 
             type="submit" 
-            className="btn-primary w-full py-2.5 sm:py-3 text-sm sm:text-base font-medium"
+            className="btn-primary btn-primary-light dark:btn-primary-dark w-full py-3 sm:py-4 text-sm sm:text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isLoading}
           >
             {isLoading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
         
-        <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-neutral-200 dark:border-neutral-700">
-          <p className="text-center text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed">
+        <div className="mt-6 sm:mt-8 pt-6 sm:pt-8 border-t border-gray-200 dark:border-gray-700">
+          <p className="text-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
             Mock Auth: Use "admin", "staff", "faculty", or "student" as username
           </p>
         </div>

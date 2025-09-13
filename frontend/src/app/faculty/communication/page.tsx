@@ -11,7 +11,7 @@ export default function CommunicationPage() {
     <DashboardLayout role="faculty">
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">Communication</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-gray-200">Communication</h1>
           <button className="btn-primary w-full sm:w-auto">
             <span className="mr-2">📢</span>
             New Announcement
@@ -74,8 +74,8 @@ export default function CommunicationPage() {
                 'Exam schedule updated',
                 'Course material uploaded'
               ].map((template, index) => (
-                <button key={index} className="w-full text-left p-2 sm:p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors">
-                  <p className="text-xs sm:text-sm text-neutral-900 dark:text-neutral-100">{template}</p>
+                <button key={index} className="w-full text-left p-2 sm:p-3 bg-gray-50 dark:bg-[#3c4043] rounded-lg hover:bg-[#f5f5f5] dark:hover:bg-[#5f6368] transition-colors">
+                  <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-200">{template}</p>
                 </button>
               ))}
             </div>
@@ -90,11 +90,11 @@ export default function CommunicationPage() {
           
           <div className="space-y-3">
             {announcements.map((announcement) => (
-              <div key={announcement.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-3 sm:p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+              <div key={announcement.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-3 sm:p-4 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100">{announcement.title}</h4>
-                  <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 mt-1">{announcement.message}</p>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-2">
+                  <h4 className="font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200">{announcement.title}</h4>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">{announcement.message}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     To: {announcement.recipients} • {announcement.date}
                   </p>
                 </div>

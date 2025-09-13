@@ -11,7 +11,7 @@ export default function FeedbackPage() {
     <DashboardLayout role="student">
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">Feedback & Suggestions</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-gray-200">Feedback & Suggestions</h1>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
@@ -83,10 +83,10 @@ export default function FeedbackPage() {
               ].map((item, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{item.aspect}</span>
+                    <span className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{item.aspect}</span>
                     <div className="flex gap-0.5 sm:gap-1 flex-shrink-0">
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <button key={star} className={`text-sm sm:text-lg ${star <= item.rating ? 'text-yellow-500' : 'text-neutral-300 dark:text-neutral-600'}`}>
+                        <button key={star} className={`text-sm sm:text-lg ${star <= item.rating ? 'text-yellow-500' : 'text-gray-300 dark:text-gray-600'}`}>
                           ⭐
                         </button>
                       ))}
@@ -110,10 +110,10 @@ export default function FeedbackPage() {
           
           <div className="space-y-3">
             {feedbackHistory.map((feedback) => (
-              <div key={feedback.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+              <div key={feedback.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100">{feedback.subject}</h4>
-                  <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">{feedback.category} • {feedback.date}</p>
+                  <h4 className="font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200">{feedback.subject}</h4>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{feedback.category} • {feedback.date}</p>
                 </div>
                 <div className="flex items-center justify-between sm:justify-end gap-3">
                   <span className={`badge text-xs ${

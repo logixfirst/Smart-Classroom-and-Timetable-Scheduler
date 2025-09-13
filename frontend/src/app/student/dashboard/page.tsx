@@ -11,21 +11,21 @@ export default function StudentDashboard() {
           <div className="flex flex-col gap-4 sm:gap-6">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div className="flex-1">
-                <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold text-neutral-900 dark:text-neutral-100">
-                  Welcome back, Alex Johnson
+                <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">
+                  Welcome back, Arjun Singh
                 </h2>
-                <p className="text-sm sm:text-base text-neutral-600 dark:text-neutral-400 mt-1">
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2">
                   Computer Science Engineering • Semester 5 • Roll: CSE21001
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-                <button className="btn-primary text-xs sm:text-sm px-3 py-2 h-10 sm:h-12">
-                  <span className="mr-1 sm:mr-2">📅</span>
+                <button className="btn-primary text-xs sm:text-sm px-4 py-3">
+                  <span className="mr-1 sm:mr-2 text-lg">📅</span>
                   <span className="hidden sm:inline">View Timetable</span>
                   <span className="sm:hidden">Schedule</span>
                 </button>
-                <button className="btn-secondary text-xs sm:text-sm px-3 py-2 h-10 sm:h-12">
-                  <span className="mr-1 sm:mr-2">📚</span>
+                <button className="btn-secondary text-xs sm:text-sm px-4 py-3">
+                  <span className="mr-1 sm:mr-2 text-lg">📚</span>
                   <span className="hidden sm:inline">My Courses</span>
                   <span className="sm:hidden">Courses</span>
                 </button>
@@ -37,9 +37,9 @@ export default function StudentDashboard() {
         {/* Quick Actions */}
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title text-sm sm:text-base">Quick Actions</h3>
+            <h3 className="card-title">Quick Actions</h3>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 lg:gap-4">
             {[
               { icon: '📅', label: 'Timetable', sublabel: 'View Schedule' },
               { icon: '📝', label: 'Exams', sublabel: 'Schedule' },
@@ -50,33 +50,33 @@ export default function StudentDashboard() {
               { icon: '🔍', label: 'Clash Check', sublabel: 'Courses' },
               { icon: '📤', label: 'Export', sublabel: 'Calendar' }
             ].map((action, index) => (
-              <button key={index} className="flex flex-col items-center justify-center p-3 sm:p-4 bg-neutral-50 dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors h-16 sm:h-20">
-                <span className="text-lg sm:text-xl mb-1">{action.icon}</span>
-                <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100 text-center leading-tight">{action.label}</span>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400 text-center hidden sm:block">{action.sublabel}</span>
+              <button key={index} className="btn-secondary flex flex-col items-center justify-center p-3 h-16 sm:h-20 text-xs">
+                <span className="text-lg sm:text-2xl mb-1">{action.icon}</span>
+                <span className="font-medium text-center leading-tight">{action.label}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 text-center hidden sm:block">{action.sublabel}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Today's Schedule & Course Registration */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
-          <div className="xl:col-span-2 space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
+          <div className="xl:col-span-2 space-y-4 md:space-y-6">
             {/* Today's Classes */}
             <div className="card">
               <div className="card-header">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
-                    <h3 className="card-title text-sm sm:text-base">Today's Classes</h3>
-                    <p className="card-description text-xs sm:text-sm">Monday, March 18, 2024</p>
+                    <h3 className="card-title">Today's Classes</h3>
+                    <p className="card-description">Monday, March 18, 2024</p>
                   </div>
                   <div className="flex gap-2">
-                    <button className="btn-secondary text-xs px-2 py-1 h-8">
+                    <button className="btn-secondary text-xs px-3 py-2">
                       <span className="mr-1">📅</span>
                       <span className="hidden sm:inline">Calendar View</span>
                       <span className="sm:hidden">Calendar</span>
                     </button>
-                    <button className="btn-secondary text-xs px-2 py-1 h-8">
+                    <button className="btn-secondary text-xs px-3 py-2">
                       <span className="mr-1">📤</span>
                       <span className="hidden sm:inline">Export .ics</span>
                       <span className="sm:hidden">Export</span>
@@ -84,31 +84,31 @@ export default function StudentDashboard() {
                   </div>
                 </div>
               </div>
-              <div className="space-y-2 sm:space-y-3">
+              <div className="space-y-3">
                 {[
-                  { time: '09:00 - 10:30', subject: 'Data Structures', code: 'CS301', faculty: 'Dr. Smith', room: 'Lab 1', status: 'upcoming', type: 'Lab' },
-                  { time: '11:00 - 12:30', subject: 'Database Systems', code: 'CS302', faculty: 'Prof. Johnson', room: 'Room 205', status: 'current', type: 'Lecture' },
-                  { time: '14:00 - 15:30', subject: 'Software Engineering', code: 'CS303', faculty: 'Dr. Brown', room: 'Room 301', status: 'upcoming', type: 'Tutorial' },
+                  { time: '09:00 - 10:30', subject: 'Data Structures', code: 'CS301', faculty: 'Dr. Rajesh Kumar', room: 'Lab 1', status: 'upcoming', type: 'Lab' },
+                  { time: '11:00 - 12:30', subject: 'Database Systems', code: 'CS302', faculty: 'Prof. Meera Sharma', room: 'Room 205', status: 'current', type: 'Lecture' },
+                  { time: '14:00 - 15:30', subject: 'Software Engineering', code: 'CS303', faculty: 'Dr. Vikram Gupta', room: 'Room 301', status: 'upcoming', type: 'Tutorial' },
                 ].map((class_, index) => (
                   <div key={index} className={`p-3 sm:p-4 rounded-lg border-l-4 ${
                     class_.status === 'current' 
-                      ? 'bg-primary-50 dark:bg-primary-900/10 border-primary-500' 
-                      : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500' 
+                      : 'bg-gray-50 dark:bg-[#3c4043] border-gray-300 dark:border-gray-600'
                   }`}>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                          <h4 className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100 truncate">{class_.subject}</h4>
-                          <span className="text-xs text-neutral-500 dark:text-neutral-400">({class_.code})</span>
+                          <h4 className="font-semibold text-sm sm:text-base text-gray-800 dark:text-gray-200 truncate">{class_.subject}</h4>
+                          <span className="text-xs text-gray-600 dark:text-gray-400">({class_.code})</span>
                           <span className={`badge text-xs ${
                             class_.type === 'Lab' ? 'badge-info' :
                             class_.type === 'Tutorial' ? 'badge-warning' : 'badge-neutral'
                           }`}>{class_.type}</span>
                         </div>
-                        <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">{class_.faculty} • {class_.room}</p>
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{class_.faculty} • {class_.room}</p>
                       </div>
                       <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2">
-                        <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100">{class_.time}</p>
+                        <p className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200">{class_.time}</p>
                         <span className={`badge text-xs ${
                           class_.status === 'current' ? 'badge-success' : 'badge-neutral'
                         }`}>
@@ -126,41 +126,41 @@ export default function StudentDashboard() {
               <div className="card-header">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
-                    <h3 className="card-title text-sm sm:text-base">Current Enrollment</h3>
-                    <p className="card-description text-xs sm:text-sm">Semester 5 • 24 Credits</p>
+                    <h3 className="card-title">Current Enrollment</h3>
+                    <p className="card-description">Semester 5 • 24 Credits</p>
                   </div>
-                  <button className="btn-primary text-xs px-3 py-2 h-8 w-full sm:w-auto">
+                  <button className="btn-primary text-xs px-3 py-2 w-full sm:w-auto">
                     <span className="mr-1">🔍</span>
                     Check Clashes
                   </button>
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm">
-                  <thead>
-                    <tr className="border-b border-neutral-200 dark:border-neutral-700">
-                      <th className="text-left py-2 px-1 sm:px-2 font-medium text-neutral-900 dark:text-neutral-100">Course</th>
-                      <th className="text-left py-2 px-1 sm:px-2 font-medium text-neutral-900 dark:text-neutral-100 hidden sm:table-cell">Code</th>
-                      <th className="text-left py-2 px-1 sm:px-2 font-medium text-neutral-900 dark:text-neutral-100">Credits</th>
-                      <th className="text-left py-2 px-1 sm:px-2 font-medium text-neutral-900 dark:text-neutral-100 hidden md:table-cell">Faculty</th>
-                      <th className="text-left py-2 px-1 sm:px-2 font-medium text-neutral-900 dark:text-neutral-100">Type</th>
+                <table className="table">
+                  <thead className="table-header">
+                    <tr>
+                      <th className="table-header-cell">Course</th>
+                      <th className="table-header-cell hidden sm:table-cell">Code</th>
+                      <th className="table-header-cell">Credits</th>
+                      <th className="table-header-cell hidden md:table-cell">Faculty</th>
+                      <th className="table-header-cell">Type</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[
-                      { name: 'Data Structures', code: 'CS301', credits: 4, faculty: 'Dr. Smith', type: 'Core' },
-                      { name: 'Database Systems', code: 'CS302', credits: 4, faculty: 'Prof. Johnson', type: 'Core' },
-                      { name: 'Software Engineering', code: 'CS303', credits: 4, faculty: 'Dr. Brown', type: 'Core' },
-                      { name: 'Machine Learning', code: 'CS401', credits: 4, faculty: 'Dr. Wilson', type: 'Elective' },
-                      { name: 'Web Development', code: 'CS402', credits: 4, faculty: 'Prof. Davis', type: 'Elective' },
-                      { name: 'Technical Writing', code: 'EN301', credits: 4, faculty: 'Dr. Miller', type: 'General' }
+                      { name: 'Data Structures', code: 'CS301', credits: 4, faculty: 'Dr. Rajesh Kumar', type: 'Core' },
+                      { name: 'Database Systems', code: 'CS302', credits: 4, faculty: 'Prof. Meera Sharma', type: 'Core' },
+                      { name: 'Software Engineering', code: 'CS303', credits: 4, faculty: 'Dr. Vikram Gupta', type: 'Core' },
+                      { name: 'Machine Learning', code: 'CS401', credits: 4, faculty: 'Dr. Anita Verma', type: 'Elective' },
+                      { name: 'Web Development', code: 'CS402', credits: 4, faculty: 'Prof. Suresh Reddy', type: 'Elective' },
+                      { name: 'Technical Writing', code: 'EN301', credits: 4, faculty: 'Dr. Kavita Joshi', type: 'General' }
                     ].map((course, index) => (
-                      <tr key={index} className="border-b border-neutral-100 dark:border-neutral-800">
-                        <td className="py-2 px-1 sm:px-2 text-neutral-900 dark:text-neutral-100">{course.name}</td>
-                        <td className="py-2 px-1 sm:px-2 text-neutral-600 dark:text-neutral-400 hidden sm:table-cell">{course.code}</td>
-                        <td className="py-2 px-1 sm:px-2 text-neutral-900 dark:text-neutral-100">{course.credits}</td>
-                        <td className="py-2 px-1 sm:px-2 text-neutral-600 dark:text-neutral-400 hidden md:table-cell">{course.faculty}</td>
-                        <td className="py-2 px-1 sm:px-2">
+                      <tr key={index} className="table-row">
+                        <td className="table-cell">{course.name}</td>
+                        <td className="table-cell hidden sm:table-cell">{course.code}</td>
+                        <td className="table-cell">{course.credits}</td>
+                        <td className="table-cell hidden md:table-cell">{course.faculty}</td>
+                        <td className="table-cell">
                           <span className={`badge text-xs ${
                             course.type === 'Core' ? 'badge-primary' :
                             course.type === 'Elective' ? 'badge-info' : 'badge-neutral'
@@ -174,30 +174,30 @@ export default function StudentDashboard() {
             </div>
           </div>
 
-          <div className="xl:col-span-1 space-y-4 sm:space-y-6">
+          <div className="xl:col-span-1 space-y-4 md:space-y-6">
             {/* Academic Progress */}
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title text-sm sm:text-base">Academic Progress</h3>
+                <h3 className="card-title">Academic Progress</h3>
               </div>
               <div className="space-y-4">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">Current CGPA</span>
-                    <span className="font-semibold text-sm sm:text-base text-green-600">8.7</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Current CGPA</span>
+                    <span className="font-semibold text-sm sm:text-base text-[#34a853]">8.7</span>
                   </div>
-                  <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-2">
-                    <div className="bg-green-600 h-2 rounded-full transition-all duration-300" style={{ width: '87%' }}></div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div className="bg-[#34a853] h-2 rounded-full transition-all duration-300" style={{ width: '87%' }}></div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 sm:gap-3 pt-2">
-                  <div className="text-center p-2 sm:p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                    <p className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-neutral-100">6</p>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400">Courses</p>
+                  <div className="text-center p-2 sm:p-3 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
+                    <p className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200">6</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Courses</p>
                   </div>
-                  <div className="text-center p-2 sm:p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                    <p className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-neutral-100">24</p>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400">Credits</p>
+                  <div className="text-center p-2 sm:p-3 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
+                    <p className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200">24</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Credits</p>
                   </div>
                 </div>
               </div>
@@ -218,8 +218,8 @@ export default function StudentDashboard() {
                   <div key={index} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate block">{course.subject}</span>
-                        <span className="text-xs text-neutral-500 dark:text-neutral-400">{course.code} • {course.classes} classes</span>
+                        <span className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 truncate block">{course.subject}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{course.code} • {course.classes} classes</span>
                       </div>
                       <div className="text-right flex-shrink-0">
                         <span className={`text-xs sm:text-sm font-medium ${
@@ -233,7 +233,7 @@ export default function StudentDashboard() {
                         )}
                       </div>
                     </div>
-                    <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-1.5">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
                       <div 
                         className={`h-1.5 rounded-full transition-all duration-300 ${
                           course.attendance >= 90 ? 'bg-green-600' :
@@ -258,15 +258,15 @@ export default function StudentDashboard() {
                   { subject: 'Data Structures', type: 'Quiz', date: 'Mar 28', time: '2:00 PM', room: 'Lab 1' },
                   { subject: 'Software Engineering', type: 'Mid-term', date: 'Apr 2', time: '9:00 AM', room: 'Hall B' }
                 ].map((exam, index) => (
-                  <div key={index} className="p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                  <div key={index} className="p-3 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{exam.subject}</h4>
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400">{exam.type} • {exam.room}</p>
+                        <h4 className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{exam.subject}</h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">{exam.type} • {exam.room}</p>
                       </div>
                       <div className="text-left sm:text-right flex-shrink-0">
-                        <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{exam.date}</p>
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400">{exam.time}</p>
+                        <p className="text-xs font-medium text-gray-800 dark:text-gray-200">{exam.date}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">{exam.time}</p>
                       </div>
                     </div>
                   </div>
@@ -290,7 +290,7 @@ export default function StudentDashboard() {
                 { title: 'Software Requirements Document', subject: 'Software Engineering', code: 'CS303', due: 'March 28, 2024', priority: 'low', submitted: true },
                 { title: 'ML Model Implementation', subject: 'Machine Learning', code: 'CS401', due: 'April 5, 2024', priority: 'medium', submitted: false },
               ].map((assignment, index) => (
-                <div key={index} className="p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                <div key={index} className="p-3 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
                   <div className="flex items-start gap-3">
                     <div className={`w-3 h-3 rounded-full mt-1 flex-shrink-0 ${
                       assignment.submitted ? 'bg-green-500' :
@@ -298,10 +298,10 @@ export default function StudentDashboard() {
                       assignment.priority === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'
                     }`} />
                     <div className="min-w-0 flex-1">
-                      <h4 className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 leading-tight">{assignment.title}</h4>
-                      <p className="text-xs text-neutral-600 dark:text-neutral-400">{assignment.subject} ({assignment.code})</p>
+                      <h4 className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 leading-tight">{assignment.title}</h4>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">{assignment.subject} ({assignment.code})</p>
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mt-2">
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400">Due: {assignment.due}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Due: {assignment.due}</p>
                         <span className={`badge text-xs ${
                           assignment.submitted ? 'badge-success' : 'badge-warning'
                         }`}>
@@ -330,7 +330,7 @@ export default function StudentDashboard() {
                 <div key={index} className={`p-3 rounded-lg border-l-4 ${
                   notification.priority === 'high' ? 'bg-red-50 dark:bg-red-900/10 border-red-500' :
                   notification.priority === 'medium' ? 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-500' :
-                  'bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600'
+                  'bg-gray-50 dark:bg-[#3c4043] border-gray-300 dark:border-gray-600'
                 }`}>
                   <div className="flex items-start gap-3">
                     <div className="text-sm flex-shrink-0">
@@ -340,8 +340,8 @@ export default function StudentDashboard() {
                        notification.type === 'material' ? '📚' : '🎉'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 leading-relaxed">{notification.message}</p>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{notification.time}</p>
+                      <p className="text-xs sm:text-sm text-gray-800 dark:text-gray-200 leading-relaxed">{notification.message}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{notification.time}</p>
                     </div>
                   </div>
                 </div>
@@ -356,20 +356,20 @@ export default function StudentDashboard() {
             <div className="space-y-4">
               {/* Course Materials */}
               <div>
-                <h4 className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">Recent Materials</h4>
+                <h4 className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">Recent Materials</h4>
                 <div className="space-y-2">
                   {[
                     { title: 'Database Normalization Notes', course: 'CS302', type: 'PDF', size: '2.4 MB' },
                     { title: 'Algorithm Complexity Slides', course: 'CS301', type: 'PPT', size: '5.1 MB' },
                     { title: 'Software Testing Guidelines', course: 'CS303', type: 'DOC', size: '1.8 MB' }
                   ].map((material, index) => (
-                    <div key={index} className="flex items-center gap-3 p-2 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                    <div key={index} className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
                       <div className="text-sm flex-shrink-0">
                         {material.type === 'PDF' ? '📝' : material.type === 'PPT' ? '📊' : '📄'}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100 truncate">{material.title}</p>
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400">{material.course} • {material.size}</p>
+                        <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{material.title}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">{material.course} • {material.size}</p>
                       </div>
                       <button className="btn-secondary text-xs px-2 py-1 h-6 flex-shrink-0">
                         Download
@@ -381,7 +381,7 @@ export default function StudentDashboard() {
 
               {/* Anonymous Feedback */}
               <div>
-                <h4 className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">Anonymous Feedback</h4>
+                <h4 className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">Anonymous Feedback</h4>
                 <div className="space-y-2">
                   <button className="w-full p-3 bg-primary-50 dark:bg-primary-900/10 border border-primary-200 dark:border-primary-800 rounded-lg text-left hover:bg-primary-100 dark:hover:bg-primary-900/20 transition-colors">
                     <div className="flex items-center gap-2">
@@ -392,12 +392,12 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                   </button>
-                  <button className="w-full p-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-left hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors">
+                  <button className="w-full p-3 bg-gray-50 dark:bg-[#3c4043] border border-gray-200 dark:border-gray-700 rounded-lg text-left hover:bg-[#f5f5f5] dark:hover:bg-[#5f6368] transition-colors">
                     <div className="flex items-center gap-2">
                       <span className="text-sm">⭐</span>
                       <div>
-                        <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100">Faculty Performance</p>
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400">Rate teaching quality and methods</p>
+                        <p className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200">Faculty Performance</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Rate teaching quality and methods</p>
                       </div>
                     </div>
                   </button>
@@ -422,7 +422,7 @@ export default function StudentDashboard() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div>
-              <h4 className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-3">Current Conflicts</h4>
+              <h4 className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 mb-3">Current Conflicts</h4>
               <div className="space-y-2">
                 <div className="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg">
                   <div className="flex items-start gap-2">
@@ -446,7 +446,7 @@ export default function StudentDashboard() {
               </div>
             </div>
             <div>
-              <h4 className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-3">Alternative Options</h4>
+              <h4 className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 mb-3">Alternative Options</h4>
               <div className="space-y-2">
                 {[
                   { course: 'Web Development', code: 'CS402', section: 'B', time: 'Tuesday 10:00-11:30 AM', available: true },
@@ -455,14 +455,14 @@ export default function StudentDashboard() {
                 ].map((option, index) => (
                   <div key={index} className={`p-2 sm:p-3 rounded-lg border ${
                     option.available 
-                      ? 'bg-neutral-50 dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700' 
-                      : 'bg-neutral-100 dark:bg-neutral-900 border-neutral-300 dark:border-neutral-600 opacity-60'
+                      ? 'bg-gray-50 dark:bg-[#3c4043] border-gray-200 dark:border-gray-700' 
+                      : 'bg-gray-100 dark:bg-[#2a2a2a] border-gray-300 dark:border-gray-600 opacity-60'
                   }`}>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100">{option.course}</p>
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400">{option.code} Section {option.section}</p>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-500">{option.time}</p>
+                        <p className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200">{option.course}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">{option.code} Section {option.section}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{option.time}</p>
                       </div>
                       <span className={`badge text-xs ${
                         option.available ? 'badge-success' : 'badge-neutral'

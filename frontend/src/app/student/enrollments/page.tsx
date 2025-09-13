@@ -3,118 +3,120 @@
 import DashboardLayout from '@/components/dashboard-layout'
 
 export default function StudentEnrollments() {
-  const courses = [
-    { code: 'MATH101', name: 'Calculus I', credits: 3, status: 'Enrolled', grade: 'A-' },
-    { code: 'PHYS201', name: 'Physics II', credits: 4, status: 'Enrolled', grade: 'B+' },
-    { code: 'CHEM101', name: 'General Chemistry', credits: 3, status: 'Enrolled', grade: 'A' },
-    { code: 'ENG102', name: 'English Literature', credits: 2, status: 'Completed', grade: 'A-' },
-  ]
-
   return (
     <DashboardLayout role="student">
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100">Course Enrollments</h1>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Manage your course registrations</p>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200">Course Enrollments</h2>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Manage your course registrations</p>
           </div>
-          <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-            Add Course
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">Total Credits</p>
-                <p className="text-2xl font-bold text-blue-600">12</p>
-              </div>
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-800 rounded-lg flex items-center justify-center">
-                <span className="text-lg">📚</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">Current GPA</p>
-                <p className="text-2xl font-bold text-green-600">3.7</p>
-              </div>
-              <div className="w-10 h-10 bg-green-100 dark:bg-green-800 rounded-lg flex items-center justify-center">
-                <span className="text-lg">⭐</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white dark:bg-neutral-800 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">Completed</p>
-                <p className="text-2xl font-bold text-purple-600">1</p>
-              </div>
-              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-800 rounded-lg flex items-center justify-center">
-                <span className="text-lg">✅</span>
-              </div>
-            </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button className="btn-secondary flex-1 sm:flex-none">
+              <span className="mr-2">🔍</span>
+              Check Clashes
+            </button>
+            <button className="btn-primary flex-1 sm:flex-none">
+              <span className="mr-2">➕</span>
+              Add Course
+            </button>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-          <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700">
-            <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Enrolled Courses</h3>
+        {/* Current Enrollments */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Current Enrollments - Semester 5</h3>
+            <p className="card-description">24 Credits Total</p>
           </div>
-          
-          <div className="block sm:hidden">
-            {courses.map((course, index) => (
-              <div key={index} className="p-4 border-b border-neutral-200 dark:border-neutral-700 last:border-b-0">
-                <div className="flex items-start justify-between mb-2">
-                  <div>
-                    <h4 className="font-medium text-neutral-900 dark:text-neutral-100">{course.code}</h4>
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400">{course.name}</p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-500">{course.credits} credits</p>
-                  </div>
-                  <div className="text-right">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      course.status === 'Enrolled' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200' :
-                      'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200'
-                    }`}>
-                      {course.status}
-                    </span>
-                    <p className="text-sm font-medium mt-1">{course.grade}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-neutral-50 dark:bg-neutral-700">
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead className="table-header">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Course Code</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Course Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Credits</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Grade</th>
+                  <th className="table-header-cell">Course Name</th>
+                  <th className="table-header-cell">Code</th>
+                  <th className="table-header-cell">Faculty</th>
+                  <th className="table-header-cell">Credits</th>
+                  <th className="table-header-cell">Type</th>
+                  <th className="table-header-cell">Status</th>
+                  <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
-                {courses.map((course, index) => (
-                  <tr key={index} className="hover:bg-neutral-50 dark:hover:bg-neutral-700">
-                    <td className="px-4 py-3 text-sm font-medium text-neutral-900 dark:text-neutral-100">{course.code}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">{course.name}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">{course.credits}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        course.status === 'Enrolled' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-200' :
-                        'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200'
+              <tbody>
+                {[
+                  { name: 'Data Structures', code: 'CS301', credits: 4, faculty: 'Dr. Rajesh Kumar', type: 'Core', status: 'Enrolled' },
+                  { name: 'Database Systems', code: 'CS302', credits: 4, faculty: 'Prof. Meera Sharma', type: 'Core', status: 'Enrolled' },
+                  { name: 'Software Engineering', code: 'CS303', credits: 4, faculty: 'Dr. Vikram Gupta', type: 'Core', status: 'Enrolled' },
+                  { name: 'Machine Learning', code: 'CS401', credits: 4, faculty: 'Dr. Anita Verma', type: 'Elective', status: 'Enrolled' },
+                  { name: 'Web Development', code: 'CS402', credits: 4, faculty: 'Prof. Suresh Reddy', type: 'Elective', status: 'Enrolled' },
+                  { name: 'Technical Writing', code: 'EN301', credits: 4, faculty: 'Dr. Kavita Joshi', type: 'General', status: 'Enrolled' }
+                ].map((course, index) => (
+                  <tr key={index} className="table-row">
+                    <td className="table-cell font-medium">{course.name}</td>
+                    <td className="table-cell border-b border-gray-200 dark:border-gray-600">{course.code}</td>
+                    <td className="table-cell border-b border-gray-200 dark:border-gray-600">{course.faculty}</td>
+                    <td className="table-cell">{course.credits}</td>
+                    <td className="table-cell">
+                      <span className={`badge text-xs ${
+                        course.type === 'Core' ? 'badge-success' :
+                        course.type === 'Elective' ? 'badge-warning' : 'badge-neutral'
                       }`}>
-                        {course.status}
+                        {course.type}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm font-medium text-neutral-900 dark:text-neutral-100">{course.grade}</td>
+                    <td className="table-cell">
+                      <span className="badge badge-success text-xs">{course.status}</span>
+                    </td>
+                    <td className="table-cell">
+                      <button className="btn-ghost text-xs px-2 py-1">Drop</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Available Courses */}
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Available Courses</h3>
+            <p className="card-description">Courses you can enroll in</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead className="table-header">
+                <tr>
+                  <th className="table-header-cell">Course Name</th>
+                  <th className="table-header-cell">Code</th>
+                  <th className="table-header-cell">Faculty</th>
+                  <th className="table-header-cell">Credits</th>
+                  <th className="table-header-cell">Type</th>
+                  <th className="table-header-cell">Seats</th>
+                  <th className="table-header-cell">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { name: 'Mobile App Development', code: 'CS403', credits: 4, faculty: 'Prof. Amit Sharma', type: 'Elective', seats: '5/40' },
+                  { name: 'Artificial Intelligence', code: 'CS404', credits: 4, faculty: 'Dr. Neha Gupta', type: 'Elective', seats: '12/40' },
+                  { name: 'Cyber Security', code: 'CS405', credits: 4, faculty: 'Prof. Rohit Verma', type: 'Elective', seats: 'Full' }
+                ].map((course, index) => (
+                  <tr key={index} className="table-row">
+                    <td className="table-cell font-medium">{course.name}</td>
+                    <td className="table-cell border-b border-gray-200 dark:border-gray-600">{course.code}</td>
+                    <td className="table-cell border-b border-gray-200 dark:border-gray-600">{course.faculty}</td>
+                    <td className="table-cell">{course.credits}</td>
+                    <td className="table-cell">
+                      <span className="badge badge-warning text-xs">{course.type}</span>
+                    </td>
+                    <td className="table-cell">{course.seats}</td>
+                    <td className="table-cell">
+                      <button className={`btn-primary text-xs px-2 py-1 ${course.seats === 'Full' ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={course.seats === 'Full'}>
+                        {course.seats === 'Full' ? 'Full' : 'Enroll'}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

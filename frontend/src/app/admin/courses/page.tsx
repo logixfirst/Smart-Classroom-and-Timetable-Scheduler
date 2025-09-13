@@ -10,11 +10,11 @@ export default function CoursesPage() {
 
   return (
     <DashboardLayout role="admin">
-      <div className="space-y-4 sm:space-y-6">
+      <div className="space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">Course Management</h1>
-          <button className="btn-primary w-full sm:w-auto">
-            <span className="mr-2">📚</span>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">Course Management</h1>
+          <button className="btn-primary w-full sm:w-auto px-6 py-3">
+            <span className="mr-2 text-lg">📚</span>
             Add Course
           </button>
         </div>
@@ -24,7 +24,7 @@ export default function CoursesPage() {
             <h3 className="card-title">Courses</h3>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
               <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400">🔍</span>
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
                 <input 
                   placeholder="Search courses..." 
                   className="input-primary pl-10 w-full" 
@@ -53,21 +53,21 @@ export default function CoursesPage() {
           {/* Mobile Card View */}
           <div className="block sm:hidden space-y-3">
             {courses.map((course) => (
-              <div key={course.id} className="p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+              <div key={course.id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="badge badge-neutral text-xs">{course.code}</span>
-                      <span className="text-xs text-neutral-500 dark:text-neutral-400">{course.credits} credits</span>
+                      <span className="text-xs text-gray-600 dark:text-gray-400">{course.credits} credits</span>
                     </div>
-                    <h4 className="font-medium text-neutral-900 dark:text-neutral-100 text-sm">{course.name}</h4>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400">{course.department}</p>
+                    <h4 className="font-medium text-sm text-gray-800 dark:text-gray-200">{course.name}</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{course.department}</p>
                   </div>
                   <span className="badge badge-success text-xs ml-2">Sem {course.semester}</span>
                 </div>
                 <div className="flex gap-2">
                   <button className="btn-ghost text-xs px-3 py-1 flex-1">Edit</button>
-                  <button className="btn-ghost text-xs px-3 py-1 flex-1 text-red-600">Delete</button>
+                  <button className="btn-danger text-xs px-3 py-1 flex-1">Delete</button>
                 </div>
               </div>
             ))}
@@ -75,38 +75,38 @@ export default function CoursesPage() {
           
           {/* Desktop Table View */}
           <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-neutral-200 dark:border-neutral-700">
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400">Code</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400">Course Name</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400 hidden md:table-cell">Credits</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400 hidden lg:table-cell">Department</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400">Semester</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-medium text-neutral-500 dark:text-neutral-400">Actions</th>
+            <table className="table">
+              <thead className="table-header">
+                <tr>
+                  <th className="table-header-cell">Code</th>
+                  <th className="table-header-cell">Course Name</th>
+                  <th className="table-header-cell">Credits</th>
+                  <th className="table-header-cell">Department</th>
+                  <th className="table-header-cell">Semester</th>
+                  <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {courses.map((course) => (
-                  <tr key={course.id} className="border-b border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800">
-                    <td className="p-3 sm:p-4">
-                      <span className="font-medium text-neutral-900 dark:text-neutral-100">{course.code}</span>
+                  <tr key={course.id} className="table-row">
+                    <td className="table-cell">
+                      <span className="font-medium text-gray-800 dark:text-gray-200">{course.code}</span>
                     </td>
-                    <td className="p-3 sm:p-4">
-                      <div className="font-medium text-neutral-900 dark:text-neutral-100">{course.name}</div>
-                      <div className="text-xs text-neutral-500 dark:text-neutral-400 md:hidden">
+                    <td className="table-cell">
+                      <div className="font-medium text-gray-800 dark:text-gray-200">{course.name}</div>
+                      <div className="text-xs text-gray-600 dark:text-gray-400 md:hidden">
                         {course.credits} credits • {course.department}
                       </div>
                     </td>
-                    <td className="p-3 sm:p-4 text-neutral-600 dark:text-neutral-400 hidden md:table-cell">{course.credits}</td>
-                    <td className="p-3 sm:p-4 text-neutral-600 dark:text-neutral-400 hidden lg:table-cell">{course.department}</td>
-                    <td className="p-3 sm:p-4">
+                    <td className="table-cell">{course.credits}</td>
+                    <td className="table-cell">{course.department}</td>
+                    <td className="table-cell">
                       <span className="badge badge-neutral text-xs">Sem {course.semester}</span>
                     </td>
-                    <td className="p-3 sm:p-4">
+                    <td className="table-cell">
                       <div className="flex gap-1 sm:gap-2">
-                        <button className="btn-ghost text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2">Edit</button>
-                        <button className="btn-ghost text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2 text-red-600">Del</button>
+                        <button className="btn-ghost text-xs px-2 py-1">Edit</button>
+                        <button className="btn-danger text-xs px-2 py-1">Del</button>
                       </div>
                     </td>
                   </tr>

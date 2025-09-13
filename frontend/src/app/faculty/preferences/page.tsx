@@ -5,7 +5,7 @@ export default function PreferencesPage() {
     <DashboardLayout role="faculty">
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">Teaching Preferences</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-gray-200">Teaching Preferences</h1>
           <button className="btn-primary w-full sm:w-auto">
             Save Preferences
           </button>
@@ -99,16 +99,16 @@ export default function PreferencesPage() {
           
           <div className="overflow-x-auto">
             <div className="grid grid-cols-7 gap-1 sm:gap-2 text-center min-w-96">
-              <div className="font-medium text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 p-1 sm:p-2">Time</div>
+              <div className="font-medium text-xs sm:text-sm text-gray-800 dark:text-gray-200 p-1 sm:p-2">Time</div>
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="font-medium text-xs sm:text-sm text-neutral-900 dark:text-neutral-100 p-1 sm:p-2">{day}</div>
+                <div key={day} className="font-medium text-xs sm:text-sm text-gray-800 dark:text-gray-200 p-1 sm:p-2">{day}</div>
               ))}
               
               {['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'].map(time => (
                 <div key={time} className="contents">
-                  <div className="p-1 sm:p-2 text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">{time}</div>
+                  <div className="p-1 sm:p-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">{time}</div>
                   {Array.from({length: 6}).map((_, i) => (
-                    <button key={i} className="p-1 sm:p-2 border border-neutral-200 dark:border-neutral-700 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors">
+                    <button key={i} className="p-1 sm:p-2 border border-gray-200 dark:border-gray-700 rounded hover:bg-[#f5f5f5] dark:hover:bg-[#3c4043] transition-colors">
                       <div className="w-3 h-3 sm:w-4 sm:h-4 bg-green-500 rounded mx-auto"></div>
                     </button>
                   ))}

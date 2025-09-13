@@ -3,72 +3,58 @@
 import DashboardLayout from '@/components/dashboard-layout'
 
 export default function StudentTimetable() {
-  const schedule = [
-    { time: '9:00 AM', monday: 'Math 101', tuesday: 'Physics 201', wednesday: 'Math 101', thursday: 'Physics 201', friday: 'Free' },
-    { time: '10:00 AM', monday: 'Chemistry', tuesday: 'Math 101', wednesday: 'Lab', thursday: 'Math 101', friday: 'Physics 201' },
-    { time: '11:00 AM', monday: 'Physics 201', tuesday: 'Free', wednesday: 'Physics 201', thursday: 'Free', friday: 'Chemistry' },
-    { time: '2:00 PM', monday: 'Lab Session', tuesday: 'Chemistry', wednesday: 'Free', thursday: 'Lab Session', friday: 'Free' },
-  ]
-
   return (
     <DashboardLayout role="student">
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100">My Timetable</h1>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Your weekly class schedule</p>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200">My Timetable</h2>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">View your weekly schedule</p>
           </div>
-          <div className="flex gap-2">
-            <button className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button className="btn-secondary flex-1 sm:flex-none">
+              <span className="mr-2">📤</span>
               Export
             </button>
-            <button className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg transition-colors">
-              Print
+            <button className="btn-primary flex-1 sm:flex-none">
+              <span className="mr-2">📅</span>
+              Sync Calendar
             </button>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-neutral-50 dark:bg-neutral-700">
+        {/* Timetable */}
+        <div className="card">
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead className="table-header">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Time</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Monday</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Tuesday</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Wednesday</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Thursday</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase">Friday</th>
+                  <th className="table-header-cell">Time</th>
+                  <th className="table-header-cell">Monday</th>
+                  <th className="table-header-cell">Tuesday</th>
+                  <th className="table-header-cell">Wednesday</th>
+                  <th className="table-header-cell">Thursday</th>
+                  <th className="table-header-cell">Friday</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
-                {schedule.map((slot, index) => (
-                  <tr key={index} className="hover:bg-neutral-50 dark:hover:bg-neutral-700">
-                    <td className="px-4 py-3 text-sm font-medium text-neutral-900 dark:text-neutral-100">{slot.time}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">{slot.monday}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">{slot.tuesday}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">{slot.wednesday}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">{slot.thursday}</td>
-                    <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">{slot.friday}</td>
+              <tbody>
+                {[
+                  { time: '09:00 - 10:30', mon: 'Data Structures\nDr. Rajesh Kumar\nLab 1', tue: '', wed: 'Database Systems\nProf. Meera Sharma\nRoom 205', thu: '', fri: 'Software Engineering\nDr. Vikram Gupta\nRoom 301' },
+                  { time: '11:00 - 12:30', mon: '', tue: 'Machine Learning\nDr. Anita Verma\nLab 2', wed: '', thu: 'Web Development\nProf. Suresh Reddy\nLab 3', fri: '' },
+                  { time: '14:00 - 15:30', mon: 'Technical Writing\nDr. Kavita Joshi\nRoom 101', tue: '', wed: 'Data Structures\nDr. Rajesh Kumar\nRoom 205', thu: '', fri: 'Database Systems\nProf. Meera Sharma\nLab 1' },
+                ].map((row, index) => (
+                  <tr key={index} className="table-row">
+                    <td className="table-cell font-medium">{row.time}</td>
+                    <td className="table-cell">{row.mon && <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs whitespace-pre-line">{row.mon}</div>}</td>
+                    <td className="table-cell">{row.tue && <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded text-xs whitespace-pre-line">{row.tue}</div>}</td>
+                    <td className="table-cell">{row.wed && <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded text-xs whitespace-pre-line">{row.wed}</div>}</td>
+                    <td className="table-cell">{row.thu && <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded text-xs whitespace-pre-line">{row.thu}</div>}</td>
+                    <td className="table-cell">{row.fri && <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded text-xs whitespace-pre-line">{row.fri}</div>}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-
-          <div className="block sm:hidden">
-            {schedule.map((slot, index) => (
-              <div key={index} className="p-4 border-b border-neutral-200 dark:border-neutral-700 last:border-b-0">
-                <h3 className="font-medium text-neutral-900 dark:text-neutral-100 mb-3">{slot.time}</h3>
-                <div className="grid grid-cols-1 gap-2">
-                  <div className="flex justify-between"><span className="text-xs text-neutral-500">Mon:</span><span className="text-sm">{slot.monday}</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-neutral-500">Tue:</span><span className="text-sm">{slot.tuesday}</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-neutral-500">Wed:</span><span className="text-sm">{slot.wednesday}</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-neutral-500">Thu:</span><span className="text-sm">{slot.thursday}</span></div>
-                  <div className="flex justify-between"><span className="text-xs text-neutral-500">Fri:</span><span className="text-sm">{slot.friday}</span></div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
