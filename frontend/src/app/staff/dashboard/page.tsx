@@ -50,65 +50,65 @@ export default function StaffDashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-          <div className="card p-3 sm:p-4 lg:p-6 hover:shadow-md transition-shadow cursor-pointer" onClick={() => window.location.href='/staff/approvals'}>
+        <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-8">
+          <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 hover:shadow-amber-500/10 transition-all duration-300 ease-in-out cursor-pointer" onClick={() => window.location.href='/staff/approvals'}>
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-400">Pending Approvals</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-yellow-600 truncate">12</p>
+                <p className="text-xs sm:text-sm font-medium text-slate-300">Pending Approvals</p>
+                <p className="text-lg sm:text-xl lg:text-4xl font-bold text-white truncate">12</p>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-yellow-100 dark:bg-yellow-800 rounded-xl flex items-center justify-center flex-shrink-0">
-                <span className="text-sm sm:text-base lg:text-lg">📋</span>
+              <div className="w-10 h-10 lg:w-16 lg:h-16 bg-amber-600/30 backdrop-blur-sm border border-amber-500/50 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/25">
+                <span className="text-lg lg:text-3xl">📋</span>
               </div>
             </div>
-            <div className="mt-2 sm:mt-3">
-              <span className="badge badge-warning text-xs">Needs attention</span>
+            <div className="mt-3">
+              <span className="px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-400/50 rounded-full backdrop-blur-sm">Needs attention</span>
             </div>
           </div>
 
-          <div className="card p-3 sm:p-4 lg:p-6 hover:shadow-md transition-shadow">
+          <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 hover:shadow-indigo-500/10 transition-all duration-300 ease-in-out">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-400">Resource Bookings</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-blue-600 truncate">8</p>
+                <p className="text-xs sm:text-sm font-medium text-slate-300">Resource Bookings</p>
+                <p className="text-lg sm:text-xl lg:text-4xl font-bold text-white truncate">8</p>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-blue-100 dark:bg-blue-800 rounded-xl flex items-center justify-center flex-shrink-0">
-                <span className="text-sm sm:text-base lg:text-lg">🏫</span>
+              <div className="w-10 h-10 lg:w-16 lg:h-16 bg-indigo-600/30 backdrop-blur-sm border border-indigo-500/50 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/25">
+                <span className="text-lg lg:text-3xl">🏫</span>
               </div>
             </div>
-            <div className="mt-2 sm:mt-3 flex items-center text-xs sm:text-sm">
-              <span className="text-neutral-600 dark:text-neutral-400">Active bookings</span>
+            <div className="mt-3 flex items-center text-xs sm:text-sm">
+              <span className="text-slate-400">Active bookings</span>
             </div>
           </div>
 
-          <div className="card p-3 sm:p-4 lg:p-6 hover:shadow-md transition-shadow">
+          <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 hover:shadow-orange-500/10 transition-all duration-300 ease-in-out">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-400">Faculty Load</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-600 truncate">85%</p>
+                <p className="text-xs sm:text-sm font-medium text-slate-300">Faculty Load</p>
+                <p className="text-lg sm:text-xl lg:text-4xl font-bold text-white truncate">85%</p>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-orange-100 dark:bg-orange-800 rounded-xl flex items-center justify-center flex-shrink-0">
-                <span className="text-sm sm:text-base lg:text-lg">👥</span>
+              <div className="w-10 h-10 lg:w-16 lg:h-16 bg-orange-600/30 backdrop-blur-sm border border-orange-500/50 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-orange-500/25">
+                <span className="text-lg lg:text-3xl">👥</span>
               </div>
             </div>
-            <div className="mt-2 sm:mt-3">
-              <span className="badge badge-warning text-xs">Average load</span>
+            <div className="mt-3">
+              <span className="px-3 py-1 text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-400/50 rounded-full backdrop-blur-sm">Average load</span>
             </div>
           </div>
 
-          <div className="card p-3 sm:p-4 lg:p-6 hover:shadow-md transition-shadow">
+          <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 hover:shadow-emerald-500/10 transition-all duration-300 ease-in-out">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-400">Messages</p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600 truncate">4</p>
+                <p className="text-xs sm:text-sm font-medium text-slate-300">Messages</p>
+                <p className="text-lg sm:text-xl lg:text-4xl font-bold text-white truncate">4</p>
               </div>
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-green-100 dark:bg-green-800 rounded-xl flex items-center justify-center flex-shrink-0">
-                <span className="text-sm sm:text-base lg:text-lg">💬</span>
+              <div className="w-10 h-10 lg:w-16 lg:h-16 bg-emerald-600/30 backdrop-blur-sm border border-emerald-500/50 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/25">
+                <span className="text-lg lg:text-3xl">💬</span>
               </div>
             </div>
-            <div className="mt-2 sm:mt-3 flex items-center text-xs sm:text-sm">
-              <span className="text-green-600">2 unread</span>
-              <span className="ml-2 text-neutral-600 dark:text-neutral-400">notifications</span>
+            <div className="mt-3 flex items-center text-xs sm:text-sm">
+              <span className="text-emerald-400 font-semibold">2 unread</span>
+              <span className="ml-2 text-slate-400">notifications</span>
             </div>
           </div>
         </div>

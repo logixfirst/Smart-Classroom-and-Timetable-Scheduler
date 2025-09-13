@@ -7,21 +7,21 @@ export default function FacultyDashboard() {
     <DashboardLayout role="faculty">
       <div className="space-y-4 sm:space-y-6">
         {/* Welcome Section */}
-        <div className="card">
+        <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-8 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h2 className="text-lg sm:text-xl font-semibold text-neutral-900 dark:text-neutral-100">
+              <h2 className="text-lg sm:text-xl lg:text-3xl font-bold text-white">
                 Welcome back, Dr. Rajesh Kumar
               </h2>
-              <p className="text-sm sm:text-base text-neutral-600 dark:text-neutral-400 mt-1">
+              <p className="text-sm sm:text-base text-slate-300 mt-2">
                 Computer Science Department • Today's overview
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-              <button className="btn-primary text-sm sm:text-base">
+              <button className="btn-primary text-sm sm:text-base px-6 py-3 shadow-lg shadow-indigo-500/25">
                 📅 View Schedule
               </button>
-              <button className="btn-secondary text-sm sm:text-base">
+              <button className="btn-secondary text-sm sm:text-base px-6 py-3">
                 ⚙️ Preferences
               </button>
             </div>
@@ -29,37 +29,37 @@ export default function FacultyDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-8 gap-2 sm:gap-3">
-          <button className="btn-primary justify-center flex-col h-14 sm:h-16 text-xs">
-            <span className="text-base sm:text-lg mb-1">📅</span>
+        <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-8 gap-3 lg:gap-4">
+          <button className="bg-indigo-600/80 hover:bg-indigo-600 backdrop-blur-sm border border-indigo-500/50 rounded-lg shadow-lg hover:shadow-indigo-500/25 transition-all duration-300 ease-in-out focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500 flex flex-col items-center justify-center h-16 sm:h-20 text-xs font-semibold text-white">
+            <span className="text-lg sm:text-2xl mb-1">📅</span>
             <span>Schedule</span>
           </button>
-          <button className="btn-secondary justify-center flex-col h-14 sm:h-16 text-xs">
-            <span className="text-base sm:text-lg mb-1">👥</span>
+          <button className="btn-secondary justify-center flex-col h-16 sm:h-20 text-xs">
+            <span className="text-lg sm:text-2xl mb-1">👥</span>
             <span>Students</span>
           </button>
-          <button className="btn-secondary justify-center flex-col h-14 sm:h-16 text-xs">
-            <span className="text-base sm:text-lg mb-1">💬</span>
+          <button className="btn-secondary justify-center flex-col h-16 sm:h-20 text-xs">
+            <span className="text-lg sm:text-2xl mb-1">💬</span>
             <span>Announce</span>
           </button>
-          <button className="btn-secondary justify-center flex-col h-14 sm:h-16 text-xs">
-            <span className="text-base sm:text-lg mb-1">🔧</span>
+          <button className="btn-secondary justify-center flex-col h-16 sm:h-20 text-xs">
+            <span className="text-lg sm:text-2xl mb-1">🔧</span>
             <span>Resources</span>
           </button>
-          <button className="btn-secondary justify-center flex-col h-14 sm:h-16 text-xs">
-            <span className="text-base sm:text-lg mb-1">📊</span>
+          <button className="btn-secondary justify-center flex-col h-16 sm:h-20 text-xs">
+            <span className="text-lg sm:text-2xl mb-1">📊</span>
             <span>Analytics</span>
           </button>
-          <button className="btn-secondary justify-center flex-col h-14 sm:h-16 text-xs">
-            <span className="text-base sm:text-lg mb-1">⚙️</span>
+          <button className="btn-secondary justify-center flex-col h-16 sm:h-20 text-xs">
+            <span className="text-lg sm:text-2xl mb-1">⚙️</span>
             <span>Profiles</span>
           </button>
-          <button className="btn-secondary justify-center flex-col h-14 sm:h-16 text-xs">
-            <span className="text-base sm:text-lg mb-1">🔄</span>
+          <button className="btn-secondary justify-center flex-col h-16 sm:h-20 text-xs">
+            <span className="text-lg sm:text-2xl mb-1">🔄</span>
             <span>Swap</span>
           </button>
-          <button className="btn-secondary justify-center flex-col h-14 sm:h-16 text-xs">
-            <span className="text-base sm:text-lg mb-1">🔔</span>
+          <button className="btn-secondary justify-center flex-col h-16 sm:h-20 text-xs">
+            <span className="text-lg sm:text-2xl mb-1">🔔</span>
             <span>Alerts</span>
           </button>
         </div>
@@ -67,19 +67,19 @@ export default function FacultyDashboard() {
         {/* Personal Timetable & Management */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           <div className="lg:col-span-2">
-            <div className="card">
-              <div className="card-header">
+            <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
+              <div className="pb-4 border-b border-slate-600/50 mb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
-                    <h3 className="card-title text-sm sm:text-base">Today's Classes</h3>
-                    <p className="card-description text-xs sm:text-sm">Monday, March 18, 2024</p>
+                    <h3 className="text-lg lg:text-2xl font-bold text-white">Today's Classes</h3>
+                    <p className="text-sm text-slate-300 mt-1">Monday, March 18, 2024</p>
                   </div>
                   <div className="flex gap-2">
-                    <button className="btn-ghost text-xs px-2 py-1">
+                    <button className="bg-slate-500/20 hover:bg-slate-500/40 backdrop-blur-sm border border-slate-700 rounded-lg shadow-lg transition-all duration-300 ease-in-out text-xs px-3 py-2 text-white">
                       <span className="mr-1">📅</span>
                       Sync Calendar
                     </button>
-                    <button className="btn-ghost text-xs px-2 py-1">
+                    <button className="bg-slate-500/20 hover:bg-slate-500/40 backdrop-blur-sm border border-slate-700 rounded-lg shadow-lg transition-all duration-300 ease-in-out text-xs px-3 py-2 text-white">
                       <span className="mr-1">🔄</span>
                       Request Swap
                     </button>
@@ -92,24 +92,24 @@ export default function FacultyDashboard() {
                   { time: '11:00 - 12:30', subject: 'Algorithm Design', room: 'Room 205', students: 38, type: 'lecture' },
                   { time: '14:00 - 15:30', subject: 'Database Systems', room: 'Room 301', students: 42, type: 'lecture' },
                 ].map((class_, index) => (
-                  <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                  <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-slate-500/10 backdrop-blur-sm border border-slate-600/30 rounded-lg shadow-lg">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary-100 dark:bg-primary-900/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                        {class_.type === 'practical' ? '💻' : '📖'}
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-600/30 backdrop-blur-sm border border-indigo-500/50 rounded-lg flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/25">
+                        <span className="text-lg">{class_.type === 'practical' ? '💻' : '📖'}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100">{class_.subject}</h4>
-                        <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">{class_.time} • {class_.room}</p>
+                        <h4 className="font-semibold text-sm sm:text-base text-white">{class_.subject}</h4>
+                        <p className="text-xs sm:text-sm text-slate-300">{class_.time} • {class_.room}</p>
                       </div>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
                       <div className="text-left sm:text-right">
-                        <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100">{class_.students} students</p>
-                        <span className="badge badge-success text-xs">{class_.type}</span>
+                        <p className="text-xs sm:text-sm font-semibold text-white">{class_.students} students</p>
+                        <span className="px-2 py-1 text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/50 rounded-full backdrop-blur-sm">{class_.type}</span>
                       </div>
                       <div className="flex gap-1">
-                        <button className="btn-ghost text-xs px-2 py-1">View</button>
-                        <button className="btn-ghost text-xs px-2 py-1">Edit</button>
+                        <button className="bg-slate-500/20 hover:bg-slate-500/40 backdrop-blur-sm border border-slate-700 rounded-lg transition-all duration-300 ease-in-out text-xs px-2 py-1 text-white">View</button>
+                        <button className="bg-slate-500/20 hover:bg-slate-500/40 backdrop-blur-sm border border-slate-700 rounded-lg transition-all duration-300 ease-in-out text-xs px-2 py-1 text-white">Edit</button>
                       </div>
                     </div>
                   </div>

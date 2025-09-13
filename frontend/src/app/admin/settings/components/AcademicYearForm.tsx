@@ -19,7 +19,7 @@ export default function AcademicYearForm() {
       
       <form className="space-y-4">
         <div className="form-group">
-          <label className="form-label text-sm sm:text-base">Academic Year</label>
+          <label className="block text-sm font-medium text-slate-300">Academic Year</label>
           <input 
             type="text" 
             className="input-primary text-sm sm:text-base"
@@ -30,7 +30,7 @@ export default function AcademicYearForm() {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="form-group">
-            <label className="form-label text-sm sm:text-base">Semester Start</label>
+            <label className="block text-sm font-medium text-slate-300">Semester Start</label>
             <input 
               type="date" 
               className="input-primary text-sm sm:text-base"
@@ -40,7 +40,7 @@ export default function AcademicYearForm() {
           </div>
           
           <div className="form-group">
-            <label className="form-label text-sm sm:text-base">Semester End</label>
+            <label className="block text-sm font-medium text-slate-300">Semester End</label>
             <input 
               type="date" 
               className="input-primary text-sm sm:text-base"
@@ -51,7 +51,7 @@ export default function AcademicYearForm() {
         </div>
         
         <div className="form-group">
-          <label className="form-label text-sm sm:text-base">Holiday List</label>
+          <label className="block text-sm font-medium text-slate-300">Holiday List</label>
           <textarea 
             className="input-primary min-h-16 sm:min-h-20 text-sm sm:text-base"
             placeholder="Enter holidays (one per line)"

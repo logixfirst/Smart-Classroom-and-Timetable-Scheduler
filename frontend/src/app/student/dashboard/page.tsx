@@ -7,25 +7,25 @@ export default function StudentDashboard() {
     <DashboardLayout role="student">
       <div className="space-y-4 sm:space-y-6">
         {/* Welcome Section */}
-        <div className="card">
+        <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-8 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
           <div className="flex flex-col gap-4 sm:gap-6">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div className="flex-1">
-                <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold text-neutral-900 dark:text-neutral-100">
+                <h2 className="text-lg sm:text-xl lg:text-3xl font-bold text-white">
                   Welcome back, Arjun Singh
                 </h2>
-                <p className="text-sm sm:text-base text-neutral-600 dark:text-neutral-400 mt-1">
+                <p className="text-sm sm:text-base text-slate-300 mt-2">
                   Computer Science Engineering • Semester 5 • Roll: CSE21001
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-                <button className="btn-primary text-xs sm:text-sm px-3 py-2 h-10 sm:h-12">
-                  <span className="mr-1 sm:mr-2">📅</span>
+                <button className="btn-primary text-xs sm:text-sm px-4 py-3 h-10 sm:h-12 shadow-lg shadow-indigo-500/25">
+                  <span className="mr-1 sm:mr-2 text-lg">📅</span>
                   <span className="hidden sm:inline">View Timetable</span>
                   <span className="sm:hidden">Schedule</span>
                 </button>
-                <button className="btn-secondary text-xs sm:text-sm px-3 py-2 h-10 sm:h-12">
-                  <span className="mr-1 sm:mr-2">📚</span>
+                <button className="btn-secondary text-xs sm:text-sm px-4 py-3 h-10 sm:h-12">
+                  <span className="mr-1 sm:mr-2 text-lg">📚</span>
                   <span className="hidden sm:inline">My Courses</span>
                   <span className="sm:hidden">Courses</span>
                 </button>
@@ -35,11 +35,11 @@ export default function StudentDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title text-sm sm:text-base">Quick Actions</h3>
+        <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
+          <div className="pb-4 border-b border-slate-600/50 mb-4">
+            <h3 className="text-lg lg:text-2xl font-bold text-white">Quick Actions</h3>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 lg:gap-4">
             {[
               { icon: '📅', label: 'Timetable', sublabel: 'View Schedule' },
               { icon: '📝', label: 'Exams', sublabel: 'Schedule' },
@@ -50,10 +50,10 @@ export default function StudentDashboard() {
               { icon: '🔍', label: 'Clash Check', sublabel: 'Courses' },
               { icon: '📤', label: 'Export', sublabel: 'Calendar' }
             ].map((action, index) => (
-              <button key={index} className="btn-secondary flex-col h-16 sm:h-20">
-                <span className="text-lg sm:text-xl mb-1">{action.icon}</span>
-                <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100 text-center leading-tight">{action.label}</span>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400 text-center hidden sm:block">{action.sublabel}</span>
+              <button key={index} className="bg-slate-500/20 hover:bg-slate-500/40 backdrop-blur-sm border border-slate-700 rounded-lg shadow-lg transition-all duration-300 ease-in-out focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-slate-500 flex flex-col items-center justify-center p-3 h-16 sm:h-20">
+                <span className="text-lg sm:text-2xl mb-1">{action.icon}</span>
+                <span className="text-xs font-semibold text-white text-center leading-tight">{action.label}</span>
+                <span className="text-xs text-slate-400 text-center hidden sm:block">{action.sublabel}</span>
               </button>
             ))}
           </div>
@@ -63,20 +63,20 @@ export default function StudentDashboard() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
           <div className="xl:col-span-2 space-y-4 sm:space-y-6">
             {/* Today's Classes */}
-            <div className="card">
-              <div className="card-header">
+            <div className="bg-black/20 backdrop-blur-lg rounded-2xl p-4 lg:p-6 border border-slate-700/50 shadow-2xl hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
+              <div className="pb-4 border-b border-slate-600/50 mb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
-                    <h3 className="card-title text-sm sm:text-base">Today's Classes</h3>
-                    <p className="card-description text-xs sm:text-sm">Monday, March 18, 2024</p>
+                    <h3 className="text-lg lg:text-2xl font-bold text-white">Today's Classes</h3>
+                    <p className="text-sm text-slate-300 mt-1">Monday, March 18, 2024</p>
                   </div>
                   <div className="flex gap-2">
-                    <button className="btn-secondary text-xs px-2 py-1 h-8">
+                    <button className="btn-secondary text-xs px-3 py-2 h-8">
                       <span className="mr-1">📅</span>
                       <span className="hidden sm:inline">Calendar View</span>
                       <span className="sm:hidden">Calendar</span>
                     </button>
-                    <button className="btn-secondary text-xs px-2 py-1 h-8">
+                    <button className="btn-secondary text-xs px-3 py-2 h-8">
                       <span className="mr-1">📤</span>
                       <span className="hidden sm:inline">Export .ics</span>
                       <span className="sm:hidden">Export</span>
@@ -90,25 +90,25 @@ export default function StudentDashboard() {
                   { time: '11:00 - 12:30', subject: 'Database Systems', code: 'CS302', faculty: 'Prof. Meera Sharma', room: 'Room 205', status: 'current', type: 'Lecture' },
                   { time: '14:00 - 15:30', subject: 'Software Engineering', code: 'CS303', faculty: 'Dr. Vikram Gupta', room: 'Room 301', status: 'upcoming', type: 'Tutorial' },
                 ].map((class_, index) => (
-                  <div key={index} className={`p-3 sm:p-4 rounded-lg border-l-4 ${
+                  <div key={index} className={`p-3 sm:p-4 rounded-lg border-l-4 backdrop-blur-sm shadow-lg ${
                     class_.status === 'current' 
-                      ? 'bg-primary-50 dark:bg-primary-900/10 border-primary-500' 
-                      : 'bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600'
+                      ? 'bg-indigo-500/10 border-indigo-400 shadow-indigo-500/10' 
+                      : 'bg-slate-500/10 border-slate-600 shadow-slate-500/10'
                   }`}>
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                          <h4 className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100 truncate">{class_.subject}</h4>
-                          <span className="text-xs text-neutral-500 dark:text-neutral-400">({class_.code})</span>
+                          <h4 className="font-semibold text-sm sm:text-base text-white truncate">{class_.subject}</h4>
+                          <span className="text-xs text-slate-400">({class_.code})</span>
                           <span className={`badge text-xs ${
                             class_.type === 'Lab' ? 'badge-info' :
                             class_.type === 'Tutorial' ? 'badge-warning' : 'badge-neutral'
                           }`}>{class_.type}</span>
                         </div>
-                        <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">{class_.faculty} • {class_.room}</p>
+                        <p className="text-xs sm:text-sm text-slate-300">{class_.faculty} • {class_.room}</p>
                       </div>
                       <div className="flex items-center justify-between sm:flex-col sm:items-end gap-2">
-                        <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100">{class_.time}</p>
+                        <p className="text-xs sm:text-sm font-semibold text-white">{class_.time}</p>
                         <span className={`badge text-xs ${
                           class_.status === 'current' ? 'badge-success' : 'badge-neutral'
                         }`}>

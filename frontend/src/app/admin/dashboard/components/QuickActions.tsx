@@ -2,33 +2,33 @@ export default function QuickActions() {
   return (
     <div className="card">
       <div className="card-header">
-        <h3 className="card-title">Quick Actions</h3>
-        <p className="card-description">Common administrative tasks</p>
+        <h3 className="card-title">Strategic Actions</h3>
+        <p className="card-description">Administrative control center</p>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-        <button className="btn-primary justify-center flex-col h-16 sm:h-20">
-          <span className="text-lg sm:text-xl mb-1">👤</span>
-          <span className="text-xs sm:text-sm">Add User</span>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <button className="flex flex-col items-center justify-center p-3 h-16 text-xs font-medium text-white bg-indigo-600/50 hover:bg-indigo-600/80 backdrop-blur-sm border border-indigo-500/50 rounded-lg shadow-lg hover:shadow-indigo-500/25 transition-all duration-300">
+          <span className="text-lg mb-1">👤</span>
+          <span>Add User</span>
         </button>
-        <button className="btn-secondary justify-center flex-col h-16 sm:h-20">
-          <span className="text-lg sm:text-xl mb-1">📚</span>
-          <span className="text-xs sm:text-sm">New Course</span>
+        <button className="btn-secondary flex-col h-16">
+          <span className="text-lg mb-1">🔐</span>
+          <span>Roles</span>
         </button>
-        <button className="btn-secondary justify-center flex-col h-16 sm:h-20">
-          <span className="text-lg sm:text-xl mb-1">🏫</span>
-          <span className="text-xs sm:text-sm">Add Room</span>
+        <button className="btn-secondary flex-col h-16">
+          <span className="text-lg mb-1">📊</span>
+          <span>Audit</span>
         </button>
-        <button className="btn-secondary justify-center flex-col h-16 sm:h-20">
-          <span className="text-lg sm:text-xl mb-1">📅</span>
-          <span className="text-xs sm:text-sm">Generate</span>
+        <button className="btn-secondary flex-col h-16">
+          <span className="text-lg mb-1">⚙️</span>
+          <span>Config</span>
         </button>
-        <button className="btn-secondary justify-center flex-col h-16 sm:h-20">
-          <span className="text-lg sm:text-xl mb-1">⚙️</span>
-          <span className="text-xs sm:text-sm">Settings</span>
+        <button className="btn-secondary flex-col h-16">
+          <span className="text-lg mb-1">💾</span>
+          <span>Backup</span>
         </button>
-        <button className="btn-secondary justify-center flex-col h-16 sm:h-20">
-          <span className="text-lg sm:text-xl mb-1">📊</span>
-          <span className="text-xs sm:text-sm">Reports</span>
+        <button className="btn-secondary flex-col h-16">
+          <span className="text-lg mb-1">📈</span>
+          <span>Reports</span>
         </button>
       </div>
     </div>

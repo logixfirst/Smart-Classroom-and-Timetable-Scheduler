@@ -14,14 +14,14 @@ export default function RoleManager() {
       </div>
       <div className="space-y-3">
         {roles.map((role, index) => (
-          <div key={index} className="flex items-center justify-between p-3 sm:p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+          <div key={index} className="flex items-center justify-between p-3 sm:p-4 bg-slate-500/10 backdrop-blur-sm rounded-xl border border-slate-600/30">
             <div className="flex-1 min-w-0">
-              <h4 className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100">{role.name}</h4>
-              <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 truncate">{role.permissions.join(', ')}</p>
+              <h4 className="font-medium text-sm sm:text-base text-white">{role.name}</h4>
+              <p className="text-xs sm:text-sm text-slate-300 truncate">{role.permissions.join(', ')}</p>
             </div>
             <div className="text-right flex-shrink-0">
-              <p className="text-sm sm:text-base font-medium text-neutral-900 dark:text-neutral-100">{role.users}</p>
-              <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">users</p>
+              <p className="text-sm sm:text-base font-medium text-white">{role.users}</p>
+              <p className="text-xs sm:text-sm text-slate-400">users</p>
             </div>
           </div>
         ))}

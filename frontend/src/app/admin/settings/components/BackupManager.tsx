@@ -22,12 +22,12 @@ export default function BackupManager() {
       
       <div className="space-y-3">
         {backups.map((backup, index) => (
-          <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+          <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-slate-500/10 backdrop-blur-sm rounded-xl border border-slate-600/30">
             <div className="flex-1 min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100">{backup.date}</p>
-                  <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">{backup.time} • {backup.size}</p>
+                  <p className="font-medium text-sm sm:text-base text-white">{backup.date}</p>
+                  <p className="text-xs sm:text-sm text-slate-300">{backup.time} • {backup.size}</p>
                 </div>
                 <span className={`badge text-xs self-start sm:self-center ${
                   backup.status === 'Success' ? 'badge-success' : 'badge-danger'

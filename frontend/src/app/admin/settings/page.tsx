@@ -8,7 +8,7 @@ export default function SettingsPage() {
     <DashboardLayout role="admin">
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">System Settings</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">System Settings</h1>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">

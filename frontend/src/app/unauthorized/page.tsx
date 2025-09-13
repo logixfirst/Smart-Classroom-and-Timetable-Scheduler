@@ -13,21 +13,21 @@ export default function UnauthorizedPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="card w-full max-w-md text-center">
-        <div className="mb-6">
-          <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl">🚫</span>
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
+      <div className="bg-black/20 backdrop-blur-xl rounded-3xl shadow-2xl border border-slate-700/50 p-6 sm:p-8 lg:p-10 w-full max-w-md text-center hover:bg-black/30 hover:border-slate-600 transition-all duration-300 ease-in-out">
+        <div className="mb-6 lg:mb-8">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-red-500/20 backdrop-blur-sm border border-red-400/50 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-red-500/25">
+            <span className="text-2xl sm:text-3xl">🚫</span>
           </div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 mb-2">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
             Access Denied
           </h1>
-          <p className="text-neutral-600 dark:text-neutral-400">
+          <p className="text-slate-300 text-sm sm:text-base">
             You don't have permission to access this page.
           </p>
         </div>
         
-        <button onClick={handleLogout} className="btn-primary w-full">
+        <button onClick={handleLogout} className="w-full py-3 sm:py-4 text-sm sm:text-base font-bold text-white bg-indigo-600/80 hover:bg-indigo-600 backdrop-blur-sm border border-indigo-500/50 rounded-xl shadow-lg hover:shadow-indigo-500/25 transition-all duration-300 ease-in-out focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-indigo-500">
           Back to Login
         </button>
       </div>
