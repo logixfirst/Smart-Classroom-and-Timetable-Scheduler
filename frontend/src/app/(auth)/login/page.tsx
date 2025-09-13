@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="card w-full max-w-sm sm:max-w-md">
         <div className="text-center mb-6 lg:mb-8">
           <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#1a73e8] dark:bg-[#FF0000] rounded-xl flex items-center justify-center text-white font-bold text-xl sm:text-2xl shadow-sm">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-[#1a73e8] dark:bg-[#1a73e8] rounded-xl flex items-center justify-center text-white font-bold text-xl sm:text-2xl shadow-sm">
               S
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">SIH28</h1>

@@ -13,7 +13,7 @@ export default function CoursesPage() {
       <div className="space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">Course Management</h1>
-          <button className="btn-primary btn-primary-light dark:btn-primary-dark w-full sm:w-auto px-6 py-3">
+          <button className="btn-primary w-full sm:w-auto px-6 py-3">
             <span className="mr-2 text-lg">📚</span>
             Add Course
           </button>
@@ -53,7 +53,7 @@ export default function CoursesPage() {
           {/* Mobile Card View */}
           <div className="block sm:hidden space-y-3">
             {courses.map((course) => (
-              <div key={course.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div key={course.id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -80,15 +80,15 @@ export default function CoursesPage() {
                 <tr>
                   <th className="table-header-cell">Code</th>
                   <th className="table-header-cell">Course Name</th>
-                  <th className="table-header-cell hidden md:table-cell">Credits</th>
-                  <th className="table-header-cell hidden lg:table-cell">Department</th>
+                  <th className="table-header-cell">Credits</th>
+                  <th className="table-header-cell">Department</th>
                   <th className="table-header-cell">Semester</th>
                   <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {courses.map((course) => (
-                  <tr key={course.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
+                  <tr key={course.id} className="table-row">
                     <td className="table-cell">
                       <span className="font-medium text-gray-800 dark:text-gray-200">{course.code}</span>
                     </td>
@@ -98,8 +98,8 @@ export default function CoursesPage() {
                         {course.credits} credits • {course.department}
                       </div>
                     </td>
-                    <td className="table-cell hidden md:table-cell">{course.credits}</td>
-                    <td className="table-cell hidden lg:table-cell">{course.department}</td>
+                    <td className="table-cell">{course.credits}</td>
+                    <td className="table-cell">{course.department}</td>
                     <td className="table-cell">
                       <span className="badge badge-neutral text-xs">Sem {course.semester}</span>
                     </td>

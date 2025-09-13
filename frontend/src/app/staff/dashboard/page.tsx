@@ -38,7 +38,7 @@ export default function StaffDashboard() {
             <span className="sm:hidden">Tools</span>
           </button>
           <button className="btn-secondary flex flex-col items-center justify-center h-14 sm:h-16 text-xs">
-            <span className="text-base sm:text-lg mb-1">👨🎓</span>
+            <span className="text-base sm:text-lg mb-1">🎓</span>
             <span className="hidden sm:inline">Sections</span>
             <span className="sm:hidden">Batch</span>
           </button>

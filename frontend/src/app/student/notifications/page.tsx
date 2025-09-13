@@ -9,51 +9,53 @@ export default function StudentNotifications() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Notifications</h2>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Stay updated with important announcements</p>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200">Notifications</h2>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Stay updated with important announcements</p>
           </div>
-          <div className="flex gap-2">
-            <button className="btn-secondary">
-              ✅ Mark All Read
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button className="btn-secondary flex-1 sm:flex-none">
+              <span className="mr-2">✅</span>
+              Mark All Read
             </button>
-            <button className="btn-primary">
-              ⚙️ Settings
+            <button className="btn-primary flex-1 sm:flex-none">
+              <span className="mr-2">⚙️</span>
+              Settings
             </button>
           </div>
         </div>
 
         {/* Notification Categories */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="card p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div className="card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Unread</p>
-                <p className="text-2xl font-bold text-red-600">8</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Unread</p>
+                <p className="text-xl sm:text-2xl font-bold text-red-600">8</p>
               </div>
-              <div className="w-10 h-10 bg-red-100 dark:bg-red-800 rounded-lg flex items-center justify-center">
-                🔔
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-100 dark:bg-red-800 rounded-lg flex items-center justify-center">
+                <span className="text-sm sm:text-base">🔔</span>
               </div>
             </div>
           </div>
-          <div className="card p-4">
+          <div className="card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Today</p>
-                <p className="text-2xl font-bold text-blue-600">12</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">Today</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-600">12</p>
               </div>
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-800 rounded-lg flex items-center justify-center">
-                📅
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 dark:bg-blue-800 rounded-lg flex items-center justify-center">
+                <span className="text-sm sm:text-base">📅</span>
               </div>
             </div>
           </div>
-          <div className="card p-4">
+          <div className="card p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">This Week</p>
-                <p className="text-2xl font-bold text-green-600">45</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600 dark:text-gray-400">This Week</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-600">45</p>
               </div>
-              <div className="w-10 h-10 bg-green-100 dark:bg-green-800 rounded-lg flex items-center justify-center">
-                📊
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 dark:bg-green-800 rounded-lg flex items-center justify-center">
+                <span className="text-sm sm:text-base">📊</span>
               </div>
             </div>
           </div>
@@ -118,7 +120,7 @@ export default function StudentNotifications() {
                 notification.type === 'assignment' ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-500' :
                 notification.type === 'event' ? 'bg-purple-50 dark:bg-purple-900/10 border-purple-500' :
                 notification.type === 'material' ? 'bg-green-50 dark:bg-green-900/10 border-green-500' :
-                'bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600'
+                'bg-gray-50 dark:bg-[#3c4043] border-gray-300 dark:border-gray-600'
               } ${!notification.read ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-3 flex-1">
@@ -131,13 +133,13 @@ export default function StudentNotifications() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium text-neutral-900 dark:text-neutral-100">{notification.title}</h4>
+                        <h4 className="font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200">{notification.title}</h4>
                         {!notification.read && (
                           <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                         )}
                       </div>
-                      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">{notification.message}</p>
-                      <div className="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">{notification.message}</p>
+                      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                         <span>From: {notification.from}</span>
                         <span>{notification.time}</span>
                       </div>
@@ -170,10 +172,10 @@ export default function StudentNotifications() {
               { category: 'Material Updates', description: 'New study materials and resources', enabled: true },
               { category: 'Exam Schedules', description: 'Examination timetables and updates', enabled: true }
             ].map((pref, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                <div className="flex-1">
-                  <h4 className="font-medium text-neutral-900 dark:text-neutral-100">{pref.category}</h4>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">{pref.description}</p>
+              <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200">{pref.category}</h4>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{pref.description}</p>
                 </div>
                 <button className={`btn-secondary text-xs px-3 py-1 ${pref.enabled ? 'bg-green-100 text-green-700' : ''}`}>
                   {pref.enabled ? 'On' : 'Off'}

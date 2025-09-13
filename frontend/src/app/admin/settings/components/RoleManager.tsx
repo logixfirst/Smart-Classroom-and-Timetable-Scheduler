@@ -14,7 +14,7 @@ export default function RoleManager() {
       </div>
       <div className="space-y-3">
         {roles.map((role, index) => (
-          <div key={index} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div key={index} className="interactive-element flex items-center justify-between p-4 border border-gray-200 dark:border-[#3c4043]">
             <div className="flex-1 min-w-0">
               <h4 className="font-medium text-gray-800 dark:text-gray-200">{role.name}</h4>
               <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{role.permissions.join(', ')}</p>

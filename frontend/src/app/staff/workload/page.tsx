@@ -12,7 +12,7 @@ export default function WorkloadPage() {
     <DashboardLayout role="staff">
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100">Faculty Workload</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-gray-200">Faculty Workload</h1>
           <button className="btn-primary w-full sm:w-auto">
             <span className="mr-2">📊</span>
             Generate Report
@@ -21,19 +21,19 @@ export default function WorkloadPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
           <div className="card p-3 sm:p-4">
-            <h3 className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100 mb-2">Optimal Load</h3>
+            <h3 className="font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200 mb-2">Optimal Load</h3>
             <p className="text-xl sm:text-2xl font-bold text-green-600">12</p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">faculty members</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">faculty members</p>
           </div>
           <div className="card p-3 sm:p-4">
-            <h3 className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100 mb-2">Overloaded</h3>
+            <h3 className="font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200 mb-2">Overloaded</h3>
             <p className="text-xl sm:text-2xl font-bold text-red-600">3</p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">need redistribution</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">need redistribution</p>
           </div>
           <div className="card p-3 sm:p-4">
-            <h3 className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100 mb-2">Underloaded</h3>
+            <h3 className="font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200 mb-2">Underloaded</h3>
             <p className="text-xl sm:text-2xl font-bold text-yellow-600">2</p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">can take more</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">can take more</p>
           </div>
         </div>
 
@@ -45,11 +45,11 @@ export default function WorkloadPage() {
           
           <div className="space-y-3">
             {faculty.map((member, index) => (
-              <div key={index} className="p-3 sm:p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+              <div key={index} className="p-3 sm:p-4 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm sm:text-base text-neutral-900 dark:text-neutral-100">{member.name}</h4>
-                    <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400">{member.department}</p>
+                    <h4 className="font-medium text-sm sm:text-base text-gray-800 dark:text-gray-200">{member.name}</h4>
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{member.department}</p>
                   </div>
                   <span className={`badge text-xs flex-shrink-0 ${
                     member.status === 'optimal' ? 'badge-success' :
@@ -61,24 +61,24 @@ export default function WorkloadPage() {
                 
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
                   <div>
-                    <p className="text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100">{member.courses}</p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400">Courses</p>
+                    <p className="text-base sm:text-lg font-bold text-gray-800 dark:text-gray-200">{member.courses}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Courses</p>
                   </div>
                   <div>
-                    <p className="text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100">{member.hours}</p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400">Hours/Week</p>
+                    <p className="text-base sm:text-lg font-bold text-gray-800 dark:text-gray-200">{member.hours}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Hours/Week</p>
                   </div>
                   <div>
                     <p className={`text-base sm:text-lg font-bold ${
                       member.load > 100 ? 'text-red-600' :
                       member.load < 70 ? 'text-yellow-600' : 'text-green-600'
                     }`}>{member.load}%</p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400">Load</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Load</p>
                   </div>
                 </div>
                 
                 <div className="mt-3">
-                  <div className="w-full bg-neutral-200 dark:bg-neutral-700 rounded-full h-2">
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                     <div 
                       className={`h-2 rounded-full transition-all duration-300 ${
                         member.load > 100 ? 'bg-red-600' :

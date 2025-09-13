@@ -8,13 +8,13 @@ export default function AdminDashboard() {
       <div className="space-y-4 sm:space-y-6">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="card hover:shadow-lg transition-shadow duration-300">
+          <div className="card">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
                 <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">1,234</p>
               </div>
-              <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#1a73e8] dark:bg-[#FF0000] rounded-xl flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#1a73e8] rounded-xl flex items-center justify-center flex-shrink-0">
                 <span className="text-xl lg:text-2xl text-white">👥</span>
               </div>
             </div>
@@ -24,7 +24,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="card hover:shadow-lg transition-shadow duration-300">
+          <div className="card">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Courses</p>
@@ -40,7 +40,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="card hover:shadow-lg transition-shadow duration-300 cursor-pointer" onClick={() => window.location.href='/admin/approvals'}>
+          <div className="card clickable-card" onClick={() => window.location.href='/admin/approvals'}>
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Approvals</p>
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="card hover:shadow-lg transition-shadow duration-300">
+          <div className="card">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">System Health</p>
@@ -149,28 +149,28 @@ export default function AdminDashboard() {
               <p className="card-description">Critical system actions</p>
             </div>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Timetable Approved</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400 truncate">priya.patel@sih28.edu</p>
                 </div>
                 <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">2 min ago</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">User Role Changed</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400 truncate">harsh.sharma@sih28.edu</p>
                 </div>
                 <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">15 min ago</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Course Updated</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400 truncate">rajesh.kumar@sih28.edu</p>
                 </div>
                 <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">1h ago</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Login Failed</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400 truncate">unknown</p>
@@ -186,28 +186,28 @@ export default function AdminDashboard() {
               <p className="card-description">Permission control</p>
             </div>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Admin</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">All Access</p>
                 </div>
                 <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">3</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Staff</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">Approvals, Reports</p>
                 </div>
                 <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">8</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Faculty</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">Schedule View</p>
                 </div>
                 <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">45</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">HOD</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">Dept. Management</p>
@@ -226,26 +226,26 @@ export default function AdminDashboard() {
               <p className="card-description">Global settings</p>
             </div>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Academic Year</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">2024-25</p>
                 </div>
-                <button className="text-xs text-[#1a73e8] dark:text-[#FF0000] hover:underline">Edit</button>
+                <button className="text-xs text-[#1a73e8] hover:underline">Edit</button>
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Semester Dates</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">Jul 1 - Dec 15</p>
                 </div>
-                <button className="text-xs text-[#1a73e8] dark:text-[#FF0000] hover:underline">Edit</button>
+                <button className="text-xs text-[#1a73e8] hover:underline">Edit</button>
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Holiday List</p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">15 holidays configured</p>
                 </div>
-                <button className="text-xs text-[#1a73e8] dark:text-[#FF0000] hover:underline">Edit</button>
+                <button className="text-xs text-[#1a73e8] hover:underline">Edit</button>
               </div>
             </div>
           </div>

@@ -13,7 +13,7 @@ export default function ClassroomsPage() {
       <div className="space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">Classroom Management</h1>
-          <button className="btn-primary btn-primary-light dark:btn-primary-dark w-full sm:w-auto px-6 py-3">
+          <button className="btn-primary w-full sm:w-auto px-6 py-3">
             <span className="mr-2 text-lg">🏢</span>
             Add Classroom
           </button>
@@ -85,15 +85,15 @@ export default function ClassroomsPage() {
                 <tr>
                   <th className="table-header-cell">Name</th>
                   <th className="table-header-cell">Type</th>
-                  <th className="table-header-cell hidden md:table-cell">Capacity</th>
-                  <th className="table-header-cell hidden lg:table-cell">Location</th>
-                  <th className="table-header-cell hidden xl:table-cell">Equipment</th>
+                  <th className="table-header-cell">Capacity</th>
+                  <th className="table-header-cell">Location</th>
+                  <th className="table-header-cell">Equipment</th>
                   <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {classrooms.map((classroom) => (
-                  <tr key={classroom.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
+                  <tr key={classroom.id} className="table-row">
                     <td className="table-cell">
                       <div className="font-medium text-gray-800 dark:text-gray-200">{classroom.name}</div>
                       <div className="text-xs text-gray-600 dark:text-gray-400 md:hidden">
@@ -103,14 +103,14 @@ export default function ClassroomsPage() {
                     <td className="table-cell">
                       <span className="badge badge-neutral text-xs">{classroom.type}</span>
                     </td>
-                    <td className="table-cell hidden md:table-cell">{classroom.capacity} seats</td>
-                    <td className="table-cell hidden lg:table-cell">
+                    <td className="table-cell">{classroom.capacity} seats</td>
+                    <td className="table-cell">
                       <div className="flex items-center gap-1 text-sm">
                         <span>📍</span>
                         {classroom.building}, Floor {classroom.floor}
                       </div>
                     </td>
-                    <td className="table-cell hidden xl:table-cell">
+                    <td className="table-cell">
                       <div className="flex flex-wrap gap-1">
                         {classroom.equipment.slice(0, 2).map((item, index) => (
                           <span key={index} className="badge badge-neutral text-xs">{item}</span>

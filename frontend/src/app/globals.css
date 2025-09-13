@@ -131,11 +131,15 @@
   }
   
   .table-cell {
-    @apply px-4 py-3 text-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-[#3c4043] hover:bg-gray-50 dark:hover:bg-[#3c4043] transition-colors duration-200;
+    @apply px-4 py-3 text-sm text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-[#3c4043];
+  }
+  
+  .table-row {
+    @apply hover:bg-gray-50 dark:hover:bg-[#3c4043] transition-colors duration-200;
   }
   
   .table-header-cell {
-    @apply px-4 py-3 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider;
+    @apply px-4 py-3 text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-[#5f6368] !important;
   }
   
   /* Form Components */

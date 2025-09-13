@@ -50,7 +50,7 @@ export default function AdminApprovals() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <div className="card hover:shadow-lg transition-shadow duration-300">
+          <div className="card">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Pending</p>
@@ -62,7 +62,7 @@ export default function AdminApprovals() {
             </div>
           </div>
           
-          <div className="card hover:shadow-lg transition-shadow duration-300">
+          <div className="card">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">High Priority</p>
@@ -74,7 +74,7 @@ export default function AdminApprovals() {
             </div>
           </div>
           
-          <div className="card hover:shadow-lg transition-shadow duration-300">
+          <div className="card">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Approved Today</p>
@@ -86,7 +86,7 @@ export default function AdminApprovals() {
             </div>
           </div>
           
-          <div className="card hover:shadow-lg transition-shadow duration-300">
+          <div className="card">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Avg. Response Time</p>
@@ -110,7 +110,7 @@ export default function AdminApprovals() {
           {/* Mobile View */}
           <div className="block sm:hidden space-y-3">
             {pendingApprovals.map((approval) => (
-              <div key={approval.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div key={approval.id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">{approval.type}</h4>
@@ -161,7 +161,7 @@ export default function AdminApprovals() {
               </thead>
               <tbody>
                 {pendingApprovals.map((approval) => (
-                  <tr key={approval.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
+                  <tr key={approval.id} className="table-row">
                     <td className="table-cell">
                       <div className="font-medium text-gray-800 dark:text-gray-200">{approval.type}</div>
                     </td>

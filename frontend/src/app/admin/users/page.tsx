@@ -13,7 +13,7 @@ export default function UsersPage() {
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">User Management</h1>
-          <button className="btn-primary btn-primary-light dark:btn-primary-dark w-full sm:w-auto px-6 py-3">
+          <button className="btn-primary w-full sm:w-auto px-6 py-3">
             <span className="mr-2 text-lg">➕</span>
             Add User
           </button>
@@ -51,7 +51,7 @@ export default function UsersPage() {
           {/* Mobile Card View */}
           <div className="block sm:hidden space-y-3">
             {users.map((user) => (
-              <div key={user.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div key={user.id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">{user.name}</h4>
@@ -79,25 +79,25 @@ export default function UsersPage() {
               <thead className="table-header">
                 <tr>
                   <th className="table-header-cell">Name</th>
-                  <th className="table-header-cell hidden md:table-cell">Email</th>
+                  <th className="table-header-cell">Email</th>
                   <th className="table-header-cell">Role</th>
-                  <th className="table-header-cell hidden lg:table-cell">Department</th>
+                  <th className="table-header-cell">Department</th>
                   <th className="table-header-cell">Status</th>
                   <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
+                  <tr key={user.id} className="table-row">
                     <td className="table-cell">
                       <div className="font-medium text-gray-800 dark:text-gray-200">{user.name}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden">{user.email}</div>
                     </td>
-                    <td className="table-cell hidden md:table-cell">{user.email}</td>
+                    <td className="table-cell">{user.email}</td>
                     <td className="table-cell">
                       <span className="badge badge-neutral text-xs">{user.role}</span>
                     </td>
-                    <td className="table-cell hidden lg:table-cell">{user.department}</td>
+                    <td className="table-cell">{user.department}</td>
                     <td className="table-cell">
                       <span className="badge badge-success text-xs">{user.status}</span>
                     </td>

@@ -18,7 +18,7 @@ export default function FacultyDashboard() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
-              <button className="btn-primary btn-primary-light dark:btn-primary-dark px-6 py-3">
+              <button className="btn-primary px-6 py-3">
                 📅 View Schedule
               </button>
               <button className="btn-secondary px-6 py-3">
@@ -30,7 +30,7 @@ export default function FacultyDashboard() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-8 gap-3 lg:gap-4">
-          <button className="btn-primary btn-primary-light dark:btn-primary-dark flex flex-col items-center justify-center h-16 sm:h-20 text-xs">
+          <button className="btn-primary flex flex-col items-center justify-center h-16 sm:h-20 text-xs">
             <span className="text-lg sm:text-2xl mb-1">📅</span>
             <span>Schedule</span>
           </button>
@@ -92,9 +92,9 @@ export default function FacultyDashboard() {
                   { time: '11:00 - 12:30', subject: 'Algorithm Design', room: 'Room 205', students: 38, type: 'lecture' },
                   { time: '14:00 - 15:30', subject: 'Database Systems', room: 'Room 301', students: 42, type: 'lecture' },
                 ].map((class_, index) => (
-                  <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#1a73e8] dark:bg-[#FF0000] rounded-lg flex items-center justify-center flex-shrink-0">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#1a73e8] dark:bg-[#1a73e8] rounded-lg flex items-center justify-center flex-shrink-0">
                         <span className="text-lg text-white">{class_.type === 'practical' ? '💻' : '📖'}</span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -129,13 +129,13 @@ export default function FacultyDashboard() {
                   { course: 'Algorithm Design', progress: 45, students: 38, materials: 8 },
                   { course: 'Database Systems', progress: 80, students: 42, materials: 15 }
                 ].map((course, index) => (
-                  <div key={index} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div key={index} className="p-3 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium text-sm text-gray-800 dark:text-gray-200">{course.course}</h4>
                       <span className="text-xs text-gray-600 dark:text-gray-400">{course.progress}%</span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mb-2">
-                      <div className="bg-[#1a73e8] dark:bg-[#FF0000] h-1.5 rounded-full transition-all duration-300" style={{width: `${course.progress}%`}}></div>
+                      <div className="bg-[#1a73e8] dark:bg-[#1a73e8] h-1.5 rounded-full transition-all duration-300" style={{width: `${course.progress}%`}}></div>
                     </div>
                     <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
                       <span>{course.students} students</span>
@@ -162,12 +162,12 @@ export default function FacultyDashboard() {
                   </div>
                   <span className="badge badge-success text-xs">Active</span>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-[#3c4043] rounded-lg">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                     <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Research Semester</span>
                   </div>
-                  <button className="text-xs text-[#1a73e8] dark:text-[#FF0000] hover:underline">Apply</button>
+                  <button className="text-xs text-[#1a73e8] dark:text-[#1a73e8] hover:underline">Apply</button>
                 </div>
                 <button className="btn-secondary w-full text-xs py-2">
                   ➕ Create New Profile
@@ -210,7 +210,7 @@ export default function FacultyDashboard() {
                   { type: 'warning', message: 'Room change for Database class', time: '4h ago', priority: 'high' },
                   { type: 'success', message: 'Swap request approved', time: '1d ago', priority: 'normal' },
                 ].map((notification, index) => (
-                  <div key={index} className="flex items-start gap-2 p-2 bg-gray-50 dark:bg-gray-800 rounded text-xs">
+                  <div key={index} className="flex items-start gap-2 p-2 bg-gray-50 dark:bg-[#3c4043] rounded text-xs">
                     <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
                       notification.type === 'success' ? 'bg-green-500' :
                       notification.type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500'

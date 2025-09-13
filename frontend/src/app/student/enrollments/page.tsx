@@ -9,15 +9,17 @@ export default function StudentEnrollments() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Course Enrollments</h2>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1">Manage your course registrations</p>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200">Course Enrollments</h2>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Manage your course registrations</p>
           </div>
-          <div className="flex gap-2">
-            <button className="btn-secondary">
-              🔍 Check Clashes
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <button className="btn-secondary flex-1 sm:flex-none">
+              <span className="mr-2">🔍</span>
+              Check Clashes
             </button>
-            <button className="btn-primary">
-              ➕ Add Course
+            <button className="btn-primary flex-1 sm:flex-none">
+              <span className="mr-2">➕</span>
+              Add Course
             </button>
           </div>
         </div>
@@ -28,35 +30,51 @@ export default function StudentEnrollments() {
             <h3 className="card-title">Current Enrollments - Semester 5</h3>
             <p className="card-description">24 Credits Total</p>
           </div>
-          <div className="space-y-3">
-            {[
-              { name: 'Data Structures', code: 'CS301', credits: 4, faculty: 'Dr. Rajesh Kumar', type: 'Core', status: 'Enrolled' },
-              { name: 'Database Systems', code: 'CS302', credits: 4, faculty: 'Prof. Meera Sharma', type: 'Core', status: 'Enrolled' },
-              { name: 'Software Engineering', code: 'CS303', credits: 4, faculty: 'Dr. Vikram Gupta', type: 'Core', status: 'Enrolled' },
-              { name: 'Machine Learning', code: 'CS401', credits: 4, faculty: 'Dr. Anita Verma', type: 'Elective', status: 'Enrolled' },
-              { name: 'Web Development', code: 'CS402', credits: 4, faculty: 'Prof. Suresh Reddy', type: 'Elective', status: 'Enrolled' },
-              { name: 'Technical Writing', code: 'EN301', credits: 4, faculty: 'Dr. Kavita Joshi', type: 'General', status: 'Enrolled' }
-            ].map((course, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <h4 className="font-medium text-neutral-900 dark:text-neutral-100">{course.name}</h4>
-                    <span className="text-sm text-neutral-500">({course.code})</span>
-                    <span className={`badge ${
-                      course.type === 'Core' ? 'badge-success' :
-                      course.type === 'Elective' ? 'badge-warning' : 'badge-neutral'
-                    }`}>
-                      {course.type}
-                    </span>
-                  </div>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">{course.faculty} • {course.credits} Credits</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="badge badge-success">{course.status}</span>
-                  <button className="btn-ghost text-xs px-2 py-1">Drop</button>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead className="table-header">
+                <tr>
+                  <th className="table-header-cell">Course Name</th>
+                  <th className="table-header-cell">Code</th>
+                  <th className="table-header-cell">Faculty</th>
+                  <th className="table-header-cell">Credits</th>
+                  <th className="table-header-cell">Type</th>
+                  <th className="table-header-cell">Status</th>
+                  <th className="table-header-cell">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { name: 'Data Structures', code: 'CS301', credits: 4, faculty: 'Dr. Rajesh Kumar', type: 'Core', status: 'Enrolled' },
+                  { name: 'Database Systems', code: 'CS302', credits: 4, faculty: 'Prof. Meera Sharma', type: 'Core', status: 'Enrolled' },
+                  { name: 'Software Engineering', code: 'CS303', credits: 4, faculty: 'Dr. Vikram Gupta', type: 'Core', status: 'Enrolled' },
+                  { name: 'Machine Learning', code: 'CS401', credits: 4, faculty: 'Dr. Anita Verma', type: 'Elective', status: 'Enrolled' },
+                  { name: 'Web Development', code: 'CS402', credits: 4, faculty: 'Prof. Suresh Reddy', type: 'Elective', status: 'Enrolled' },
+                  { name: 'Technical Writing', code: 'EN301', credits: 4, faculty: 'Dr. Kavita Joshi', type: 'General', status: 'Enrolled' }
+                ].map((course, index) => (
+                  <tr key={index} className="table-row">
+                    <td className="table-cell font-medium">{course.name}</td>
+                    <td className="table-cell border-b border-gray-200 dark:border-gray-600">{course.code}</td>
+                    <td className="table-cell border-b border-gray-200 dark:border-gray-600">{course.faculty}</td>
+                    <td className="table-cell">{course.credits}</td>
+                    <td className="table-cell">
+                      <span className={`badge text-xs ${
+                        course.type === 'Core' ? 'badge-success' :
+                        course.type === 'Elective' ? 'badge-warning' : 'badge-neutral'
+                      }`}>
+                        {course.type}
+                      </span>
+                    </td>
+                    <td className="table-cell">
+                      <span className="badge badge-success text-xs">{course.status}</span>
+                    </td>
+                    <td className="table-cell">
+                      <button className="btn-ghost text-xs px-2 py-1">Drop</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -66,29 +84,43 @@ export default function StudentEnrollments() {
             <h3 className="card-title">Available Courses</h3>
             <p className="card-description">Courses you can enroll in</p>
           </div>
-          <div className="space-y-3">
-            {[
-              { name: 'Mobile App Development', code: 'CS403', credits: 4, faculty: 'Prof. Amit Sharma', type: 'Elective', seats: '5/40' },
-              { name: 'Artificial Intelligence', code: 'CS404', credits: 4, faculty: 'Dr. Neha Gupta', type: 'Elective', seats: '12/40' },
-              { name: 'Cyber Security', code: 'CS405', credits: 4, faculty: 'Prof. Rohit Verma', type: 'Elective', seats: 'Full' }
-            ].map((course, index) => (
-              <div key={index} className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <h4 className="font-medium text-neutral-900 dark:text-neutral-100">{course.name}</h4>
-                    <span className="text-sm text-neutral-500">({course.code})</span>
-                    <span className="badge badge-warning">{course.type}</span>
-                  </div>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">{course.faculty} • {course.credits} Credits</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-neutral-600 dark:text-neutral-400">Seats: {course.seats}</span>
-                  <button className={`btn-primary text-xs px-2 py-1 ${course.seats === 'Full' ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={course.seats === 'Full'}>
-                    {course.seats === 'Full' ? 'Full' : 'Enroll'}
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead className="table-header">
+                <tr>
+                  <th className="table-header-cell">Course Name</th>
+                  <th className="table-header-cell">Code</th>
+                  <th className="table-header-cell">Faculty</th>
+                  <th className="table-header-cell">Credits</th>
+                  <th className="table-header-cell">Type</th>
+                  <th className="table-header-cell">Seats</th>
+                  <th className="table-header-cell">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { name: 'Mobile App Development', code: 'CS403', credits: 4, faculty: 'Prof. Amit Sharma', type: 'Elective', seats: '5/40' },
+                  { name: 'Artificial Intelligence', code: 'CS404', credits: 4, faculty: 'Dr. Neha Gupta', type: 'Elective', seats: '12/40' },
+                  { name: 'Cyber Security', code: 'CS405', credits: 4, faculty: 'Prof. Rohit Verma', type: 'Elective', seats: 'Full' }
+                ].map((course, index) => (
+                  <tr key={index} className="table-row">
+                    <td className="table-cell font-medium">{course.name}</td>
+                    <td className="table-cell border-b border-gray-200 dark:border-gray-600">{course.code}</td>
+                    <td className="table-cell border-b border-gray-200 dark:border-gray-600">{course.faculty}</td>
+                    <td className="table-cell">{course.credits}</td>
+                    <td className="table-cell">
+                      <span className="badge badge-warning text-xs">{course.type}</span>
+                    </td>
+                    <td className="table-cell">{course.seats}</td>
+                    <td className="table-cell">
+                      <button className={`btn-primary text-xs px-2 py-1 ${course.seats === 'Full' ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={course.seats === 'Full'}>
+                        {course.seats === 'Full' ? 'Full' : 'Enroll'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

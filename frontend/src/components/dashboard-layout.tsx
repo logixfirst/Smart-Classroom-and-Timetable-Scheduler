@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 
@@ -16,6 +16,23 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
   const [showSignOutDialog, setShowSignOutDialog] = useState(false)
   const { theme, setTheme } = useTheme()
   const router = useRouter()
+  const settingsRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setShowSettings(false)
+      }
+    }
+
+    if (showSettings) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showSettings])
 
   const getNavigationItems = () => {
     const baseItems = [
@@ -42,7 +59,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           { name: 'Analytics', href: '/staff/analytics', icon: '📈' },
           { name: 'Messages', href: '/staff/messages', icon: '💬' },
           { name: 'Resources', href: '/staff/resources', icon: '🔧' },
-          { name: 'Sections', href: '/staff/sections', icon: '👨🎓' },
+          { name: 'Sections', href: '/staff/sections', icon: '🎓' },
           { name: 'Workload', href: '/staff/workload', icon: '⚖️' },
         ]
       case 'faculty':
@@ -79,7 +96,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       )}
 
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#2a2a2a] transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-56'} w-56`}>
+      <div className={`fixed inset-y-0 left-0 z-[60] bg-white dark:bg-[#2a2a2a] transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-56'} w-56`}>
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between px-4 py-3 min-h-[60px]">
@@ -94,7 +111,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             ) : (
               <>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#1a73e8] dark:bg-[#FF0000] rounded-lg flex items-center justify-center text-white font-bold shadow-sm">
+                  <div className="w-10 h-10 bg-[#1a73e8] dark:bg-[#1a73e8] rounded-lg flex items-center justify-center text-white font-bold shadow-sm">
                     S
                   </div>
                   <span className="text-xl font-semibold text-gray-800 dark:text-gray-200">SIH28</span>
@@ -102,13 +119,13 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                 <div className="flex gap-2">
                   <button
                     onClick={() => setSidebarCollapsed(true)}
-                    className="hidden lg:block w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center justify-center text-gray-600 dark:text-gray-300"
+                    className="hidden lg:block w-10 h-10 rounded-lg hover:bg-[#f5f5f5] dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center justify-center text-gray-600 dark:text-gray-300"
                   >
                     <span className="text-lg leading-none">←</span>
                   </button>
                   <button
                     onClick={() => setSidebarOpen(false)}
-                    className="lg:hidden w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center justify-center text-gray-600 dark:text-gray-300"
+                    className="lg:hidden w-10 h-10 rounded-lg hover:bg-[#f5f5f5] dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center justify-center text-gray-600 dark:text-gray-300"
                   >
                     <span className="text-lg leading-none">←</span>
                   </button>
@@ -167,7 +184,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
                   setSidebarOpen(true)
                   setSidebarCollapsed(false)
                 }}
-                className="w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3c4043] transition-colors duration-300 lg:hidden flex items-center justify-center text-gray-600 dark:text-gray-300"
+                className="w-10 h-10 rounded-lg hover:bg-[#f5f5f5] dark:hover:bg-[#3c4043] transition-colors duration-300 lg:hidden flex items-center justify-center text-gray-600 dark:text-gray-300"
                 title="Open menu"
               >
                 <span className="text-lg">☰</span>
@@ -179,31 +196,31 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
             </div>
             
             <div className="flex items-center gap-2">
-              <button className="w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center justify-center text-gray-600 dark:text-gray-300">
+              <button className="w-10 h-10 rounded-lg hover:bg-[#f5f5f5] dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center justify-center text-gray-600 dark:text-gray-300">
                 🔔
               </button>
               <button 
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center justify-center text-gray-600 dark:text-gray-300"
+                className="w-10 h-10 rounded-lg hover:bg-[#f5f5f5] dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center justify-center text-gray-600 dark:text-gray-300"
               >
                 {theme === 'dark' ? '☀️' : '🌙'}
               </button>
-              <div className="relative">
+              <div className="relative" ref={settingsRef}>
                 <button 
                   onClick={() => setShowSettings(!showSettings)}
-                  className="w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center justify-center text-gray-600 dark:text-gray-300"
+                  className="w-10 h-10 rounded-lg hover:bg-[#f5f5f5] dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center justify-center text-gray-600 dark:text-gray-300"
                 >
                   ⚙️
                 </button>
                 {showSettings && (
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#2a2a2a] border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-[9999]">
                     <div className="py-1">
-                      <button className="w-full px-4 py-2 text-left text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center gap-2 rounded-lg">
+                      <button className="w-full px-4 py-2 text-left text-sm text-gray-800 dark:text-gray-200 hover:bg-[#f5f5f5] dark:hover:bg-[#3c4043] transition-colors duration-300 flex items-center gap-2 rounded-lg">
                         👤 My Profile
                       </button>
                       <button 
                         onClick={() => { setShowSignOutDialog(true); setShowSettings(false); }}
-                        className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-300 flex items-center gap-2 rounded-lg"
+                        className="w-full px-4 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-[#f5f5f5] dark:hover:bg-red-900/20 transition-colors duration-300 flex items-center gap-2 rounded-lg"
                       >
                         🚪 Sign Out
                       </button>

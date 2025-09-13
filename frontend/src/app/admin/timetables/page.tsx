@@ -133,7 +133,7 @@ export default function TimetablesPage() {
           {/* Mobile Card View */}
           <div className="block sm:hidden space-y-3">
             {timetables.map((timetable) => (
-              <div key={timetable.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div key={timetable.id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">{timetable.name}</h4>
@@ -166,24 +166,24 @@ export default function TimetablesPage() {
               <thead className="table-header">
                 <tr>
                   <th className="table-header-cell">Name</th>
-                  <th className="table-header-cell hidden md:table-cell">Department</th>
-                  <th className="table-header-cell hidden lg:table-cell">Semester</th>
+                  <th className="table-header-cell">Department</th>
+                  <th className="table-header-cell">Semester</th>
                   <th className="table-header-cell">Status</th>
-                  <th className="table-header-cell hidden xl:table-cell">Last Generated</th>
+                  <th className="table-header-cell">Last Generated</th>
                   <th className="table-header-cell">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {timetables.map((timetable) => (
-                  <tr key={timetable.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200">
+                  <tr key={timetable.id} className="table-row">
                     <td className="table-cell">
                       <div className="font-medium text-gray-800 dark:text-gray-200">{timetable.name}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden">
                         {timetable.department} • Sem {timetable.semester}
                       </div>
                     </td>
-                    <td className="table-cell hidden md:table-cell">{timetable.department}</td>
-                    <td className="table-cell hidden lg:table-cell">Semester {timetable.semester}</td>
+                    <td className="table-cell">{timetable.department}</td>
+                    <td className="table-cell">Semester {timetable.semester}</td>
                     <td className="table-cell">
                       <span className={`badge text-xs ${
                         timetable.status === 'Active' ? 'badge-success' :
@@ -192,7 +192,7 @@ export default function TimetablesPage() {
                         {timetable.status}
                       </span>
                     </td>
-                    <td className="table-cell hidden xl:table-cell">{timetable.lastGenerated}</td>
+                    <td className="table-cell">{timetable.lastGenerated}</td>
                     <td className="table-cell">
                       <div className="flex gap-1 sm:gap-2">
                         <button className="btn-ghost text-xs px-2 py-1">📅</button>
