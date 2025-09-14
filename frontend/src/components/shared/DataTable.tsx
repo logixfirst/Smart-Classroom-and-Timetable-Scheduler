@@ -66,7 +66,7 @@ export default function DataTable({
     <div className="space-y-4">
       {searchable && (
         <div className="relative">
-          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400">🔍</span>
+          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500">🔍</span>
           <input
             type="text"
             placeholder="Search..."
@@ -78,14 +78,14 @@ export default function DataTable({
       )}
 
       <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-neutral-200 dark:border-neutral-700">
+        <table className="table">
+          <thead className="table-header">
+            <tr>
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`text-left p-3 text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider ${
-                    column.sortable ? 'cursor-pointer hover:text-neutral-700 dark:hover:text-neutral-300' : ''
+                  className={`table-header-cell ${
+                    column.sortable ? 'cursor-pointer hover:text-gray-700 dark:hover:text-gray-300' : ''
                   }`}
                   onClick={() => column.sortable && handleSort(column.key)}
                 >
@@ -103,9 +103,9 @@ export default function DataTable({
           </thead>
           <tbody>
             {paginatedData.map((item, index) => (
-              <tr key={index} className="border-b border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800">
+              <tr key={index} className="table-row">
                 {columns.map((column) => (
-                  <td key={column.key} className="p-3 text-sm text-neutral-700 dark:text-neutral-300">
+                  <td key={column.key} className="table-cell">
                     {item[column.key]}
                   </td>
                 ))}
@@ -116,11 +116,11 @@ export default function DataTable({
       </div>
 
       {pagination && totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, sortedData.length)} of {sortedData.length} results
           </p>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
@@ -128,7 +128,7 @@ export default function DataTable({
             >
               Previous
             </button>
-            <span className="px-3 py-1 text-sm text-neutral-600 dark:text-neutral-400">
+            <span className="px-3 py-1 text-sm text-gray-600 dark:text-gray-400">
               Page {currentPage} of {totalPages}
             </span>
             <button

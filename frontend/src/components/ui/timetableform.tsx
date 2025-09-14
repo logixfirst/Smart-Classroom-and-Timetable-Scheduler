@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface Classroom {
   id: string
@@ -49,6 +49,33 @@ export default function TimetableForm() {
   const [faculty, setFaculty] = useState<Faculty[]>([])
   const [fixedSlots, setFixedSlots] = useState<FixedSlot[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setFormData({ department: 'cs', semester: '1', academicYear: '2023-24', maxClassesPerDay: 6 })
+        
+        const [classroomsRes, batchesRes, subjectsRes, facultyRes] = await Promise.all([
+          fetch('http://localhost:8000/api/v1/classrooms/'),
+          fetch('http://localhost:8000/api/v1/auth/batches/'),
+          fetch('http://localhost:8000/api/v1/courses/'),
+          fetch('http://localhost:8000/api/v1/auth/faculty/')
+        ])
+        
+        if (classroomsRes.ok) setClassrooms(await classroomsRes.json())
+        if (batchesRes.ok) setBatches(await batchesRes.json())
+        if (subjectsRes.ok) setSubjects(await subjectsRes.json())
+        if (facultyRes.ok) setFaculty(await facultyRes.json())
+        
+      } catch (error) {
+        console.error('Failed to load data:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadData()
+  }, [])
 
   // Classroom functions
   const addClassroom = () => {
@@ -185,7 +212,12 @@ export default function TimetableForm() {
       
       if (result.success) {
         alert(`Generated ${result.options.length} timetable options successfully!`)
-        window.location.href = '/admin/timetables/review'
+        // Redirect to the specific timetable review page
+        if (result.options && result.options.length > 0) {
+          window.location.href = `/admin/timetables/${result.options[0].id}/review`
+        } else {
+          window.location.href = '/admin/timetables'
+        }
       } else {
         alert(`Generation failed: ${result.error}`)
       }
@@ -195,6 +227,17 @@ export default function TimetableForm() {
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="loading-spinner w-8 h-8 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading form data...</p>
+        </div>
+      </div>
+    )
   }
 
   return (

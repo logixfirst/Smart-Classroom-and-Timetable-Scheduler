@@ -10,11 +10,27 @@ class User(AbstractUser):
     ]
     
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
-    employee_id = models.CharField(max_length=50, unique=True, null=True, blank=True)
     department = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=15, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
+    
     def __str__(self):
         return f"{self.username} ({self.role})"
+
+class Faculty(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    employee_id = models.CharField(max_length=50, unique=True)
+    specialization = models.CharField(max_length=100, blank=True)
+    max_hours_per_week = models.IntegerField(default=20)
+    
+    def __str__(self):
+        return f"{self.user.first_name} {self.user.last_name}"
+
+class Batch(models.Model):
+    name = models.CharField(max_length=50)
+    department = models.CharField(max_length=100)
+    semester = models.CharField(max_length=20)
+    strength = models.IntegerField()
+    academic_year = models.CharField(max_length=20)
+    
+    def __str__(self):
+        return f"{self.department} Sem {self.semester} - {self.name}"

@@ -89,7 +89,7 @@ export default function LoginPage() {
           
           <button 
             type="submit" 
-            className="btn-primary btn-primary-light dark:btn-primary-dark w-full py-3 sm:py-4 text-sm sm:text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn-primary w-full py-3 sm:py-4 text-sm sm:text-base font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isLoading}
           >
             {isLoading ? 'Signing In...' : 'Sign In'}

@@ -15,6 +15,9 @@ class TimetableGenerator:
             
         options = []
         for i in range(3):  # Generate 3 options
+            # Use different random seeds for variety
+            random.seed(i * 42 + hash(str(self.request.dict())))
+            
             schedule = self._generate_schedule()
             if schedule:
                 score = self._calculate_score(schedule)
@@ -26,6 +29,8 @@ class TimetableGenerator:
                     conflicts=conflicts
                 ))
         
+        # Reset random seed
+        random.seed()
         return sorted(options, key=lambda x: x.score, reverse=True)
     
     def _validate_constraints(self) -> bool:
@@ -43,26 +48,31 @@ class TimetableGenerator:
     def _generate_schedule(self) -> List[TimeSlot]:
         schedule = []
         
+        # Limit time slots based on maxClassesPerDay
+        available_times = self.time_slots[:self.request.maxClassesPerDay]
+        
         # Place fixed slots first
         for fixed in self.request.fixedSlots:
-            schedule.append(TimeSlot(
-                day=fixed.day,
-                time=fixed.timeSlot,
-                subject=fixed.subject,
-                faculty=fixed.faculty,
-                classroom=self._get_available_classroom(schedule, fixed.day, fixed.timeSlot),
-                batch=self.request.batches[0].name if self.request.batches else "Default"
-            ))
+            classroom = self._get_available_classroom(schedule, fixed.day, fixed.timeSlot)
+            if classroom:
+                schedule.append(TimeSlot(
+                    day=fixed.day,
+                    time=fixed.timeSlot,
+                    subject=fixed.subject,
+                    faculty=fixed.faculty,
+                    classroom=classroom,
+                    batch=self.request.batches[0].name if self.request.batches else "Default"
+                ))
         
-        # Generate remaining schedule using genetic algorithm approach
+        # Generate remaining schedule
         for batch in self.request.batches:
             for subject in self.request.subjects:
                 classes_scheduled = 0
                 attempts = 0
                 
-                while classes_scheduled < subject.classesPerWeek and attempts < 100:
+                while classes_scheduled < subject.classesPerWeek and attempts < 200:
                     day = random.choice(self.days)
-                    time = random.choice(self.time_slots)
+                    time = random.choice(available_times)  # Use limited time slots
                     
                     if self._is_slot_available(schedule, day, time, batch.name):
                         faculty = self._assign_faculty(schedule, day, time)
@@ -92,6 +102,11 @@ class TimetableGenerator:
         # Check max classes per day constraint
         day_classes = [s for s in schedule if s.day == day and s.batch == batch]
         if len(day_classes) >= self.request.maxClassesPerDay:
+            return False
+        
+        # Only use time slots within the maxClassesPerDay limit
+        available_times = self.time_slots[:self.request.maxClassesPerDay]
+        if time not in available_times:
             return False
             
         return True

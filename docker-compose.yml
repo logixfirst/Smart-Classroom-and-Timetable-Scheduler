@@ -21,6 +21,7 @@ services:
       - DB_USER=postgres
       - DB_PASSWORD=password
       - FASTAPI_AI_SERVICE_URL=http://fastapi:8001
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/sih28
     depends_on:
       - postgres
     volumes:

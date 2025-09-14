@@ -19,34 +19,34 @@ export default function AddEditUserModal({ isOpen, onClose, user }: AddEditUserM
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 bg-neutral-900/50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
       <div className="card w-full max-w-sm sm:max-w-md">
         <div className="card-header">
-          <h3 className="card-title text-base sm:text-lg">{user ? 'Edit User' : 'Add New User'}</h3>
+          <h3 className="card-title">{user ? 'Edit User' : 'Add New User'}</h3>
         </div>
-        <form className="space-y-3 sm:space-y-4">
+        <form className="space-y-4">
           <div className="form-group">
-            <label className="form-label text-sm sm:text-base">Name</label>
+            <label className="form-label">Name</label>
             <input 
               type="text" 
-              className="input-primary text-sm sm:text-base"
+              className="input-primary"
               value={formData.name}
               onChange={(e) => setFormData({...formData, name: e.target.value})}
             />
           </div>
           <div className="form-group">
-            <label className="form-label text-sm sm:text-base">Email</label>
+            <label className="form-label">Email</label>
             <input 
               type="email" 
-              className="input-primary text-sm sm:text-base"
+              className="input-primary"
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})}
             />
           </div>
           <div className="form-group">
-            <label className="form-label text-sm sm:text-base">Role</label>
+            <label className="form-label">Role</label>
             <select 
-              className="input-primary text-sm sm:text-base"
+              className="input-primary"
               value={formData.role}
               onChange={(e) => setFormData({...formData, role: e.target.value})}
             >
@@ -57,19 +57,19 @@ export default function AddEditUserModal({ isOpen, onClose, user }: AddEditUserM
             </select>
           </div>
           <div className="form-group">
-            <label className="form-label text-sm sm:text-base">Department</label>
+            <label className="form-label">Department</label>
             <input 
               type="text" 
-              className="input-primary text-sm sm:text-base"
+              className="input-primary"
               value={formData.department}
               onChange={(e) => setFormData({...formData, department: e.target.value})}
             />
           </div>
-          <div className="flex gap-2 sm:gap-3 pt-3 sm:pt-4">
-            <button type="button" className="btn-secondary flex-1 text-sm sm:text-base py-2 sm:py-2.5" onClick={onClose}>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4">
+            <button type="button" className="btn-secondary flex-1" onClick={onClose}>
               Cancel
             </button>
-            <button type="submit" className="btn-primary flex-1 text-sm sm:text-base py-2 sm:py-2.5">
+            <button type="submit" className="btn-primary flex-1">
               {user ? 'Update' : 'Create'}
             </button>
           </div>

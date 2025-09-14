@@ -18,7 +18,7 @@ class Timetable(models.Model):
     schedule_data = models.JSONField()
     score = models.FloatField(default=0.0)
     conflicts = models.JSONField(default=list)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

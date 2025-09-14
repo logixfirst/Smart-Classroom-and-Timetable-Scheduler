@@ -9,6 +9,7 @@ from .serializers import TimetableGenerateSerializer
 from .models import Timetable
 
 @api_view(['POST'])
+@permission_classes([])
 def generate_timetable(request):
     serializer = TimetableGenerateSerializer(data=request.data)
     

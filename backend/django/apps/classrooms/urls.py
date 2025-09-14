@@ -1,10 +1,7 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 from . import views
 
-router = DefaultRouter()
-router.register(r'', views.ClassroomViewSet)
-
 urlpatterns = [
-    path('', include(router.urls)),
+    path('', views.get_classrooms, name='get_classrooms'),
+    path('create/', views.create_classroom, name='create_classroom'),
 ]

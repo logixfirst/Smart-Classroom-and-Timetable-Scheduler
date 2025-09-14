@@ -41,12 +41,19 @@ async def generate_timetable(request: TimetableRequest):
                 error=error_msg
             )
         
+        # Log generation details
+        print(f"Generated {len(options)} timetable options for {request.department} Semester {request.semester}")
+        print(f"Max classes per day: {request.maxClassesPerDay}")
+        for i, option in enumerate(options):
+            print(f"Option {i+1}: Score {option.score:.1f}, Conflicts: {len(option.conflicts)}, Classes: {len(option.schedule)}")
+        
         return TimetableResponse(
             success=True,
             options=options
         )
         
     except Exception as e:
+        print(f"Timetable generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
 
 @app.get("/health")
