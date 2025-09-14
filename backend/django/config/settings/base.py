@@ -1,7 +1,12 @@
 from pathlib import Path
-from decouple import config
+from decouple import config, Csv
+import dj_database_url
+import os
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+load_dotenv()  # read .env file
 
 SECRET_KEY = config('SECRET_KEY', default='your-secret-key-here')
 
@@ -68,14 +73,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME', default='sih28'),
-        'USER': config('DB_USER', default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default='password'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
-    }
+    'default': dj_database_url.config(default=os.getenv("DATABASE_URL"))
 }
 
 AUTH_PASSWORD_VALIDATORS = [

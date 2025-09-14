@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from .models import TimetableRequest, TimetableResponse
-from .timetable_generator import TimetableGenerator
+from src.models import TimetableRequest, TimetableResponse
+from src.timetable_generator import TimetableGenerator
 
 app = FastAPI(title="SIH28 Timetable AI Service", version="1.0.0")
 
