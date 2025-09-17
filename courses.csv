@@ -1,0 +1,8 @@
+course_id,course_name,duration_years,level
+C001,B.Tech,4,UG
+C002,M.Tech,2,PG
+C003,MBA,5,PhD
+C004,BBA,5,PhD
+C005,B.Sc,4,UG
+C006,M.Sc,2,PG
+C007,PhD,5,PhD
