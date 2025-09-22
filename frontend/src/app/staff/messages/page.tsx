@@ -54,14 +54,16 @@ export default function MessagesPage() {
                     <p className="card-description text-xs sm:text-sm">Communication hub for scheduling coordination</p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <select className="input-primary text-sm w-full sm:w-32">
+                    <label htmlFor="message-type-filter" className="sr-only">Filter by message type</label>
+                    <select id="message-type-filter" className="input-primary text-sm w-full sm:w-32">
                       <option>All Types</option>
                       <option>Conflicts</option>
                       <option>Requests</option>
                       <option>Maintenance</option>
                       <option>Info</option>
                     </select>
-                    <select className="input-primary text-sm w-full sm:w-32">
+                    <label htmlFor="priority-filter" className="sr-only">Filter by priority</label>
+                    <select id="priority-filter" className="input-primary text-sm w-full sm:w-32">
                       <option>All Priority</option>
                       <option>High</option>
                       <option>Medium</option>
@@ -116,8 +118,8 @@ export default function MessagesPage() {
               
               <form className="space-y-3">
                 <div className="form-group">
-                  <label className="form-label text-sm">To Department</label>
-                  <select className="input-primary text-sm">
+                  <label htmlFor="to-department" className="form-label text-sm">To Department</label>
+                  <select id="to-department" className="input-primary text-sm">
                     {departments.map(dept => (
                       <option key={dept}>{dept}</option>
                     ))}
@@ -125,8 +127,8 @@ export default function MessagesPage() {
                 </div>
                 
                 <div className="form-group">
-                  <label className="form-label text-sm">Priority</label>
-                  <select className="input-primary text-sm">
+                  <label htmlFor="message-priority" className="form-label text-sm">Priority</label>
+                  <select id="message-priority" className="input-primary text-sm">
                     <option>High</option>
                     <option>Medium</option>
                     <option>Low</option>
@@ -134,13 +136,13 @@ export default function MessagesPage() {
                 </div>
                 
                 <div className="form-group">
-                  <label className="form-label text-sm">Subject</label>
-                  <input type="text" className="input-primary text-sm" placeholder="Message subject" />
+                  <label htmlFor="message-subject" className="form-label text-sm">Subject</label>
+                  <input id="message-subject" type="text" className="input-primary text-sm" placeholder="Message subject" />
                 </div>
                 
                 <div className="form-group">
-                  <label className="form-label text-sm">Message</label>
-                  <textarea className="input-primary min-h-20 text-sm" placeholder="Type your message..."></textarea>
+                  <label htmlFor="message-content" className="form-label text-sm">Message</label>
+                  <textarea id="message-content" className="input-primary min-h-20 text-sm" placeholder="Type your message..."></textarea>
                 </div>
                 
                 <button type="submit" className="btn-primary w-full text-sm py-2">

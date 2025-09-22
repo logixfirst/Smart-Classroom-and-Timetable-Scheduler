@@ -173,7 +173,10 @@ export default function AdminTimetablesPage() {
                   {faculty.name}
                 </span>
                 <button
+                  type="button"
                   onClick={() => toggleFacultyAvailability(faculty.id)}
+                  aria-label={`Toggle availability for ${faculty.name}`}
+                  aria-pressed={faculty.available ? "true" : "false"}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                     faculty.available ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
                   }`}
