@@ -121,8 +121,9 @@ export default function ClassroomsPage() {
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Room Number</label>
+                <label htmlFor="room_number" className="block text-sm font-medium mb-2">Room Number</label>
                 <input
+                  id="room_number"
                   type="text"
                   value={formData.room_number}
                   onChange={(e) => setFormData({...formData, room_number: e.target.value})}
@@ -131,8 +132,9 @@ export default function ClassroomsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Capacity</label>
+                <label htmlFor="capacity" className="block text-sm font-medium mb-2">Capacity</label>
                 <input
+                  id="capacity"
                   type="number"
                   value={formData.capacity}
                   onChange={(e) => setFormData({...formData, capacity: e.target.value})}
@@ -141,8 +143,9 @@ export default function ClassroomsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Type</label>
+                <label htmlFor="room_type" className="block text-sm font-medium mb-2">Type</label>
                 <select
+                  id="room_type"
                   value={formData.room_type}
                   onChange={(e) => setFormData({...formData, room_type: e.target.value})}
                   className="input-primary"
@@ -152,13 +155,8 @@ export default function ClassroomsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Department</label>
-                <input
-                  type="text"
-                  value={formData.department}
-                  onChange={(e) => setFormData({...formData, department: e.target.value})}
-                  className="input-primary"
-                />
+                <label htmlFor="department" className="block text-sm font-medium mb-2">Department</label>
+                <input id="department" type="text" value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="input-primary" />
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">

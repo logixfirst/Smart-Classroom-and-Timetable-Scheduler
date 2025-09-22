@@ -116,15 +116,19 @@ export default function FacultyManagePage() {
             <h3 className="card-title">Faculty Members</h3>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
               <div className="relative flex-1">
+                <label htmlFor="faculty-search" className="sr-only">Search faculty</label>
                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
                 <input 
+                  id="faculty-search"
                   placeholder="Search faculty..." 
                   className="input-primary pl-10"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              <label htmlFor="department-filter" className="sr-only">Filter by department</label>
               <select 
+                id="department-filter"
                 className="input-primary w-full sm:w-36"
                 value={selectedDepartment}
                 onChange={(e) => setSelectedDepartment(e.target.value)}

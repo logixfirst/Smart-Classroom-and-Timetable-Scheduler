@@ -123,8 +123,10 @@ export default function StudentsPage() {
             <h3 className="card-title">Students</h3>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
               <div className="relative flex-1">
+                <label htmlFor="student-search" className="sr-only">Search students</label>
                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
                 <input 
+                  id="student-search"
                   placeholder="Search students..." 
                   className="input-primary pl-10"
                   value={searchTerm}
@@ -132,7 +134,9 @@ export default function StudentsPage() {
                 />
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
+                <label htmlFor="department-filter" className="sr-only">Filter by department</label>
                 <select 
+                  id="department-filter"
                   className="input-primary w-full sm:w-36"
                   value={selectedDepartment}
                   onChange={(e) => setSelectedDepartment(e.target.value)}
@@ -142,7 +146,9 @@ export default function StudentsPage() {
                     <option key={dept} value={dept}>{dept}</option>
                   ))}
                 </select>
+                <label htmlFor="year-filter" className="sr-only">Filter by year</label>
                 <select 
+                  id="year-filter"
                   className="input-primary w-full sm:w-32"
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(e.target.value)}

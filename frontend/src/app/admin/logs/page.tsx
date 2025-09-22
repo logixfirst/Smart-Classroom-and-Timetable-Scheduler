@@ -15,7 +15,8 @@ export default function LogsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">System Logs</h1>
           <div className="flex flex-col sm:flex-row gap-2">
-            <select className="input-primary w-full sm:w-32">
+            <label htmlFor="level-filter" className="sr-only">Filter by log level</label>
+            <select id="level-filter" className="input-primary w-full sm:w-32">
               <option>All Levels</option>
               <option>INFO</option>
               <option>SUCCESS</option>
@@ -34,8 +35,10 @@ export default function LogsPage() {
             <h3 className="card-title">Recent Activity</h3>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
               <div className="relative flex-1">
+                <label htmlFor="log-search" className="sr-only">Search logs</label>
                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400">🔍</span>
                 <input 
+                  id="log-search"
                   placeholder="Search logs..." 
                   className="input-primary pl-10 w-full" 
                 />

@@ -132,24 +132,24 @@ export default function FacultyLeaveRequests() {
               <h3 className="card-title mb-4">New Leave Request</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="form-label">Leave Type</label>
-                  <select className="input-primary">
+                  <label htmlFor="leave-type" className="form-label">Leave Type</label>
+                  <select id="leave-type" className="input-primary">
                     <option>Sick Leave</option>
                     <option>Personal Leave</option>
                     <option>Conference</option>
                   </select>
                 </div>
                 <div>
-                  <label className="form-label">Start Date</label>
-                  <input type="date" className="input-primary" />
+                  <label htmlFor="start-date" className="form-label">Start Date</label>
+                  <input id="start-date" type="date" className="input-primary" />
                 </div>
                 <div>
-                  <label className="form-label">End Date</label>
-                  <input type="date" className="input-primary" />
+                  <label htmlFor="end-date" className="form-label">End Date</label>
+                  <input id="end-date" type="date" className="input-primary" />
                 </div>
                 <div>
-                  <label className="form-label">Reason</label>
-                  <textarea className="input-primary" rows={3}></textarea>
+                  <label htmlFor="reason" className="form-label">Reason</label>
+                  <textarea id="reason" className="input-primary" rows={3}></textarea>
                 </div>
               </div>
               <div className="flex gap-2 justify-end mt-6">

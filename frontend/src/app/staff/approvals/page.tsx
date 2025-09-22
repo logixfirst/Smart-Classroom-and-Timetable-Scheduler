@@ -14,7 +14,8 @@ export default function ApprovalsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-gray-200">Timetable Approvals</h1>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-            <select className="input-primary text-sm w-full sm:w-32">
+            <label htmlFor="status-filter" className="sr-only">Filter by status</label>
+            <select id="status-filter" className="input-primary text-sm w-full sm:w-32">
               <option>All Status</option>
               <option>Pending</option>
               <option>Approved</option>

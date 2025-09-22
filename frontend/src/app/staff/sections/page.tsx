@@ -50,7 +50,8 @@ export default function SectionsPage() {
                 <p className="card-description text-xs sm:text-sm">Manage student sections and practical groups</p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
-                <select className="input-primary text-sm w-full sm:w-32">
+                <label htmlFor="department-filter" className="sr-only">Filter by department</label>
+                <select id="department-filter" className="input-primary text-sm w-full sm:w-32">
                   <option>All Departments</option>
                   <option>Computer Science</option>
                   <option>Electronics</option>
