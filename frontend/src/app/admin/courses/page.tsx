@@ -31,13 +31,13 @@ export default function CoursesPage() {
                 />
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
-                <select className="input-primary w-full sm:w-36">
+                <select className="input-primary w-full sm:w-36" aria-label="Filter by department">
                   <option>All Departments</option>
                   <option>Computer Science</option>
                   <option>Mathematics</option>
                   <option>Physics</option>
                 </select>
-                <select className="input-primary w-full sm:w-28">
+                <select className="input-primary w-full sm:w-28" aria-label="Filter by semester">
                   <option>All Semesters</option>
                   <option>Semester 1</option>
                   <option>Semester 2</option>

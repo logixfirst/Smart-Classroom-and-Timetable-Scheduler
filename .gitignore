@@ -8,10 +8,13 @@ build/
 dist/
 
 # Environment variables
-.env
-.env.local
-.env.production
-.env.development
+<<<<<<< HEAD
+# .env
+# .env.local
+# .env.production
+# .env.development
+=======
+>>>>>>> 956765f518cc4e253414b8eacef210c0807bc9ed
 
 # Python
 __pycache__/

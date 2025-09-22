@@ -32,14 +32,14 @@ export default function AdminApprovals() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
-            <select className="input-primary w-full sm:w-36">
+            <select className="input-primary w-full sm:w-36" aria-label="Filter by approval type">
               <option>All Types</option>
               <option>Timetable</option>
               <option>Room Change</option>
               <option>Faculty Leave</option>
               <option>Course Update</option>
             </select>
-            <select className="input-primary w-full sm:w-32">
+            <select className="input-primary w-full sm:w-32" aria-label="Filter by priority level">
               <option>All Priority</option>
               <option>High</option>
               <option>Medium</option>

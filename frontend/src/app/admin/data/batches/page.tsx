@@ -163,6 +163,7 @@ export default function BatchesPage() {
                   value={formData.strength}
                   onChange={(e) => setFormData({...formData, strength: e.target.value})}
                   className="input-primary"
+                  placeholder="e.g., 60"
                   min="1"
                   required
                 />
