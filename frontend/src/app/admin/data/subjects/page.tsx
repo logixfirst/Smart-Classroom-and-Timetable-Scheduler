@@ -124,8 +124,9 @@ export default function SubjectsPage() {
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Subject Name</label>
+                <label htmlFor="name" className="block text-sm font-medium mb-2">Subject Name</label>
                 <input
+                  id="name"
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
@@ -134,8 +135,9 @@ export default function SubjectsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Subject Code</label>
+                <label htmlFor="code" className="block text-sm font-medium mb-2">Subject Code</label>
                 <input
+                  id="code"
                   type="text"
                   value={formData.code}
                   onChange={(e) => setFormData({...formData, code: e.target.value})}
@@ -144,8 +146,9 @@ export default function SubjectsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Department</label>
+                <label htmlFor="department" className="block text-sm font-medium mb-2">Department</label>
                 <input
+                  id="department"
                   type="text"
                   value={formData.department}
                   onChange={(e) => setFormData({...formData, department: e.target.value})}
@@ -154,8 +157,9 @@ export default function SubjectsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Semester</label>
+                <label htmlFor="semester" className="block text-sm font-medium mb-2">Semester</label>
                 <input
+                  id="semester"
                   type="text"
                   value={formData.semester}
                   onChange={(e) => setFormData({...formData, semester: e.target.value})}
@@ -164,8 +168,9 @@ export default function SubjectsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Classes Per Week</label>
+                <label htmlFor="classes_per_week" className="block text-sm font-medium mb-2">Classes Per Week</label>
                 <input
+                  id="classes_per_week"
                   type="number"
                   value={formData.classes_per_week}
                   onChange={(e) => setFormData({...formData, classes_per_week: e.target.value})}

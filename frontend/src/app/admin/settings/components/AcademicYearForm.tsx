@@ -19,8 +19,9 @@ export default function AcademicYearForm() {
       
       <form className="space-y-4">
         <div className="form-group">
-          <label className="form-label">Academic Year</label>
+          <label htmlFor="academic-year" className="form-label">Academic Year</label>
           <input 
+            id="academic-year"
             type="text" 
             className="input-primary"
             value={formData.academicYear}
@@ -30,8 +31,9 @@ export default function AcademicYearForm() {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="form-group">
-            <label className="form-label">Semester Start</label>
+            <label htmlFor="semester-start" className="form-label">Semester Start</label>
             <input 
+              id="semester-start"
               type="date" 
               className="input-primary"
               value={formData.semesterStart}
@@ -40,8 +42,9 @@ export default function AcademicYearForm() {
           </div>
           
           <div className="form-group">
-            <label className="form-label">Semester End</label>
+            <label htmlFor="semester-end" className="form-label">Semester End</label>
             <input 
+              id="semester-end"
               type="date" 
               className="input-primary"
               value={formData.semesterEnd}
@@ -51,8 +54,9 @@ export default function AcademicYearForm() {
         </div>
         
         <div className="form-group">
-          <label className="form-label">Holiday List</label>
+          <label htmlFor="holidays" className="form-label">Holiday List</label>
           <textarea 
+            id="holidays"
             className="input-primary min-h-20"
             placeholder="Enter holidays (one per line)"
             value={formData.holidays}

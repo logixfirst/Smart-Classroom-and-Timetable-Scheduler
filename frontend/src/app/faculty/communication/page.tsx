@@ -27,8 +27,8 @@ export default function CommunicationPage() {
             
             <form className="space-y-3 sm:space-y-4">
               <div className="form-group">
-                <label className="form-label text-sm sm:text-base">Recipients</label>
-                <select className="input-primary text-sm sm:text-base">
+                <label htmlFor="recipients" className="form-label text-sm sm:text-base">Recipients</label>
+                <select id="recipients" className="input-primary text-sm sm:text-base">
                   <option>CS Semester 5</option>
                   <option>CS Semester 3</option>
                   <option>All My Students</option>
@@ -37,18 +37,18 @@ export default function CommunicationPage() {
               </div>
               
               <div className="form-group">
-                <label className="form-label text-sm sm:text-base">Subject</label>
-                <input type="text" className="input-primary text-sm sm:text-base" placeholder="Enter announcement title" />
+                <label htmlFor="subject" className="form-label text-sm sm:text-base">Subject</label>
+                <input id="subject" type="text" className="input-primary text-sm sm:text-base" placeholder="Enter announcement title" />
               </div>
               
               <div className="form-group">
-                <label className="form-label text-sm sm:text-base">Message</label>
-                <textarea className="input-primary min-h-20 sm:min-h-24 text-sm sm:text-base" placeholder="Enter your message"></textarea>
+                <label htmlFor="message" className="form-label text-sm sm:text-base">Message</label>
+                <textarea id="message" className="input-primary min-h-20 sm:min-h-24 text-sm sm:text-base" placeholder="Enter your message"></textarea>
               </div>
               
               <div className="form-group">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" className="rounded w-4 h-4" />
+                <label htmlFor="email-notification" className="flex items-center gap-2">
+                  <input id="email-notification" type="checkbox" className="rounded w-4 h-4" />
                   <span className="text-xs sm:text-sm">Send email notification</span>
                 </label>
               </div>

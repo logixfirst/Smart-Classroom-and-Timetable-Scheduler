@@ -23,8 +23,8 @@ export default function FeedbackPage() {
             
             <form className="space-y-3 sm:space-y-4">
               <div className="form-group">
-                <label className="form-label text-sm sm:text-base">Category</label>
-                <select className="input-primary text-sm sm:text-base">
+                <label htmlFor="category" className="form-label text-sm sm:text-base">Category</label>
+                <select id="category" className="input-primary text-sm sm:text-base">
                   <option>Schedule Issues</option>
                   <option>Room Facilities</option>
                   <option>Course Timing</option>
@@ -35,18 +35,18 @@ export default function FeedbackPage() {
               </div>
               
               <div className="form-group">
-                <label className="form-label text-sm sm:text-base">Subject</label>
-                <input type="text" className="input-primary text-sm sm:text-base" placeholder="Brief description of your feedback" />
+                <label htmlFor="subject" className="form-label text-sm sm:text-base">Subject</label>
+                <input id="subject" type="text" className="input-primary text-sm sm:text-base" placeholder="Brief description of your feedback" />
               </div>
               
               <div className="form-group">
-                <label className="form-label text-sm sm:text-base">Details</label>
-                <textarea className="input-primary min-h-20 sm:min-h-24 text-sm sm:text-base" placeholder="Provide detailed feedback or suggestions"></textarea>
+                <label htmlFor="details" className="form-label text-sm sm:text-base">Details</label>
+                <textarea id="details" className="input-primary min-h-20 sm:min-h-24 text-sm sm:text-base" placeholder="Provide detailed feedback or suggestions"></textarea>
               </div>
               
               <div className="form-group">
-                <label className="form-label text-sm sm:text-base">Priority</label>
-                <select className="input-primary text-sm sm:text-base">
+                <label htmlFor="priority" className="form-label text-sm sm:text-base">Priority</label>
+                <select id="priority" className="input-primary text-sm sm:text-base">
                   <option>Low</option>
                   <option>Medium</option>
                   <option>High</option>
@@ -55,8 +55,8 @@ export default function FeedbackPage() {
               </div>
               
               <div className="form-group">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" className="rounded w-4 h-4" />
+                <label htmlFor="anonymous" className="flex items-center gap-2">
+                  <input id="anonymous" type="checkbox" className="rounded w-4 h-4" />
                   <span className="text-xs sm:text-sm">Submit anonymously</span>
                 </label>
               </div>
