@@ -38,7 +38,7 @@ staticfiles/
 .idea/
 *.swp
 *.swo
-
+``
 # OS
 .DS_Store
 Thumbs.db
@@ -59,6 +59,3 @@ yarn-error.log*
 # Temporary files
 *.tmp
 *.temp
-
-#Ignore vscode AI rules
-.github\instructions\codacy.instructions.md

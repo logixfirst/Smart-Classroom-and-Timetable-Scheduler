@@ -35,7 +35,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         {/* Main content */}
         <div className={`transition-all duration-300 ease-out ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-56'}`}>
           <main className={`min-h-[calc(100vh-4rem)] mt-16 ${sidebarCollapsed ? 'p-2 lg:p-4' : 'p-4 lg:p-6'}`}>
-            <div className={`mx-auto ${sidebarCollapsed ? 'max-w-none px-2 lg:px-4' : 'max-w-7xl'}`}>
+            <div className={`mx-auto ${sidebarCollapsed ? 'max-w-1xl px-1 lg:px-1' : 'max-w-7xl'}`}>
               {children}
             </div>
           </main>
