@@ -4,6 +4,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
+from django.core.cache import cache
 
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import (
@@ -16,7 +19,54 @@ from .serializers import (
     LabSerializer, TimetableSerializer, TimetableSlotSerializer, AttendanceSerializer
 )
 
-class UserViewSet(viewsets.ModelViewSet):
+class CachedModelViewSet(viewsets.ModelViewSet):
+    """Base ViewSet with caching and cache invalidation"""
+    
+    @method_decorator(cache_page(60 * 5))  # Cache for 5 minutes
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+    
+    def invalidate_cache(self):
+        """Clear related cache when data changes"""
+        try:
+            # Clear all cached pages - this ensures fresh data after changes
+            from django_redis import get_redis_connection
+            redis_conn = get_redis_connection("default")
+            
+            # Delete all cache keys with our prefix
+            pattern = "sih28:1:views.decorators.cache.cache_page*"
+            keys = redis_conn.keys(pattern)
+            if keys:
+                redis_conn.delete(*keys)
+                
+        except Exception as e:
+            # Fallback: clear entire cache if pattern delete fails
+            try:
+                cache.clear()
+            except:
+                pass  # Ignore cache errors
+    
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        self.invalidate_cache()
+        return response
+    
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        self.invalidate_cache()
+        return response
+    
+    def partial_update(self, request, *args, **kwargs):
+        response = super().partial_update(request, *args, **kwargs)
+        self.invalidate_cache()
+        return response
+    
+    def destroy(self, request, *args, **kwargs):
+        response = super().destroy(request, *args, **kwargs)
+        self.invalidate_cache()
+        return response
+
+class UserViewSet(CachedModelViewSet):
     queryset = User.objects.all().order_by('id')
     serializer_class = UserSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -24,20 +74,20 @@ class UserViewSet(viewsets.ModelViewSet):
     search_fields = ['username', 'email', 'first_name', 'last_name']
     ordering_fields = ['id', 'username', 'role']
 
-class DepartmentViewSet(viewsets.ModelViewSet):
+class DepartmentViewSet(CachedModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['department_name', 'department_id']
 
-class CourseViewSet(viewsets.ModelViewSet):
+class CourseViewSet(CachedModelViewSet):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['course_type', 'duration']
     search_fields = ['course_name', 'course_id']
 
-class SubjectViewSet(viewsets.ModelViewSet):
+class SubjectViewSet(CachedModelViewSet):
     queryset = Subject.objects.select_related('course', 'department').all().order_by('subject_id')
     serializer_class = SubjectSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -45,7 +95,7 @@ class SubjectViewSet(viewsets.ModelViewSet):
     search_fields = ['subject_name', 'subject_id']
     ordering_fields = ['subject_id', 'subject_name']
 
-class FacultyViewSet(viewsets.ModelViewSet):
+class FacultyViewSet(CachedModelViewSet):
     queryset = Faculty.objects.select_related('department').all().order_by('faculty_id')
     serializer_class = FacultySerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -60,7 +110,7 @@ class FacultyViewSet(viewsets.ModelViewSet):
         serializer = TimetableSlotSerializer(slots, many=True)
         return Response(serializer.data)
 
-class StudentViewSet(viewsets.ModelViewSet):
+class StudentViewSet(CachedModelViewSet):
     queryset = Student.objects.select_related('department', 'course', 'faculty_advisor').all().order_by('student_id')
     serializer_class = StudentSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -75,7 +125,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         serializer = AttendanceSerializer(attendance, many=True)
         return Response(serializer.data)
 
-class BatchViewSet(viewsets.ModelViewSet):
+class BatchViewSet(CachedModelViewSet):
     queryset = Batch.objects.select_related('course', 'department').all().order_by('batch_id')
     serializer_class = BatchSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -83,7 +133,7 @@ class BatchViewSet(viewsets.ModelViewSet):
     search_fields = ['batch_id']
     ordering_fields = ['batch_id', 'year', 'semester']
 
-class ClassroomViewSet(viewsets.ModelViewSet):
+class ClassroomViewSet(CachedModelViewSet):
     queryset = Classroom.objects.select_related('department').all().order_by('room_id')
     serializer_class = ClassroomSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -91,7 +141,7 @@ class ClassroomViewSet(viewsets.ModelViewSet):
     search_fields = ['room_number', 'room_id']
     ordering_fields = ['room_id', 'capacity']
 
-class LabViewSet(viewsets.ModelViewSet):
+class LabViewSet(CachedModelViewSet):
     queryset = Lab.objects.select_related('department').all().order_by('lab_id')
     serializer_class = LabSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -99,7 +149,7 @@ class LabViewSet(viewsets.ModelViewSet):
     ordering_fields = ['lab_id', 'capacity']
     search_fields = ['lab_name', 'lab_id']
 
-class TimetableViewSet(viewsets.ModelViewSet):
+class TimetableViewSet(CachedModelViewSet):
     queryset = Timetable.objects.all()
     serializer_class = TimetableSerializer
     filter_backends = [DjangoFilterBackend]
@@ -112,7 +162,7 @@ class TimetableViewSet(viewsets.ModelViewSet):
         serializer = TimetableSlotSerializer(slots, many=True)
         return Response(serializer.data)
 
-class TimetableSlotViewSet(viewsets.ModelViewSet):
+class TimetableSlotViewSet(CachedModelViewSet):
     queryset = TimetableSlot.objects.all()
     serializer_class = TimetableSlotSerializer
     filter_backends = [DjangoFilterBackend]
