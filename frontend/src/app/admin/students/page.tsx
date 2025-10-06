@@ -2,17 +2,27 @@
 
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
+import apiClient from '@/lib/api'
 
 interface Student {
   id: number
   student_id: string
-  student_name: string
-  department: string
-  course: string
-  elective_chosen: string
+  name: string
+  department: {
+    department_id: string
+    department_name: string
+  }
+  course: {
+    course_id: string
+    course_name: string
+  }
+  electives: string
   year: number
   semester: number
-  faculty_assigned: string
+  faculty_advisor: {
+    faculty_id: string
+    faculty_name: string
+  } | null
 }
 
 export default function StudentsPage() {
@@ -22,57 +32,44 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('')
   const [selectedYear, setSelectedYear] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
   useEffect(() => {
-    // Set static mock students instead of API call
-    const mockStudents = [
-      { 
-        id: 1, 
-        student_id: 'STU001', 
-        student_name: 'Rahul Sharma', 
-        department: 'Computer Science', 
-        course: 'B.Tech CSE', 
-        elective_chosen: 'Machine Learning', 
-        year: 2, 
-        semester: 4, 
-        faculty_assigned: 'Dr. Rajesh Kumar' 
-      },
-      { 
-        id: 2, 
-        student_id: 'STU002', 
-        student_name: 'Priya Patel', 
-        department: 'Computer Science', 
-        course: 'B.Tech CSE', 
-        elective_chosen: 'Web Development', 
-        year: 3, 
-        semester: 5, 
-        faculty_assigned: 'Dr. Priya Sharma' 
-      },
-      { 
-        id: 3, 
-        student_id: 'STU003', 
-        student_name: 'Arjun Singh', 
-        department: 'Mathematics', 
-        course: 'B.Sc Math', 
-        elective_chosen: 'Statistics', 
-        year: 1, 
-        semester: 2, 
-        faculty_assigned: 'Prof. Amit Singh' 
+    fetchStudents()
+  }, [currentPage])
+
+  const fetchStudents = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await apiClient.getStudents(currentPage)
+      if (response.error) {
+        setError(response.error)
+      } else if (response.data) {
+        setStudents(response.data.results || response.data)
+        setTotalCount(response.data.count || 0)
+        if (response.data.count) {
+          setTotalPages(Math.ceil(response.data.count / 100))
+        }
       }
-    ]
-    setStudents(mockStudents)
-    setIsLoading(false)
-  }, [])
+    } catch (err) {
+      setError('Failed to fetch students')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const filteredStudents = students.filter(student => {
-    const matchesSearch = student.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          student.student_id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesDepartment = !selectedDepartment || student.department === selectedDepartment
+    const matchesDepartment = !selectedDepartment || student.department.department_name === selectedDepartment
     const matchesYear = !selectedYear || student.year.toString() === selectedYear
     return matchesSearch && matchesDepartment && matchesYear
   })
 
-  const departments = [...new Set(students.map(s => s.department))].filter(Boolean)
+  const departments = [...new Set(students.map(s => s.department.department_name))].filter(Boolean)
   const years = [...new Set(students.map(s => s.year))].sort((a, b) => a - b)
 
   if (isLoading) {
@@ -113,7 +110,7 @@ export default function StudentsPage() {
               Student Management
             </h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Total: {filteredStudents.length} students
+              Total: {totalCount} students | Page {currentPage} of {totalPages}
             </p>
           </div>
         </div>
@@ -173,27 +170,27 @@ export default function StudentsPage() {
               </p>
             </div>
           ) : (
-            <>
+            <div>
               {/* Mobile Card View */}
               <div className="block lg:hidden space-y-3">
                 {filteredStudents.map((student) => (
                   <div key={student.id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">{student.student_name}</h4>
+                        <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">{student.name}</h4>
                         <p className="text-sm text-gray-600 dark:text-gray-400">{student.student_id}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">{student.course}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">{student.course.course_name}</p>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <div className="flex gap-2">
-                        <span className="badge badge-neutral text-xs">{student.department}</span>
-                        <span className="badge badge-info text-xs">Year {student.year}</span>
-                        <span className="badge badge-success text-xs">Sem {student.semester}</span>
+                        <span key={`dept-${student.id}`} className="badge badge-neutral text-xs">{student.department.department_name}</span>
+                        <span key={`year-${student.id}`} className="badge badge-info text-xs">Year {student.year}</span>
+                        <span key={`sem-${student.id}`} className="badge badge-success text-xs">Sem {student.semester}</span>
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">
-                        <p><strong>Electives:</strong> {student.elective_chosen}</p>
-                        <p><strong>Faculty:</strong> {student.faculty_assigned}</p>
+                        <p key={`electives-${student.id}`}><strong>Electives:</strong> {student.electives || 'None'}</p>
+                        <p key={`faculty-${student.id}`}><strong>Faculty:</strong> {student.faculty_advisor?.faculty_name || 'Not assigned'}</p>
                       </div>
                     </div>
                   </div>
@@ -222,12 +219,12 @@ export default function StudentsPage() {
                           <span className="font-mono text-sm">{student.student_id}</span>
                         </td>
                         <td className="table-cell">
-                          <div className="font-medium text-gray-800 dark:text-gray-200">{student.student_name}</div>
+                          <div className="font-medium text-gray-800 dark:text-gray-200">{student.name}</div>
                         </td>
                         <td className="table-cell">
-                          <span className="badge badge-neutral text-xs">{student.department}</span>
+                          <span className="badge badge-neutral text-xs">{student.department.department_name}</span>
                         </td>
-                        <td className="table-cell">{student.course}</td>
+                        <td className="table-cell">{student.course.course_name}</td>
                         <td className="table-cell">
                           <span className="badge badge-info text-xs">Year {student.year}</span>
                         </td>
@@ -235,17 +232,44 @@ export default function StudentsPage() {
                           <span className="badge badge-success text-xs">Sem {student.semester}</span>
                         </td>
                         <td className="table-cell">
-                          <div className="max-w-xs truncate" title={student.elective_chosen}>
-                            {student.elective_chosen}
+                          <div className="max-w-xs truncate" title={student.electives || 'None'}>
+                            {student.electives || 'None'}
                           </div>
                         </td>
-                        <td className="table-cell">{student.faculty_assigned}</td>
+                        <td className="table-cell">{student.faculty_advisor?.faculty_name || 'Not assigned'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </>
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-[#3c4043]">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="btn-secondary px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ← Previous
+                  </button>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="btn-secondary px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>

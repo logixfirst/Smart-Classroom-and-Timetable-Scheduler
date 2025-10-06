@@ -1,21 +1,11 @@
 subject_id,subject_name,course_id,department_id,faculty_assigned,credits
-S001,AI & ML,C001,D003,Faculty_52,4
-S002,Data Science,C001,D011,Faculty_37,4
-S003,IoT,C001,D001,Faculty_72,4
-S004,Cyber Security,C008,D010,Faculty_59,4
-S005,Robotics,C007,D009,Faculty_100,4
-S006,Digital Marketing,C001,D009,Faculty_50,4
-S007,Entrepreneurship,C005,D002,Faculty_65,2
-S008,Environmental Science,C008,D010,Faculty_77,3
-S009,Psychology,C009,D005,Faculty_1,4
-S010,Philosophy,C007,D003,Faculty_47,3
-S011,Econometrics,C002,D001,Faculty_13,4
-S012,Cloud Computing,C007,D005,Faculty_7,3
-S013,History,C002,D007,Faculty_50,4
-S014,English,C006,D006,Faculty_91,2
-S015,Political Science,C005,D003,Faculty_92,4
-S016,Sociology,C006,D006,Faculty_67,3
-S017,Statistics,C003,D004,Faculty_3,2
-S018,Blockchain,C004,D001,Faculty_70,4
-S019,Bioinformatics,C003,D003,Faculty_7,4
-S020,Ethics in Technology,C008,D003,Faculty_98,4
+S001,Artificial Intelligence,C001,D001,F001,4
+S002,Data Structures,C001,D001,F002,4
+S003,Database Management,C001,D001,F003,3
+S004,Computer Networks,C001,D001,F004,3
+S005,Operating Systems,C001,D001,F005,4
+S006,Machine Learning,C001,D001,F006,4
+S007,Web Development,C001,D001,F007,3
+S008,Cloud Computing,C001,D001,F008,3
+S009,Cybersecurity,C001,D001,F009,4
+S010,Software Engineering,C001,D001,F010,4

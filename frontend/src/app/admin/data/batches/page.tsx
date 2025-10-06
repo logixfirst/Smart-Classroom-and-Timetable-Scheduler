@@ -1,27 +1,36 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import apiClient from '@/lib/api'
 
 interface Batch {
-  id: number
-  name: string
-  department: string
-  semester: string
-  strength: number
-  academic_year: string
+  batch_id: string
+  course: {
+    course_id: string
+    course_name: string
+  }
+  department: {
+    department_id: string
+    department_name: string
+  }
+  year: number
+  semester: number
+  no_of_students: number
 }
 
 export default function BatchesPage() {
   const [batches, setBatches] = useState<Batch[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
-    name: '',
+    batch_id: '',
+    course: '',
     department: '',
+    year: '',
     semester: '',
-    strength: '',
-    academic_year: ''
+    no_of_students: ''
   })
 
   useEffect(() => {
@@ -29,14 +38,21 @@ export default function BatchesPage() {
   }, [])
 
   const loadBatches = async () => {
+    setLoading(true)
+    setError(null)
     try {
-      const response = await fetch('http://localhost:8000/api/v1/auth/batches/')
-      if (response.ok) {
-        const data = await response.json()
-        setBatches(data)
+      const response = await apiClient.getBatches()
+      if (response.error) {
+        setError(response.error)
+      } else if (response.data) {
+        // Handle both paginated and non-paginated responses
+        const batchData = Array.isArray(response.data) 
+          ? response.data 
+          : response.data.results || []
+        setBatches(batchData)
       }
-    } catch (error) {
-      console.error('Failed to load batches:', error)
+    } catch (err) {
+      setError('Failed to load batches')
     } finally {
       setLoading(false)
     }
@@ -66,17 +82,18 @@ export default function BatchesPage() {
 
   const handleEdit = (batch: Batch) => {
     setFormData({
-      name: batch.name,
-      department: batch.department,
-      semester: batch.semester,
-      strength: batch.strength.toString(),
-      academic_year: batch.academic_year
+      batch_id: batch.batch_id,
+      course: batch.course.course_id,
+      department: batch.department.department_id,
+      year: batch.year.toString(),
+      semester: batch.semester.toString(),
+      no_of_students: batch.no_of_students.toString()
     })
-    setEditingId(batch.id)
+    setEditingId(batch.batch_id)
     setShowForm(true)
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Delete this batch?')) return
     
     try {
@@ -93,7 +110,7 @@ export default function BatchesPage() {
   }
 
   const resetForm = () => {
-    setFormData({ name: '', department: '', semester: '', strength: '', academic_year: '' })
+    setFormData({ batch_id: '', course: '', department: '', year: '', semester: '', no_of_students: '' })
     setEditingId(null)
     setShowForm(false)
   }
@@ -124,13 +141,24 @@ export default function BatchesPage() {
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Batch Name</label>
+                <label className="block text-sm font-medium mb-2">Batch ID</label>
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  value={formData.batch_id}
+                  onChange={(e) => setFormData({...formData, batch_id: e.target.value})}
                   className="input-primary"
                   placeholder="e.g., CS-A, CS-B"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Course</label>
+                <input
+                  type="text"
+                  value={formData.course}
+                  onChange={(e) => setFormData({...formData, course: e.target.value})}
+                  className="input-primary"
+                  placeholder="Course ID"
                   required
                 />
               </div>
@@ -141,41 +169,45 @@ export default function BatchesPage() {
                   value={formData.department}
                   onChange={(e) => setFormData({...formData, department: e.target.value})}
                   className="input-primary"
-                  placeholder="e.g., Computer Science"
+                  placeholder="Department ID"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Year</label>
+                <input
+                  type="number"
+                  value={formData.year}
+                  onChange={(e) => setFormData({...formData, year: e.target.value})}
+                  className="input-primary"
+                  placeholder="e.g., 1, 2, 3, 4"
+                  min="1"
+                  max="4"
                   required
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-2">Semester</label>
                 <input
-                  type="text"
+                  type="number"
                   value={formData.semester}
                   onChange={(e) => setFormData({...formData, semester: e.target.value})}
                   className="input-primary"
-                  placeholder="e.g., 1, 2, 3"
+                  placeholder="e.g., 1, 2"
+                  min="1"
+                  max="2"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Strength</label>
+                <label className="block text-sm font-medium mb-2">Number of Students</label>
                 <input
                   type="number"
-                  value={formData.strength}
-                  onChange={(e) => setFormData({...formData, strength: e.target.value})}
+                  value={formData.no_of_students}
+                  onChange={(e) => setFormData({...formData, no_of_students: e.target.value})}
                   className="input-primary"
                   placeholder="e.g., 60"
                   min="1"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Academic Year</label>
-                <input
-                  type="text"
-                  value={formData.academic_year}
-                  onChange={(e) => setFormData({...formData, academic_year: e.target.value})}
-                  className="input-primary"
-                  placeholder="e.g., 2024-25"
                   required
                 />
               </div>
@@ -197,24 +229,26 @@ export default function BatchesPage() {
           <table className="table">
             <thead className="table-header">
               <tr>
-                <th className="table-header-cell">Name</th>
+                <th className="table-header-cell">Batch ID</th>
+                <th className="table-header-cell">Course</th>
                 <th className="table-header-cell">Department</th>
+                <th className="table-header-cell">Year</th>
                 <th className="table-header-cell">Semester</th>
-                <th className="table-header-cell">Strength</th>
-                <th className="table-header-cell">Academic Year</th>
+                <th className="table-header-cell">Students</th>
                 <th className="table-header-cell">Actions</th>
               </tr>
             </thead>
             <tbody>
               {batches.map((batch) => (
-                <tr key={batch.id} className="table-row">
-                  <td className="table-cell font-medium">{batch.name}</td>
-                  <td className="table-cell">{batch.department}</td>
+                <tr key={batch.batch_id} className="table-row">
+                  <td className="table-cell font-medium">{batch.batch_id}</td>
+                  <td className="table-cell">{batch.course.course_name}</td>
+                  <td className="table-cell">{batch.department.department_name}</td>
+                  <td className="table-cell">Year {batch.year}</td>
                   <td className="table-cell">
-                    <span className="badge badge-neutral">{batch.semester}</span>
+                    <span className="badge badge-neutral">Sem {batch.semester}</span>
                   </td>
-                  <td className="table-cell">{batch.strength}</td>
-                  <td className="table-cell">{batch.academic_year}</td>
+                  <td className="table-cell">{batch.no_of_students}</td>
                   <td className="table-cell">
                     <div className="flex gap-2">
                       <button
@@ -224,7 +258,7 @@ export default function BatchesPage() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(batch.id)}
+                        onClick={() => handleDelete(batch.batch_id)}
                         className="btn-danger text-xs px-2 py-1"
                       >
                         Delete

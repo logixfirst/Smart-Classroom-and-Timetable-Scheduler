@@ -1,24 +1,29 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import apiClient from '@/lib/api'
 
 interface Classroom {
-  id: number
-  roomNumber: string
+  room_id: string
+  room_number: string
   capacity: number
-  type: string
-  department: string
+  room_type: string
+  department: {
+    department_id: string
+    department_name: string
+  }
 }
 
 export default function ClassroomsPage() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     room_number: '',
     capacity: '',
-    room_type: 'lecture',
+    room_type: 'lecture hall',
     department: ''
   })
 
@@ -27,14 +32,21 @@ export default function ClassroomsPage() {
   }, [])
 
   const loadClassrooms = async () => {
+    setLoading(true)
+    setError(null)
     try {
-      const response = await fetch('http://localhost:8000/api/v1/classrooms/')
-      if (response.ok) {
-        const data = await response.json()
-        setClassrooms(data)
+      const response = await apiClient.getClassrooms()
+      if (response.error) {
+        setError(response.error)
+      } else if (response.data) {
+        // Handle both paginated and non-paginated responses
+        const classroomData = Array.isArray(response.data) 
+          ? response.data 
+          : response.data.results || []
+        setClassrooms(classroomData)
       }
-    } catch (error) {
-      console.error('Failed to load classrooms:', error)
+    } catch (err) {
+      setError('Failed to load classrooms')
     } finally {
       setLoading(false)
     }
@@ -64,24 +76,23 @@ export default function ClassroomsPage() {
 
   const handleEdit = (classroom: Classroom) => {
     setFormData({
-      room_number: classroom.roomNumber,
+      room_number: classroom.room_number,
       capacity: classroom.capacity.toString(),
-      room_type: classroom.type,
-      department: classroom.department
+      room_type: classroom.room_type,
+      department: classroom.department.department_id
     })
-    setEditingId(classroom.id)
+    setEditingId(classroom.room_id)
     setShowForm(true)
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Delete this classroom?')) return
     
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/classrooms/${id}/`, {
-        method: 'DELETE'
-      })
-      
-      if (response.ok) {
+      const response = await apiClient.deleteClassroom(id)
+      if (response.error) {
+        alert('Failed to delete classroom: ' + response.error)
+      } else {
         loadClassrooms()
       }
     } catch (error) {
@@ -185,13 +196,13 @@ export default function ClassroomsPage() {
             </thead>
             <tbody>
               {classrooms.map((classroom) => (
-                <tr key={classroom.id} className="table-row">
-                  <td className="table-cell font-medium">{classroom.roomNumber}</td>
+                <tr key={classroom.room_id} className="table-row">
+                  <td className="table-cell font-medium">{classroom.room_number}</td>
                   <td className="table-cell">{classroom.capacity}</td>
                   <td className="table-cell">
-                    <span className="badge badge-neutral">{classroom.type}</span>
+                    <span className="badge badge-neutral">{classroom.room_type}</span>
                   </td>
-                  <td className="table-cell">{classroom.department}</td>
+                  <td className="table-cell">{classroom.department.department_name}</td>
                   <td className="table-cell">
                     <div className="flex gap-2">
                       <button
@@ -201,7 +212,7 @@ export default function ClassroomsPage() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(classroom.id)}
+                        onClick={() => handleDelete(classroom.room_id)}
                         className="btn-danger text-xs px-2 py-1"
                       >
                         Delete
