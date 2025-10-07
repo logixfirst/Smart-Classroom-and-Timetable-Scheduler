@@ -71,7 +71,16 @@ echo "🔧 Configuring Nginx..."
 envsubst '${PORT}' < /etc/nginx/conf.d/render.conf.template > /etc/nginx/conf.d/default.conf
 rm -f /etc/nginx/conf.d/render.conf.template
 
-echo "✅ Nginx configured"
+echo "Testing Nginx configuration..."
+nginx -t
+
+if [ $? -eq 0 ]; then
+    echo "✅ Nginx configured"
+else
+    echo "❌ Nginx configuration failed"
+    cat /etc/nginx/conf.d/default.conf
+    exit 1
+fi
 
 # Cleanup on exit
 cleanup() {
@@ -90,5 +99,12 @@ echo "  📊 Django Admin: /admin"
 echo "  🤖 FastAPI Docs: /ai/docs"
 echo "  💚 Health: /health"
 echo "========================================="
+echo ""
+echo "🚀 Starting Nginx on port $PORT..."
+echo "Nginx will proxy:"
+echo "  / -> Next.js (localhost:3000)"
+echo "  /api/ -> Django (localhost:8000)"
+echo "  /ai/ -> FastAPI (localhost:8001)"
+echo ""
 
 exec nginx -g "daemon off;"
