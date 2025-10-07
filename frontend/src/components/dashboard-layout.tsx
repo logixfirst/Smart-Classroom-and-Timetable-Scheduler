@@ -16,7 +16,7 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
   return (
     <>
-      <div className={`min-h-screen bg-white dark:bg-[#2a2a2a] transition-colors duration-300 ${showSignOutDialog ? 'blur-sm' : ''}`}>
+      <div className={`min-h-screen bg-[#FFFFFF] dark:bg-[#121212] transition-colors duration-300 ${showSignOutDialog ? 'blur-sm' : ''}`}>
         <Header 
           sidebarOpen={sidebarOpen}
           sidebarCollapsed={sidebarCollapsed}
@@ -33,9 +33,9 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         />
 
         {/* Main content */}
-        <div className={`transition-all duration-300 ease-in-out ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-56'}`}>
-          <main className="min-h-[calc(100vh-20px)] sm:min-h-[calc(100vh-28px)] mt-16 mb-2 mr-2 ml-2 sm:mb-2 sm:mt-15 sm:mr-1 sm:ml-1 pt-[15px] sm:pt-[15px] md:pt-[15px] overflow-y-auto bg-gray-100 dark:bg-[#1f1f1f] scrollbar-hide rounded-2xl">
-            <div className="pl-2 pr-2 pb-5 pt-5 sm:p-2 lg:p-4">
+        <div className={`transition-all duration-300 ease-out ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-56'}`}>
+          <main className={`min-h-[calc(100vh-4rem)] mt-16 ${sidebarCollapsed ? 'p-2 lg:p-4' : 'p-4 lg:p-6'}`}>
+            <div className={`mx-auto ${sidebarCollapsed ? 'max-w-1xl px-1 lg:px-1' : 'max-w-7xl'}`}>
               {children}
             </div>
           </main>
@@ -44,15 +44,15 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
       
       {/* Sign Out Confirmation Dialog */}
       {showSignOutDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-[#2a2a2a] rounded-xl p-6 w-full max-w-sm border border-gray-200 dark:border-gray-700 shadow-lg">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-[#1E1E1E] rounded-xl p-6 w-full max-w-sm border border-[#E0E0E0] dark:border-[#2A2A2A] shadow-2xl">
+            <h3 className="text-lg font-semibold text-[#2C2C2C] dark:text-[#FFFFFF] mb-2">
               Sign Out
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            <p className="text-sm text-[#6B6B6B] dark:text-[#B3B3B3] mb-6">
               Are you sure you want to sign out?
             </p>
-            <div className="flex gap-2 justify-end">
+            <div className="flex gap-3 justify-end">
               <button 
                 onClick={() => setShowSignOutDialog(false)}
                 className="btn-secondary"

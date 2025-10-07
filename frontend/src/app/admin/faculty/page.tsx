@@ -2,71 +2,88 @@
 
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
+import apiClient from '@/lib/api'
 
 interface Faculty {
   id: number
   faculty_id: string
   faculty_name: string
   designation: string
-  department: string
-  course_taught: string
-  elective_assigned: string
-  max_workload_per_week: number
+  specialization: string
+  department: {
+    department_id: string
+    department_name: string
+  }
+  max_workload: number
+  status: string
 }
 
 export default function FacultyManagePage() {
   const [faculty, setFaculty] = useState<Faculty[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isTableLoading, setIsTableLoading] = useState(false) // New: Table-specific loading
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
   useEffect(() => {
-    // Set static mock faculty instead of API call
-    const mockFaculty = [
-      { 
-        id: 1, 
-        faculty_id: 'FAC001', 
-        faculty_name: 'Dr. Rajesh Kumar', 
-        designation: 'Professor', 
-        department: 'Computer Science', 
-        course_taught: 'Data Structures', 
-        elective_assigned: 'Machine Learning', 
-        max_workload_per_week: 20 
-      },
-      { 
-        id: 2, 
-        faculty_id: 'FAC002', 
-        faculty_name: 'Dr. Priya Sharma', 
-        designation: 'Associate Professor', 
-        department: 'Computer Science', 
-        course_taught: 'Database Systems', 
-        elective_assigned: 'Web Development', 
-        max_workload_per_week: 18 
-      },
-      { 
-        id: 3, 
-        faculty_id: 'FAC003', 
-        faculty_name: 'Prof. Amit Singh', 
-        designation: 'Assistant Professor', 
-        department: 'Mathematics', 
-        course_taught: 'Calculus', 
-        elective_assigned: 'Statistics', 
-        max_workload_per_week: 16 
+    fetchFaculty()
+  }, [currentPage])
+
+  const fetchFaculty = async () => {
+    // For initial load, show full loading. For pagination, show table loading only
+    if (currentPage > 1) {
+      setIsTableLoading(true)
+    } else {
+      setIsLoading(true)
+    }
+    
+    setError(null)
+    try {
+      const response = await apiClient.getFaculty(currentPage)
+      if (response.error) {
+        setError(response.error)
+      } else if (response.data) {
+        setFaculty(response.data.results || response.data)
+        if (response.data.count) {
+          setTotalPages(Math.ceil(response.data.count / 100))
+        }
       }
-    ]
-    setFaculty(mockFaculty)
-    setIsLoading(false)
-  }, [])
+    } catch (err) {
+      setError('Failed to fetch faculty')
+    } finally {
+      setIsLoading(false)
+      setIsTableLoading(false) // Stop both loading states
+    }
+  }
 
   const filteredFaculty = faculty.filter(member => {
     const matchesSearch = member.faculty_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          member.faculty_id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesDepartment = !selectedDepartment || member.department === selectedDepartment
+    const matchesDepartment = !selectedDepartment || member.department.department_name === selectedDepartment
     return matchesSearch && matchesDepartment
   })
 
-  const departments = [...new Set(faculty.map(f => f.department))].filter(Boolean)
+  const departments = [...new Set(faculty.map(f => f.department.department_name))].filter(Boolean)
+
+  // Pagination handlers with table loading
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage)
+  }
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      handlePageChange(currentPage - 1)
+    }
+  }
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      handlePageChange(currentPage + 1)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -166,12 +183,12 @@ export default function FacultyManagePage() {
                     </div>
                     <div className="space-y-2">
                       <div className="flex gap-2">
-                        <span className="badge badge-neutral text-xs">{member.department}</span>
-                        <span className="badge badge-info text-xs">{member.max_workload_per_week}h/week</span>
+                        <span className="badge badge-neutral text-xs">{member.department.department_name}</span>
+                        <span className="badge badge-info text-xs">{member.max_workload}h/week</span>
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">
-                        <p><strong>Course:</strong> {member.course_taught}</p>
-                        <p><strong>Elective:</strong> {member.elective_assigned}</p>
+                        <p><strong>Specialization:</strong> {member.specialization}</p>
+                        <p><strong>Status:</strong> {member.status}</p>
                       </div>
                     </div>
                   </div>
@@ -179,7 +196,17 @@ export default function FacultyManagePage() {
               </div>
               
               {/* Desktop Table View */}
-              <div className="hidden lg:block overflow-x-auto">
+              <div className="hidden lg:block overflow-x-auto relative">
+                {/* Table Loading Overlay */}
+                {isTableLoading && (
+                  <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
+                    <div className="flex flex-col items-center">
+                      <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Loading...</span>
+                    </div>
+                  </div>
+                )}
+                
                 <table className="table">
                   <thead className="table-header">
                     <tr>
@@ -187,9 +214,9 @@ export default function FacultyManagePage() {
                       <th className="table-header-cell">Name</th>
                       <th className="table-header-cell">Designation</th>
                       <th className="table-header-cell">Department</th>
-                      <th className="table-header-cell">Course Taught</th>
-                      <th className="table-header-cell">Elective</th>
+                      <th className="table-header-cell">Specialization</th>
                       <th className="table-header-cell">Workload</th>
+                      <th className="table-header-cell">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -204,11 +231,13 @@ export default function FacultyManagePage() {
                         <td className="table-cell">
                           <span className="badge badge-neutral text-xs">{member.designation}</span>
                         </td>
-                        <td className="table-cell">{member.department}</td>
-                        <td className="table-cell">{member.course_taught}</td>
-                        <td className="table-cell">{member.elective_assigned}</td>
+                        <td className="table-cell">{member.department.department_name}</td>
+                        <td className="table-cell">{member.specialization}</td>
                         <td className="table-cell">
-                          <span className="badge badge-info text-xs">{member.max_workload_per_week}h/week</span>
+                          <span className="badge badge-info text-xs">{member.max_workload}h/week</span>
+                        </td>
+                        <td className="table-cell">
+                          <span className="badge badge-success text-xs">{member.status}</span>
                         </td>
                       </tr>
                     ))}

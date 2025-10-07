@@ -8,13 +8,11 @@ build/
 dist/
 
 # Environment variables
-<<<<<<< HEAD
-# .env
-# .env.local
-# .env.production
-# .env.development
-=======
->>>>>>> 956765f518cc4e253414b8eacef210c0807bc9ed
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Python
 __pycache__/
@@ -22,10 +20,10 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
 venv/
 .venv/
 ENV/
+.env
 env.bak/
 venv.bak/
 
@@ -45,7 +43,7 @@ staticfiles/
 .idea/
 *.swp
 *.swo
-
+``
 # OS
 .DS_Store
 Thumbs.db

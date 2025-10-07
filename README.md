@@ -1,4 +1,4 @@
-# SIH28 - Timetable Optimization Platform
+ # SIH28 - Timetable Optimization Platform
 
 A comprehensive timetable optimization platform with AI-powered scheduling, role-based dashboards, and responsive design.
 
@@ -10,7 +10,7 @@ SIH28 is a modern web application that automates timetable generation and manage
 
 - **AI-Powered Scheduling**: Intelligent timetable generation using OR-Tools
 - **Role-Based Dashboards**: Separate interfaces for Admin, Staff, Faculty, and Students
-- **Responsive Design**: Mobile-first approach with dark/light theme support
+- **Responsive Design**: Mobile-first approach  
 - **Real-time Optimization**: Conflict detection and resolution
 - **Modern UI**: Built with Next.js 14 and Tailwind CSS
 

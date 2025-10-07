@@ -1,12 +1,108 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
+import apiClient from '@/lib/api'
+
+interface Course {
+  course_id: string
+  course_name: string
+  duration_years: number
+  department: {
+    department_id: string
+    department_name: string
+  }
+}
 
 export default function CoursesPage() {
-  const courses = [
-    { id: 1, code: "CS101", name: "Introduction to Programming", credits: 3, department: "Computer Science", semester: 1 },
-    { id: 2, code: "CS201", name: "Data Structures", credits: 4, department: "Computer Science", semester: 3 },
-    { id: 3, code: "MATH101", name: "Calculus I", credits: 3, department: "Mathematics", semester: 1 },
-    { id: 4, code: "CS301", name: "Database Systems", credits: 3, department: "Computer Science", semester: 5 },
-  ]
+  const [courses, setCourses] = useState<Course[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isTableLoading, setIsTableLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
+
+  useEffect(() => {
+    fetchCourses()
+  }, [])
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm) {
+        fetchCourses(true)
+      }
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm])
+
+  const fetchCourses = async (isRefresh = false) => {
+    if (isRefresh) {
+      setIsTableLoading(true)
+    } else {
+      setIsLoading(true)
+    }
+    setError(null)
+    
+    try {
+      const response = await apiClient.getCourses()
+      if (response.error) {
+        setError(response.error)
+      } else if (response.data) {
+        // Handle both paginated and non-paginated responses
+        let courseData = Array.isArray(response.data) 
+          ? response.data 
+          : response.data.results || []
+          
+        // Filter by search term
+        if (searchTerm) {
+          courseData = courseData.filter((course: Course) =>
+            course.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            course.course_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            course.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        }
+        
+        setCourses(courseData)
+      }
+    } catch (err) {
+      setError('Failed to fetch courses')
+    } finally {
+      if (isRefresh) {
+        setIsTableLoading(false)
+      } else {
+        setIsLoading(false)
+      }
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <DashboardLayout role="admin">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="loading-spinner w-8 h-8 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading courses...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout role="admin">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="text-4xl mb-4">⚠️</div>
+            <p className="text-red-600 dark:text-red-400">{error}</p>
+            <button onClick={() => window.location.reload()} className="btn-primary mt-4">
+              Try Again
+            </button>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   return (
     <DashboardLayout role="admin">
@@ -28,6 +124,8 @@ export default function CoursesPage() {
                 <input 
                   placeholder="Search courses..." 
                   className="input-primary pl-10 w-full" 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
@@ -53,17 +151,16 @@ export default function CoursesPage() {
           {/* Mobile Card View */}
           <div className="block sm:hidden space-y-3">
             {courses.map((course) => (
-              <div key={course.id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
+              <div key={course.course_id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="badge badge-neutral text-xs">{course.code}</span>
-                      <span className="text-xs text-gray-600 dark:text-gray-400">{course.credits} credits</span>
+                      <span className="badge badge-neutral text-xs">{course.course_id}</span>
+                      <span className="text-xs text-gray-600 dark:text-gray-400">{course.duration_years} years</span>
                     </div>
-                    <h4 className="font-medium text-sm text-gray-800 dark:text-gray-200">{course.name}</h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">{course.department}</p>
+                    <h4 className="font-medium text-sm text-gray-800 dark:text-gray-200">{course.course_name}</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{course.department.department_name}</p>
                   </div>
-                  <span className="badge badge-success text-xs ml-2">Sem {course.semester}</span>
                 </div>
                 <div className="flex gap-2">
                   <button className="btn-ghost text-xs px-3 py-1 flex-1">Edit</button>
@@ -74,7 +171,17 @@ export default function CoursesPage() {
           </div>
           
           {/* Desktop Table View */}
-          <div className="hidden sm:block overflow-x-auto">
+          <div className="hidden sm:block overflow-x-auto relative">
+            {/* Table Loading Overlay */}
+            {isTableLoading && (
+              <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Loading...</span>
+                </div>
+              </div>
+            )}
+            
             <table className="table">
               <thead className="table-header">
                 <tr>
@@ -88,25 +195,25 @@ export default function CoursesPage() {
               </thead>
               <tbody>
                 {courses.map((course) => (
-                  <tr key={course.id} className="table-row">
+                  <tr key={course.course_id} className="table-row">
                     <td className="table-cell">
-                      <span className="font-medium text-gray-800 dark:text-gray-200">{course.code}</span>
+                      <span className="font-medium text-gray-800 dark:text-gray-200">{course.course_id}</span>
                     </td>
                     <td className="table-cell">
-                      <div className="font-medium text-gray-800 dark:text-gray-200">{course.name}</div>
+                      <div className="font-medium text-gray-800 dark:text-gray-200">{course.course_name}</div>
                       <div className="text-xs text-gray-600 dark:text-gray-400 md:hidden">
-                        {course.credits} credits • {course.department}
+                        {course.duration_years} years • {course.department.department_name}
                       </div>
                     </td>
-                    <td className="table-cell">{course.credits}</td>
-                    <td className="table-cell">{course.department}</td>
+                    <td className="table-cell">{course.duration_years} years</td>
+                    <td className="table-cell">{course.department.department_name}</td>
                     <td className="table-cell">
-                      <span className="badge badge-neutral text-xs">Sem {course.semester}</span>
+                      <span className="badge badge-neutral text-xs">-</span>
                     </td>
                     <td className="table-cell">
                       <div className="flex gap-1 sm:gap-2">
-                        <button className="btn-ghost text-xs px-2 py-1">Edit</button>
-                        <button className="btn-danger text-xs px-2 py-1">Del</button>
+                        <button className="btn-ghost text-xs px-2 py-1" disabled={isTableLoading}>Edit</button>
+                        <button className="btn-danger text-xs px-2 py-1" disabled={isTableLoading}>Del</button>
                       </div>
                     </td>
                   </tr>

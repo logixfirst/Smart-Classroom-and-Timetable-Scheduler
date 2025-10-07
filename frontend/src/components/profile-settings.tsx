@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ThemeToggle } from "@/components/shared/ThemeToggle"
 
 export function ProfileSettings() {
   return (
@@ -23,7 +22,6 @@ export function ProfileSettings() {
             <p className="text-muted-foreground">Tuesday, Oct 15</p>
           </div>
         </div>
-        <ThemeToggle />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
