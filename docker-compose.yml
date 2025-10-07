@@ -42,8 +42,7 @@ services:
   django:
     build: 
       context: .
-      dockerfile: Dockerfile
-      target: django-production
+      dockerfile: backend/django/Dockerfile.prod
     container_name: sih28_django
     restart: unless-stopped
     ports:
@@ -83,8 +82,7 @@ services:
   fastapi:
     build: 
       context: .
-      dockerfile: Dockerfile
-      target: fastapi-production
+      dockerfile: backend/fastapi/Dockerfile.prod
     container_name: sih28_fastapi
     restart: unless-stopped
     ports:

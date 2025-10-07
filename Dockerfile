@@ -5,8 +5,8 @@
 FROM node:18-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-# Install dependencies and fix vulnerabilities
-RUN npm ci --only=production && npm audit fix --force || true
+# Install dependencies with exact versions from lock file
+RUN npm ci --only=production --omit=dev
 COPY frontend/ ./
 RUN npm run build
 
@@ -43,20 +43,59 @@ WORKDIR /app
 COPY --from=frontend-builder /app/frontend/.next/standalone ./
 COPY --from=frontend-builder /app/frontend/.next/static ./.next/static
 COPY --from=frontend-builder /app/frontend/public ./public
+COPY scripts/render-entrypoint.sh /render-entrypoint.sh
+RUN chmod +x /render-entrypoint.sh
+ENV SERVICE_TYPE=frontend
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["/render-entrypoint.sh"]
 
 # Stage 5: Django Production  
 FROM python:3.11-slim AS django-production
 WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    curl \
+    bash \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python dependencies from builder
+COPY --from=django-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=django-builder /usr/local/bin /usr/local/bin
+
+# Copy application code
 COPY --from=django-builder /app/backend/django ./
+
+# Copy render script
+COPY scripts/render-entrypoint.sh /render-entrypoint.sh
+RUN chmod +x /render-entrypoint.sh
+
+ENV SERVICE_TYPE=django
 EXPOSE 8000
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "erp.wsgi:application"]
+CMD ["/render-entrypoint.sh"]
 
 # Stage 6: FastAPI Production
 FROM python:3.11-slim AS fastapi-production
 WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    bash \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Python dependencies from builder
+COPY --from=fastapi-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=fastapi-builder /usr/local/bin /usr/local/bin
+
+# Copy application code
 COPY --from=fastapi-builder /app/backend/fastapi ./
+
+# Copy render script
+COPY scripts/render-entrypoint.sh /render-entrypoint.sh
+RUN chmod +x /render-entrypoint.sh
+
+ENV SERVICE_TYPE=fastapi
 EXPOSE 8001
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
-CMD ["/docker-entrypoint.sh"]
+CMD ["/render-entrypoint.sh"]
