@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     # Local apps
+    'core',
     'academics',
 ]
 
