@@ -56,8 +56,8 @@ class ProgressUpdate(BaseModel):
     message: Optional[str] = None
 
 
-# Health Check
-@app.get("/")
+# Health Check (only for /ai/health via nginx proxy)
+@app.get("/health")
 async def root():
     return {
         "service": "Timetable Generation Engine",
@@ -66,7 +66,7 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.get("/detailed")
 async def health_check():
     """Health check endpoint"""
     try:
