@@ -40,10 +40,9 @@ services:
       - sih28_network
 
   django:
-    build: 
-      context: .
+    build:
+      context: ./backend/django
       dockerfile: Dockerfile
-      target: django-production
     container_name: sih28_django
     restart: unless-stopped
     ports:
@@ -81,10 +80,9 @@ services:
       - sih28_network
 
   fastapi:
-    build: 
-      context: .
+    build:
+      context: ./backend/fastapi
       dockerfile: Dockerfile
-      target: fastapi-production
     container_name: sih28_fastapi
     restart: unless-stopped
     ports:
@@ -109,10 +107,9 @@ services:
       - sih28_network
 
   frontend:
-    build: 
-      context: .
+    build:
+      context: ./frontend
       dockerfile: Dockerfile
-      target: frontend-production
     container_name: sih28_frontend
     restart: unless-stopped
     ports:
