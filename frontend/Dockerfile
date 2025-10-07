@@ -12,7 +12,7 @@ RUN if [ "$NODE_ENV" = "development" ] ; then npm install ; else npm ci --only=p
 COPY . .
 
 # Build for production (skip in development)
-RUN if [ "$NODE_ENV" != "development" ] ; then npm run build ; fi
+RUN if [ "$NODE_ENV" != "development" ] ; then SKIP_ENV_VALIDATION=1 npm run build ; fi
 
 EXPOSE 3000
 
