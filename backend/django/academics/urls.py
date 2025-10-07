@@ -6,6 +6,7 @@ from .views import (
     LabViewSet, TimetableViewSet, TimetableSlotViewSet, AttendanceViewSet,
     login_view, logout_view, current_user_view
 )
+from .generation_views import GenerationJobViewSet
 
 router = DefaultRouter()
 router.register(r'users', UserViewSet)
@@ -20,6 +21,7 @@ router.register(r'labs', LabViewSet)
 router.register(r'timetables', TimetableViewSet)
 router.register(r'timetable-slots', TimetableSlotViewSet)
 router.register(r'attendance', AttendanceViewSet)
+router.register(r'generation-jobs', GenerationJobViewSet, basename='generation-job')
 
 urlpatterns = [
     path('', include(router.urls)),

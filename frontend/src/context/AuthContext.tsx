@@ -50,8 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       const { token, user: userData } = response.data
       
-      // Set token in API client
+      // Set token in API client and localStorage
       apiClient.setToken(token)
+      localStorage.setItem('auth_token', token)
       
       // Store user data
       const userWithoutPassword = {

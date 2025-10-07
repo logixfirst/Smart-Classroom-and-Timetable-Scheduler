@@ -1,8 +1,113 @@
 "use client"
 
+import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
+import ExportButton from '@/components/shared/ExportButton'
+import apiClient from '@/lib/api'
+
+interface TodayClass {
+  time: string
+  subject: string
+  code: string
+  faculty: string
+  room: string
+  status: 'upcoming' | 'current' | 'completed'
+  type: string
+}
+
+interface TimetableSlot {
+  slot_id: string
+  day: string
+  time_slot: string
+  subject_name: string
+  faculty_name: string
+  classroom_number: string
+  batch_id: string
+}
 
 export default function StudentDashboard() {
+  const [todaysClasses, setTodaysClasses] = useState<TodayClass[]>([])
+  const [loading, setLoading] = useState(true)
+  const [timetableData, setTimetableData] = useState<any>(null)
+
+  useEffect(() => {
+    loadTimetableData()
+  }, [])
+
+  const loadTimetableData = async () => {
+    try {
+      setLoading(true)
+      
+      // Get the latest approved timetable
+      const response = await apiClient.getLatestApprovedTimetable()
+      
+      if (response.data && response.data.timetables) {
+        setTimetableData(response.data)
+        
+        // Process timetable data for student view
+        const allSlots: TimetableSlot[] = []
+        response.data.timetables.forEach((timetable: any) => {
+          if (timetable.slots) {
+            allSlots.push(...timetable.slots)
+          }
+        })
+        
+        // Filter slots for current day
+        const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
+        const todaysSlots = allSlots.filter(slot => 
+          slot.day.toLowerCase().includes(currentDay.slice(0, 3))
+        )
+        
+        // Convert to today's classes format with realistic status
+        const now = new Date()
+        const currentHour = now.getHours()
+        
+        const todaysClassesData: TodayClass[] = todaysSlots.map((slot, index) => {
+          // Parse time slot to determine status
+          const [startTime] = slot.time_slot.split('-')
+          const [hour] = startTime.split(':').map(Number)
+          
+          let status: 'upcoming' | 'current' | 'completed' = 'upcoming'
+          if (hour < currentHour) {
+            status = 'completed'
+          } else if (hour === currentHour) {
+            status = 'current'
+          }
+          
+          return {
+            time: slot.time_slot,
+            subject: slot.subject_name,
+            code: `CS${300 + index}`, // Mock course code
+            faculty: slot.faculty_name,
+            room: slot.classroom_number,
+            status,
+            type: index % 3 === 0 ? 'Lab' : index % 3 === 1 ? 'Lecture' : 'Tutorial'
+          }
+        })
+        
+        setTodaysClasses(todaysClassesData)
+      } else {
+        // Fallback to mock data if no approved timetable
+        loadMockData()
+      }
+    } catch (error) {
+      console.error('Failed to load timetable data:', error)
+      // Fallback to mock data on error
+      loadMockData()
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadMockData = () => {
+    // Fallback mock data
+    const mockClasses: TodayClass[] = [
+      { time: '09:00 - 10:30', subject: 'Data Structures', code: 'CS301', faculty: 'Dr. Rajesh Kumar', room: 'Lab 1', status: 'upcoming', type: 'Lab' },
+      { time: '11:00 - 12:30', subject: 'Database Systems', code: 'CS302', faculty: 'Prof. Meera Sharma', room: 'Room 205', status: 'current', type: 'Lecture' },
+      { time: '14:00 - 15:30', subject: 'Software Engineering', code: 'CS303', faculty: 'Dr. Vikram Gupta', room: 'Room 301', status: 'upcoming', type: 'Tutorial' },
+    ]
+    setTodaysClasses(mockClasses)
+  }
   return (
     <DashboardLayout role="student">
       <div className="space-y-4 sm:space-y-6">
@@ -76,20 +181,45 @@ export default function StudentDashboard() {
                       <span className="hidden sm:inline">Calendar View</span>
                       <span className="sm:hidden">Calendar</span>
                     </button>
-                    <button className="btn-secondary text-xs px-3 py-2">
-                      <span className="mr-1">📤</span>
-                      <span className="hidden sm:inline">Export .ics</span>
-                      <span className="sm:hidden">Export</span>
-                    </button>
+                    <ExportButton
+                      slots={todaysClasses.map(cls => ({
+                        day: new Date().toLocaleDateString('en-US', { weekday: 'long' }),
+                        time_slot: cls.time,
+                        subject_name: cls.subject,
+                        faculty_name: cls.faculty,
+                        classroom_number: cls.room,
+                        batch_id: 'CS-A' // Could be dynamic based on student data
+                      }))}
+                      tableElementId="student-schedule-grid"
+                      options={{
+                        title: 'Student Timetable',
+                        department: 'Computer Science',
+                        batch: 'CS-A',
+                        semester: 5,
+                        academicYear: '2024-25'
+                      }}
+                      className="text-xs px-3 py-2"
+                    />
                   </div>
                 </div>
               </div>
-              <div className="space-y-3">
-                {[
-                  { time: '09:00 - 10:30', subject: 'Data Structures', code: 'CS301', faculty: 'Dr. Rajesh Kumar', room: 'Lab 1', status: 'upcoming', type: 'Lab' },
-                  { time: '11:00 - 12:30', subject: 'Database Systems', code: 'CS302', faculty: 'Prof. Meera Sharma', room: 'Room 205', status: 'current', type: 'Lecture' },
-                  { time: '14:00 - 15:30', subject: 'Software Engineering', code: 'CS303', faculty: 'Dr. Vikram Gupta', room: 'Room 301', status: 'upcoming', type: 'Tutorial' },
-                ].map((class_, index) => (
+              
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Loading today's schedule...</p>
+                  </div>
+                </div>
+              ) : todaysClasses.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-4">📅</div>
+                  <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">No Classes Today</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Enjoy your free day!</p>
+                </div>
+              ) : (
+                <div id="student-schedule-grid" className="space-y-3">
+                  {todaysClasses.map((class_, index) => (
                   <div key={index} className={`p-3 sm:p-4 rounded-lg border-l-4 ${
                     class_.status === 'current' 
                       ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500' 
@@ -117,8 +247,9 @@ export default function StudentDashboard() {
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Course Registration/Enrollment */}

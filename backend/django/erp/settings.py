@@ -60,6 +60,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Custom logging middleware
+    'core.middleware.RequestResponseLoggingMiddleware',
+    'core.middleware.APIMetricsMiddleware',
 ]
 
 ROOT_URLCONF = 'erp.urls'
@@ -185,4 +188,76 @@ CACHES = {
         'KEY_PREFIX': 'sih28',
         'VERSION': 1,
     }
+}
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+        'json': {
+            'format': '%(asctime)s %(name)s %(levelname)s %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),
+            'maxBytes': 1024*1024*50,  # 50 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+        'api_requests_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'api_requests.log'),
+            'maxBytes': 1024*1024*100,  # 100 MB
+            'backupCount': 10,
+            'formatter': 'json',
+        },
+        'api_metrics_file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'api_metrics.log'),
+            'maxBytes': 1024*1024*50,  # 50 MB
+            'backupCount': 5,
+            'formatter': 'json',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'api_requests': {
+            'handlers': ['console', 'api_requests_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'api_metrics': {
+            'handlers': ['api_metrics_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'academics': {
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
 }

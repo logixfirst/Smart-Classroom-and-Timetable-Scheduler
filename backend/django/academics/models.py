@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+import uuid
 
 # Create your models here.
 
@@ -145,6 +146,37 @@ class Lab(models.Model):
     def __str__(self):
         return f"{self.lab_name} ({self.lab_id})"
 
+class GenerationJob(models.Model):
+    """Timetable Generation Job Tracking"""
+    STATUS_CHOICES = [
+        ('queued', 'Queued'),
+        ('running', 'Running'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    job_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='generation_jobs')
+    batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='generation_jobs')
+    semester = models.IntegerField()
+    academic_year = models.CharField(max_length=20)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='queued')
+    progress = models.IntegerField(default=0)  # 0-100%
+    error_message = models.TextField(blank=True, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='generation_jobs')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(blank=True, null=True)
+    
+    class Meta:
+        db_table = 'generation_jobs'
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"Job {self.job_id} - {self.status} ({self.progress}%)"
+
 class Timetable(models.Model):
     """Timetable model"""
     STATUS_CHOICES = [
@@ -155,6 +187,7 @@ class Timetable(models.Model):
     ]
     
     timetable_id = models.AutoField(primary_key=True)
+    generation_job = models.ForeignKey(GenerationJob, on_delete=models.SET_NULL, null=True, blank=True, related_name='timetables')
     department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='timetables')
     batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='timetables')
     semester = models.IntegerField()

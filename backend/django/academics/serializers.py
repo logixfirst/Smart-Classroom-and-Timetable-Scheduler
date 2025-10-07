@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     User, Department, Course, Subject, Faculty, Student,
-    Batch, Classroom, Lab, Timetable, TimetableSlot, Attendance
+    Batch, Classroom, Lab, GenerationJob, Timetable, TimetableSlot, Attendance
 )
 
 class UserSerializer(serializers.ModelSerializer):
@@ -130,6 +130,33 @@ class TimetableSerializer(serializers.ModelSerializer):
     class Meta:
         model = Timetable
         fields = '__all__'
+
+class GenerationJobSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(source='department.department_name', read_only=True)
+    batch_name = serializers.CharField(source='batch.batch_id', read_only=True)
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    
+    class Meta:
+        model = GenerationJob
+        fields = '__all__'
+        read_only_fields = ['job_id', 'status', 'progress', 'created_at', 'updated_at', 'completed_at']
+
+class GenerationJobCreateSerializer(serializers.Serializer):
+    """Serializer for creating a timetable generation job"""
+    department_id = serializers.CharField(required=True)
+    batch_id = serializers.CharField(required=True)
+    semester = serializers.IntegerField(required=True, min_value=1, max_value=8)
+    academic_year = serializers.CharField(required=True)
+    
+    def validate_department_id(self, value):
+        if not Department.objects.filter(department_id=value).exists():
+            raise serializers.ValidationError("Department does not exist")
+        return value
+    
+    def validate_batch_id(self, value):
+        if not Batch.objects.filter(batch_id=value).exists():
+            raise serializers.ValidationError("Batch does not exist")
+        return value
 
 class AttendanceSerializer(serializers.ModelSerializer):
     student_name = serializers.CharField(source='student.name', read_only=True)

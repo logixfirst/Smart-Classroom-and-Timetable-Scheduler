@@ -17,30 +17,61 @@ interface Course {
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isTableLoading, setIsTableLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     fetchCourses()
   }, [])
 
-  const fetchCourses = async () => {
-    setIsLoading(true)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm) {
+        fetchCourses(true)
+      }
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm])
+
+  const fetchCourses = async (isRefresh = false) => {
+    if (isRefresh) {
+      setIsTableLoading(true)
+    } else {
+      setIsLoading(true)
+    }
     setError(null)
+    
     try {
       const response = await apiClient.getCourses()
       if (response.error) {
         setError(response.error)
       } else if (response.data) {
         // Handle both paginated and non-paginated responses
-        const courseData = Array.isArray(response.data) 
+        let courseData = Array.isArray(response.data) 
           ? response.data 
           : response.data.results || []
+          
+        // Filter by search term
+        if (searchTerm) {
+          courseData = courseData.filter((course: Course) =>
+            course.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            course.course_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            course.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        }
+        
         setCourses(courseData)
       }
     } catch (err) {
       setError('Failed to fetch courses')
     } finally {
-      setIsLoading(false)
+      if (isRefresh) {
+        setIsTableLoading(false)
+      } else {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -93,6 +124,8 @@ export default function CoursesPage() {
                 <input 
                   placeholder="Search courses..." 
                   className="input-primary pl-10 w-full" 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
@@ -138,7 +171,17 @@ export default function CoursesPage() {
           </div>
           
           {/* Desktop Table View */}
-          <div className="hidden sm:block overflow-x-auto">
+          <div className="hidden sm:block overflow-x-auto relative">
+            {/* Table Loading Overlay */}
+            {isTableLoading && (
+              <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Loading...</span>
+                </div>
+              </div>
+            )}
+            
             <table className="table">
               <thead className="table-header">
                 <tr>
@@ -169,8 +212,8 @@ export default function CoursesPage() {
                     </td>
                     <td className="table-cell">
                       <div className="flex gap-1 sm:gap-2">
-                        <button className="btn-ghost text-xs px-2 py-1">Edit</button>
-                        <button className="btn-danger text-xs px-2 py-1">Del</button>
+                        <button className="btn-ghost text-xs px-2 py-1" disabled={isTableLoading}>Edit</button>
+                        <button className="btn-danger text-xs px-2 py-1" disabled={isTableLoading}>Del</button>
                       </div>
                     </td>
                   </tr>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import apiClient from '@/lib/api'
+import { TableLoadingOverlay } from '@/components/shared/LoadingComponents'
 
 interface Batch {
   batch_id: string
@@ -21,6 +22,7 @@ interface Batch {
 export default function BatchesPage() {
   const [batches, setBatches] = useState<Batch[]>([])
   const [loading, setLoading] = useState(true)
+  const [isTableLoading, setIsTableLoading] = useState(false) // New: Table-specific loading
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -37,8 +39,14 @@ export default function BatchesPage() {
     loadBatches()
   }, [])
 
-  const loadBatches = async () => {
-    setLoading(true)
+  const loadBatches = async (isRefresh = false) => {
+    // Use table loading for refreshes, full loading for initial load
+    if (isRefresh) {
+      setIsTableLoading(true)
+    } else {
+      setLoading(true)
+    }
+    
     setError(null)
     try {
       const response = await apiClient.getBatches()
@@ -55,6 +63,7 @@ export default function BatchesPage() {
       setError('Failed to load batches')
     } finally {
       setLoading(false)
+      setIsTableLoading(false)
     }
   }
 
@@ -72,7 +81,7 @@ export default function BatchesPage() {
       })
       
       if (response.ok) {
-        loadBatches()
+        loadBatches(true) // Refresh with table loading
         resetForm()
       }
     } catch (error) {
@@ -102,7 +111,7 @@ export default function BatchesPage() {
       })
       
       if (response.ok) {
-        loadBatches()
+        loadBatches(true) // Refresh with table loading
       }
     } catch (error) {
       console.error('Failed to delete batch:', error)
