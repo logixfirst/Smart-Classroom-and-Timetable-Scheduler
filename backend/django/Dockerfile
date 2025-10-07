@@ -40,5 +40,5 @@ EXPOSE 8000
 # Use entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Default command
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Smart command selection based on environment
+CMD if [ "$DEBUG" = "True" ] ; then python manage.py runserver 0.0.0.0:8000 ; else gunicorn erp.wsgi:application --bind 0.0.0.0:8000 --workers 2 ; fi

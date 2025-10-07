@@ -110,6 +110,8 @@ services:
     build: 
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NODE_ENV=${NODE_ENV:-development}
     container_name: sih28_frontend
     restart: unless-stopped
     ports:
@@ -135,7 +137,9 @@ services:
       - sih28_network
 
   nginx:
-    image: nginx:alpine
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
     container_name: sih28_nginx
     restart: unless-stopped
     ports:
@@ -147,9 +151,20 @@ services:
       - django_static:/var/www/static:ro
       - django_media:/var/www/media:ro
       - nginx_logs:/var/log/nginx
+      - nginx_cache:/var/cache/nginx
     depends_on:
-      - django
-      - frontend
+      django:
+        condition: service_healthy
+      fastapi:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - sih28_network
 
@@ -167,6 +182,8 @@ volumes:
   fastapi_logs:
     driver: local
   nginx_logs:
+    driver: local
+  nginx_cache:
     driver: local
 
 networks:

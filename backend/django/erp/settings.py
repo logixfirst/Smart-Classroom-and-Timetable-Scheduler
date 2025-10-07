@@ -175,20 +175,24 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
-# Cache Configuration (Redis) - Using django-redis with Upstash
+# Cache Configuration - Local development uses dummy cache
 CACHES = {
     'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': os.getenv('REDIS_URL', 'rediss://default:AUxcAAIncDI0ZWM0YjhkZjM2MGU0OWZmYWUxNjMxOTYzODBhYWFjNXAyMTk1NDg@singular-ghost-19548.upstash.io:6379'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'IGNORE_EXCEPTIONS': True,
-        },
-        'TIMEOUT': 300,
-        'KEY_PREFIX': 'sih28',
-        'VERSION': 1,
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
     }
 }
+
+# Redis Cache (for production)
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django_redis.cache.RedisCache',
+#         'LOCATION': os.getenv('REDIS_URL'),
+#         'OPTIONS': {
+#             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+#         },
+#     }
+# }
 
 # Logging Configuration
 LOGGING = {

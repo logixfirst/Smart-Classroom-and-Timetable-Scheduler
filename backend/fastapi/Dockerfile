@@ -39,5 +39,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 # Use entrypoint script
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Default command
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+# Smart command selection based on environment
+CMD if [ "$DEBUG" = "True" ] ; then uvicorn main:app --host 0.0.0.0 --port 8001 --reload ; else uvicorn main:app --host 0.0.0.0 --port 8001 --workers 2 ; fi
