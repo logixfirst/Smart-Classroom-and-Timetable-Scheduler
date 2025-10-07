@@ -134,13 +134,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY backend/django/ /app/backend/django/
 COPY backend/fastapi/ /app/backend/fastapi/
 
-# Install frontend dependencies
+# Install frontend dependencies and build
 COPY frontend/package*.json /app/frontend/
-RUN cd /app/frontend && npm ci --only=production
-
-# Copy frontend source and build
+RUN cd /app/frontend && npm ci
 COPY frontend/ /app/frontend/
-RUN cd /app/frontend && npm run build
+RUN cd /app/frontend && npm run build && npm prune --production
 
 # Configure Nginx
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
