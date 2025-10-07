@@ -100,3 +100,62 @@ RUN chmod +x /render-entrypoint.sh
 ENV SERVICE_TYPE=fastapi
 EXPOSE 8001
 CMD ["/render-entrypoint.sh"]
+
+# Stage 7: All-in-One Production (Render Single Container)
+# Use this stage for single-container deployment with Nginx
+FROM python:3.12-slim AS all-in-one
+
+# Install system dependencies including Node.js and Nginx
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    curl \
+    nginx \
+    gettext-base \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20 for Next.js
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies for both Django and FastAPI
+COPY backend/django/requirements.txt /app/backend/django/
+COPY backend/fastapi/requirements.txt /app/backend/fastapi/
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r /app/backend/django/requirements.txt && \
+    pip install --no-cache-dir -r /app/backend/fastapi/requirements.txt && \
+    pip install --no-cache-dir gunicorn uvicorn
+
+# Copy backend applications
+COPY backend/django/ /app/backend/django/
+COPY backend/fastapi/ /app/backend/fastapi/
+
+# Copy frontend from builder
+COPY --from=frontend-builder /app/frontend/.next/standalone /app/frontend/.next/standalone
+COPY --from=frontend-builder /app/frontend/.next/static /app/frontend/.next/static
+COPY --from=frontend-builder /app/frontend/public /app/frontend/public
+
+# Configure Nginx
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
+COPY nginx/conf.d/render.conf.template /etc/nginx/conf.d/
+
+# Create necessary directories
+RUN mkdir -p /app/backend/django/staticfiles \
+    /app/backend/django/media \
+    /var/cache/nginx \
+    /var/log/nginx \
+    /run/nginx
+
+# Copy all-in-one startup script
+COPY scripts/render-start-all.sh /app/
+RUN chmod +x /app/render-start-all.sh
+
+EXPOSE 10000
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-10000}/health || exit 1
+
+CMD ["/app/render-start-all.sh"]
