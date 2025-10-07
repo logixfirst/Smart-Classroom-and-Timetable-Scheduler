@@ -22,6 +22,7 @@ export default function LabsPage() {
   const [labs, setLabs] = useState<Lab[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isTableLoading, setIsTableLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -38,6 +39,16 @@ export default function LabsPage() {
     fetchDepartments()
   }, [])
 
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm) {
+        fetchLabs(true)
+      }
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm])
+
   const fetchDepartments = async () => {
     try {
       const response = await apiClient.getDepartments()
@@ -52,24 +63,43 @@ export default function LabsPage() {
     }
   }
 
-  const fetchLabs = async () => {
-    setIsLoading(true)
+  const fetchLabs = async (isRefresh = false) => {
+    if (isRefresh) {
+      setIsTableLoading(true)
+    } else {
+      setIsLoading(true)
+    }
     setError(null)
+    
     try {
       const response = await apiClient.getLabs()
       if (response.error) {
         setError(response.error)
       } else if (response.data) {
         // Handle both paginated and non-paginated responses
-        const labData = Array.isArray(response.data) 
+        let labData = Array.isArray(response.data) 
           ? response.data 
           : response.data.results || []
+          
+        // Filter by search term
+        if (searchTerm) {
+          labData = labData.filter((lab: Lab) =>
+            lab.lab_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            lab.lab_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            lab.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        }
+        
         setLabs(labData)
       }
     } catch (err) {
       setError('Failed to fetch labs')
     } finally {
-      setIsLoading(false)
+      if (isRefresh) {
+        setIsTableLoading(false)
+      } else {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -131,10 +161,8 @@ export default function LabsPage() {
     setShowForm(false)
   }
 
-  const filteredLabs = labs.filter(lab =>
-    lab.lab_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lab.lab_id.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Use labs directly since filtering is done in fetchLabs
+  const filteredLabs = labs
 
   if (isLoading) {
     return (
@@ -153,7 +181,7 @@ export default function LabsPage() {
         <div className="text-center">
           <div className="text-4xl mb-4">⚠️</div>
           <p className="text-red-600 dark:text-red-400">{error}</p>
-          <button onClick={fetchLabs} className="btn-primary mt-4">
+          <button onClick={() => fetchLabs()} className="btn-primary mt-4">
             Try Again
           </button>
         </div>
@@ -225,7 +253,17 @@ export default function LabsPage() {
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden lg:block overflow-x-auto">
+            <div className="hidden lg:block overflow-x-auto relative">
+              {/* Table Loading Overlay */}
+              {isTableLoading && (
+                <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
+                  <div className="flex flex-col items-center">
+                    <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Loading...</span>
+                  </div>
+                </div>
+              )}
+              
               <table className="table">
                 <thead className="table-header">
                   <tr>

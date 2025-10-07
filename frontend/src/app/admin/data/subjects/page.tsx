@@ -20,8 +20,10 @@ interface Subject {
 
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isTableLoading, setIsTableLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -37,24 +39,54 @@ export default function SubjectsPage() {
     loadSubjects()
   }, [])
 
-  const loadSubjects = async () => {
-    setLoading(true)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchTerm) {
+        loadSubjects(true)
+      }
+    }, 500)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm])
+
+  const loadSubjects = async (isRefresh = false) => {
+    if (isRefresh) {
+      setIsTableLoading(true)
+    } else {
+      setIsLoading(true)
+    }
     setError(null)
+    
     try {
       const response = await apiClient.getSubjects()
       if (response.error) {
         setError(response.error)
       } else if (response.data) {
         // Handle both paginated and non-paginated responses
-        const subjectData = Array.isArray(response.data) 
+        let subjectData = Array.isArray(response.data) 
           ? response.data 
           : response.data.results || []
+          
+        // Filter by search term
+        if (searchTerm) {
+          subjectData = subjectData.filter((subject: Subject) =>
+            subject.subject_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            subject.subject_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            subject.course.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            subject.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        }
+        
         setSubjects(subjectData)
       }
     } catch (err) {
       setError('Failed to load subjects')
     } finally {
-      setLoading(false)
+      if (isRefresh) {
+        setIsTableLoading(false)
+      } else {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -115,7 +147,7 @@ export default function SubjectsPage() {
     setShowForm(false)
   }
 
-  if (loading) {
+  if (isLoading) {
     return <div className="text-center py-8">Loading...</div>
   }
 
@@ -131,6 +163,23 @@ export default function SubjectsPage() {
         >
           Add Subject
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="card">
+        <div className="p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <input
+                type="text"
+                placeholder="Search by subject name, ID, course, or department..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="input-primary w-full"
+              />
+            </div>
+          </div>
+        </div>
       </div>
 
       {showForm && (
@@ -224,7 +273,17 @@ export default function SubjectsPage() {
       )}
 
       <div className="card">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto relative">
+          {/* Table Loading Overlay */}
+          {isTableLoading && (
+            <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
+              <div className="flex flex-col items-center">
+                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Loading...</span>
+              </div>
+            </div>
+          )}
+          
           <table className="table">
             <thead className="table-header">
               <tr>
@@ -253,12 +312,14 @@ export default function SubjectsPage() {
                       <button
                         onClick={() => handleEdit(subject)}
                         className="btn-ghost text-xs px-2 py-1"
+                        disabled={isTableLoading}
                       >
                         Edit
                       </button>
                       <button
                         onClick={() => handleDelete(subject.subject_id)}
                         className="btn-danger text-xs px-2 py-1"
+                        disabled={isTableLoading}
                       >
                         Delete
                       </button>

@@ -30,7 +30,7 @@ class ApiClient {
     };
 
     if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+      headers['Authorization'] = `Token ${this.token}`;
     }
 
     return headers;
@@ -302,6 +302,82 @@ class ApiClient {
   // Timetable Slots
   async getTimetableSlots(timetableId: string) {
     return this.request<any>(`/timetable-slots/?timetable=${timetableId}`);
+  }
+
+  // Timetable Generation
+  async generateTimetable(generationData: {
+    department_id: string;
+    batch_id: string;
+    semester: number;
+    academic_year: string;
+  }) {
+    return this.request<any>('/generation-jobs/generate/', {
+      method: 'POST',
+      body: JSON.stringify(generationData),
+    });
+  }
+
+  async getGenerationJobs() {
+    return this.request<any>('/generation-jobs/');
+  }
+
+  async getGenerationJob(jobId: string) {
+    return this.request<any>(`/generation-jobs/${jobId}/`);
+  }
+
+  async getGenerationStatus(jobId: string) {
+    return this.request<any>(`/generation-jobs/${jobId}/status/`);
+  }
+
+  async getGenerationProgress(jobId: string) {
+    return this.request<any>(`/generation-jobs/${jobId}/progress/`);
+  }
+
+  async approveGeneration(jobId: string) {
+    return this.request<any>(`/generation-jobs/${jobId}/approve/`, {
+      method: 'POST',
+    });
+  }
+
+  async getGenerationResult(jobId: string) {
+    return this.request<any>(`/generation-jobs/${jobId}/result/`);
+  }
+
+  // Get the latest approved timetable for a department/batch
+  async getLatestApprovedTimetable(departmentId?: string, batchId?: string) {
+    try {
+      // For students, directly get timetables instead of generation jobs
+      const user = typeof window !== 'undefined' ? 
+        JSON.parse(localStorage.getItem('user') || '{}') : {};
+      
+      if (user.role === 'student') {
+        // Students should get timetables directly
+        return this.getTimetables();
+      }
+      
+      const response = await this.getGenerationJobs();
+      if (response.data && response.data.results) {
+        // Find the latest approved job
+        const approvedJobs = response.data.results.filter((job: any) => 
+          job.status === 'approved' &&
+          (!departmentId || job.department.department_id === departmentId) &&
+          (!batchId || job.batch.batch_id === batchId)
+        );
+        
+        if (approvedJobs.length > 0) {
+          // Get the most recent one
+          const latestJob = approvedJobs.sort((a: any, b: any) => 
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+          )[0];
+          
+          // Get the result for this job
+          return this.getGenerationResult(latestJob.job_id);
+        }
+      }
+      return { data: null, error: 'No approved timetable found' };
+    } catch (error) {
+      return { data: null, error: 'Failed to fetch timetable' };
+    }
   }
 
   // Attendance
