@@ -33,6 +33,8 @@ DEBUG = os.getenv('DEBUG', 'True') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 print(f"ALLOWED_HOSTS: {ALLOWED_HOSTS}")
 
+# Disable trailing slash requirement for API endpoints
+APPEND_SLASH = False
 
 # Application definition
 

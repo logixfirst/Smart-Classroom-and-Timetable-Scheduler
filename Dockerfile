@@ -11,32 +11,28 @@ COPY frontend/ ./
 RUN mkdir -p public
 RUN npm run build
 
-# Stage 2: Build Django Backend
-FROM python:3.11-slim AS django-builder
-WORKDIR /app/backend/django
+# Stage 2: Build Backend (Django + FastAPI)
+FROM python:3.11-slim AS backend-builder
+WORKDIR /app/backend
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
+    g++ \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
-COPY backend/django/requirements.txt ./
+# Copy shared requirements
+COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
-COPY backend/django/ ./
+# Copy both Django and FastAPI
+COPY backend/django/ ./django/
+COPY backend/fastapi/ ./fastapi/
+# Collect Django static files
+WORKDIR /app/backend/django
+# Create required directories
+RUN mkdir -p logs staticfiles media
 RUN python manage.py collectstatic --noinput
-
-# Stage 3: Build FastAPI Service
-FROM python:3.11-slim AS fastapi-builder
-WORKDIR /app/backend/fastapi
-# Install system dependencies for ortools
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
-COPY backend/fastapi/requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-COPY backend/fastapi/ ./
+WORKDIR /app/backend
 
 # Stage 4: Frontend Production
 FROM node:18-alpine AS frontend-production
@@ -62,11 +58,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies from builder
-COPY --from=django-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=django-builder /usr/local/bin /usr/local/bin
+COPY --from=backend-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=backend-builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY --from=django-builder /app/backend/django ./
+COPY --from=backend-builder /app/backend/django ./
 
 # Copy render script
 COPY scripts/render-entrypoint.sh /render-entrypoint.sh
@@ -87,11 +83,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python dependencies from builder
-COPY --from=fastapi-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --from=fastapi-builder /usr/local/bin /usr/local/bin
+COPY --from=backend-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=backend-builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY --from=fastapi-builder /app/backend/fastapi ./
+COPY --from=backend-builder /app/backend/fastapi ./
 
 # Copy render script
 COPY scripts/render-entrypoint.sh /render-entrypoint.sh
@@ -123,13 +119,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 WORKDIR /app
 
-# Install Python dependencies for both Django and FastAPI
-COPY backend/django/requirements.txt /app/backend/django/
-COPY backend/fastapi/requirements.txt /app/backend/fastapi/
+# Install Python dependencies for both Django and FastAPI (shared requirements)
+COPY backend/requirements.txt /app/backend/
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r /app/backend/django/requirements.txt && \
-    pip install --no-cache-dir -r /app/backend/fastapi/requirements.txt && \
-    pip install --no-cache-dir gunicorn uvicorn
+    pip install --no-cache-dir -r /app/backend/requirements.txt
 
 # Copy backend applications
 COPY backend/django/ /app/backend/django/
