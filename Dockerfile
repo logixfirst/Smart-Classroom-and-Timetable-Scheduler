@@ -113,6 +113,7 @@ RUN apt-get update && apt-get install -y \
     nginx \
     gettext-base \
     postgresql-client \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 20 for Next.js
