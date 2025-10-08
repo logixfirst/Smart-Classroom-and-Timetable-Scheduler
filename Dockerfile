@@ -141,6 +141,10 @@ RUN cd /app/frontend && npm ci
 COPY frontend/ /app/frontend/
 RUN cd /app/frontend && npm run build && npm prune --production
 
+# Copy static assets to standalone directory
+RUN cp -r /app/frontend/public /app/frontend/.next/standalone/public || true
+RUN cp -r /app/frontend/.next/static /app/frontend/.next/standalone/.next/static || true
+
 # Configure Nginx
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY nginx/conf.d/render.conf.template /etc/nginx/conf.d/
