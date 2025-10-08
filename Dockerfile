@@ -139,6 +139,13 @@ COPY backend/fastapi/ /app/backend/fastapi/
 COPY frontend/package*.json /app/frontend/
 RUN cd /app/frontend && npm ci
 COPY frontend/ /app/frontend/
+# Set build-time environment variables
+ARG NEXT_PUBLIC_API_URL=/api
+ARG NEXT_PUBLIC_AI_SERVICE_URL=/ai
+ARG NEXT_PUBLIC_MOCK_AUTH=false
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_AI_SERVICE_URL=${NEXT_PUBLIC_AI_SERVICE_URL}
+ENV NEXT_PUBLIC_MOCK_AUTH=${NEXT_PUBLIC_MOCK_AUTH}
 RUN cd /app/frontend && npm run build && npm prune --production
 
 # Copy static assets to standalone directory
