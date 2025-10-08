@@ -2,7 +2,7 @@
 # All services run on localhost (127.0.0.1) in same container
 
 server {
-    listen ${PORT};
+    listen 0.0.0.0:${PORT};
     server_name _;
 
     # Security headers

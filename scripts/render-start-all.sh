@@ -56,9 +56,18 @@ FASTAPI_PID=$!
 
 # Start Next.js
 echo "🚀 Starting Next.js (port $FRONTEND_PORT)..."
-cd /app/frontend/.next/standalone
-PORT=$FRONTEND_PORT node server.js &
-FRONTEND_PID=$!
+if [ -f "/app/frontend/.next/standalone/server.js" ]; then
+    echo "✅ Found server.js at /app/frontend/.next/standalone/server.js"
+    cd /app/frontend/.next/standalone
+    PORT=$FRONTEND_PORT node server.js &
+    FRONTEND_PID=$!
+else
+    echo "❌ ERROR: server.js not found!"
+    echo "Checking directory structure:"
+    ls -la /app/frontend/.next/ || echo "No .next directory"
+    ls -la /app/frontend/ || echo "No frontend directory"
+    exit 1
+fi
 
 # Wait for services
 echo ""
