@@ -21,6 +21,8 @@ def django_db_setup():
         'PASSWORD': 'postgres',
         'HOST': 'localhost',
         'PORT': '5432',
+        'ATOMIC_REQUESTS': True,
+        'CONN_MAX_AGE': 600,
     }
 
 
@@ -128,11 +130,13 @@ def faculty(db, department):
     from academics.models import Faculty
     return Faculty.objects.create(
         faculty_id='FAC001',
-        faculty_name='Dr. Test Faculty',
+        faculty_name='Test Faculty',
         designation='Professor',
         department=department,
         specialization='Testing',
-        max_workload_per_week=20
+        max_workload_per_week=20,
+        email='faculty@test.com',
+        phone='1234567890'
     )
 
 
@@ -143,8 +147,8 @@ def classroom(db, department):
     return Classroom.objects.create(
         room_id='ROOM001',
         department=department,
-        room_number='101',
-        capacity=60,
+        room_number='R101',
+        capacity=50,
         room_type='lecture hall'
     )
 
@@ -154,12 +158,29 @@ def batch(db, course, department):
     """Create test batch"""
     from academics.models import Batch
     return Batch.objects.create(
-        batch_id='BATCH001',
+        batch_id='BATCH2024',
         course=course,
         department=department,
         year=1,
         semester=1,
         no_of_students=50
+    )
+
+
+@pytest.fixture
+def student(db, course, department, batch):
+    """Create test student"""
+    from academics.models import Student
+    return Student.objects.create(
+        student_id='STU001',
+        name='Test Student',
+        department=department,
+        course=course,
+        electives='CS101,CS102',
+        year=1,
+        semester=1,
+        email='student@test.com',
+        phone='9876543210'
     )
 
 
