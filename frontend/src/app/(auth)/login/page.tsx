@@ -3,34 +3,41 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { loginSchema, type LoginFormData } from '@/lib/validations'
+import { FormField } from '@/components/FormFields'
+import { useToast } from '@/components/Toast'
 
 export default function LoginPage() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const { login } = useAuth()
   const router = useRouter()
+  const { showToast } = useToast()
+  
+  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  })
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
+  const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true)
 
     try {
-      await login(username, password)
+      await login(data.username, data.password)
+      showToast('success', 'Login successful! Redirecting...')
+      
       // Redirect based on role after login
-      if (username.includes('admin')) {
+      if (data.username.includes('admin')) {
         router.push('/admin/dashboard')
-      } else if (username.includes('staff')) {
+      } else if (data.username.includes('staff')) {
         router.push('/staff/dashboard')
-      } else if (username.includes('student')) {
+      } else if (data.username.includes('student')) {
         router.push('/student/dashboard')
       } else {
         router.push('/faculty/dashboard')
       }
     } catch (err) {
-      setError('Login failed. Please try again.')
+      showToast('error', 'Login failed. Please check your credentials and try again.')
     } finally {
       setIsLoading(false)
     }
@@ -50,42 +57,26 @@ export default function LoginPage() {
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Sign in to your account</p>
         </div>
         
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-          {error && (
-            <div className="p-3 sm:p-4 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-800 dark:text-red-300 rounded-lg text-xs sm:text-sm">
-              {error}
-            </div>
-          )}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
+          <FormField
+            name="username"
+            label="Username"
+            type="text"
+            placeholder="Try: admin, staff, faculty, or student"
+            register={register}
+            error={errors.username}
+            required
+          />
           
-          <div className="form-group">
-            <label htmlFor="username" className="form-label">
-              Username
-            </label>
-            <input 
-              id="username" 
-              type="text" 
-              placeholder="Try: admin, staff, faculty, or student"
-              className="input-primary"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="password" className="form-label">
-              Password
-            </label>
-            <input 
-              id="password" 
-              type="password" 
-              placeholder="Any password"
-              className="input-primary"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
+          <FormField
+            name="password"
+            label="Password"
+            type="password"
+            placeholder="Enter your password"
+            register={register}
+            error={errors.password}
+            required
+          />
           
           <button 
             type="submit" 

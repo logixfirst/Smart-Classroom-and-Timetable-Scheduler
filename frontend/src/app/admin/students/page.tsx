@@ -195,7 +195,7 @@ export default function StudentsPage() {
               </p>
             </div>
           ) : (
-            <div>
+            <>
               {/* Mobile Card View */}
               <div className="block lg:hidden space-y-3 relative">
                 {/* Mobile Loading Overlay */}
@@ -219,13 +219,13 @@ export default function StudentsPage() {
                     </div>
                     <div className="space-y-2">
                       <div className="flex gap-2">
-                        <span key={`dept-${student.id}`} className="badge badge-neutral text-xs">{student.department.department_name}</span>
-                        <span key={`year-${student.id}`} className="badge badge-info text-xs">Year {student.year}</span>
-                        <span key={`sem-${student.id}`} className="badge badge-success text-xs">Sem {student.semester}</span>
+                        <span className="badge badge-neutral text-xs">{student.department.department_name}</span>
+                        <span className="badge badge-info text-xs">Year {student.year}</span>
+                        <span className="badge badge-success text-xs">Sem {student.semester}</span>
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">
-                        <p key={`electives-${student.id}`}><strong>Electives:</strong> {student.electives || 'None'}</p>
-                        <p key={`faculty-${student.id}`}><strong>Faculty:</strong> {student.faculty_advisor?.faculty_name || 'Not assigned'}</p>
+                        <p><strong>Electives:</strong> {student.electives || 'None'}</p>
+                        <p><strong>Faculty:</strong> {student.faculty_advisor?.faculty_name || 'Not assigned'}</p>
                       </div>
                     </div>
                   </div>
@@ -328,7 +328,7 @@ export default function StudentsPage() {
                   </button>
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>

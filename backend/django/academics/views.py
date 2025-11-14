@@ -67,25 +67,40 @@ class CachedModelViewSet(viewsets.ModelViewSet):
         return response
 
 class UserViewSet(CachedModelViewSet):
-    queryset = User.objects.all().order_by('id')
+    queryset = User.objects.all().order_by('id').only(
+        'id', 'username', 'email', 'role', 'department', 
+        'first_name', 'last_name', 'is_active'
+    )
     serializer_class = UserSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['role', 'department']
     search_fields = ['username', 'email', 'first_name', 'last_name']
     ordering_fields = ['id', 'username', 'role']
+    
+    def get_queryset(self):
+        """Optimize queryset with defer for better performance"""
+        return super().get_queryset()
 
 class DepartmentViewSet(CachedModelViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['department_name', 'department_id']
+    
+    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 class CourseViewSet(CachedModelViewSet):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['course_type', 'duration']
+    filterset_fields = ['level', 'duration_years']
     search_fields = ['course_name', 'course_id']
+    
+    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 class SubjectViewSet(CachedModelViewSet):
     queryset = Subject.objects.select_related('course', 'department').all().order_by('subject_id')
@@ -94,14 +109,22 @@ class SubjectViewSet(CachedModelViewSet):
     filterset_fields = ['course', 'department']
     search_fields = ['subject_name', 'subject_id']
     ordering_fields = ['subject_id', 'subject_name']
+    
+    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 class FacultyViewSet(CachedModelViewSet):
-    queryset = Faculty.objects.select_related('department').all().order_by('faculty_id')
+    queryset = Faculty.objects.select_related('department').order_by('faculty_id')
     serializer_class = FacultySerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['department', 'designation']
     search_fields = ['faculty_name', 'faculty_id', 'email', 'specialization']
     ordering_fields = ['faculty_id', 'faculty_name']
+    
+    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
     
     @action(detail=True, methods=['get'])
     def timetable(self, request, pk=None):
@@ -111,12 +134,24 @@ class FacultyViewSet(CachedModelViewSet):
         return Response(serializer.data)
 
 class StudentViewSet(CachedModelViewSet):
-    queryset = Student.objects.select_related('department', 'course', 'faculty_advisor').all().order_by('student_id')
+    queryset = Student.objects.select_related(
+        'department', 'course', 'faculty_advisor'
+    ).only(
+        'student_id', 'name', 'email', 'phone', 'electives', 'year', 'semester',
+        'department__department_id', 'department__department_name', 
+        'department__building_name', 'department__head_of_department',
+        'course__course_id', 'course__course_name', 'course__duration_years', 'course__level',
+        'faculty_advisor__faculty_id', 'faculty_advisor__faculty_name'
+    ).order_by('student_id')
     serializer_class = StudentSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['department', 'course', 'semester', 'year']
     search_fields = ['name', 'student_id', 'email']
     ordering_fields = ['student_id', 'name', 'year', 'semester']
+    
+    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
     
     @action(detail=True, methods=['get'])
     def attendance(self, request, pk=None):
@@ -132,6 +167,10 @@ class BatchViewSet(CachedModelViewSet):
     filterset_fields = ['course', 'department', 'semester', 'year']
     search_fields = ['batch_id']
     ordering_fields = ['batch_id', 'year', 'semester']
+    
+    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 class ClassroomViewSet(CachedModelViewSet):
     queryset = Classroom.objects.select_related('department').all().order_by('room_id')
@@ -140,6 +179,10 @@ class ClassroomViewSet(CachedModelViewSet):
     filterset_fields = ['department', 'room_type']
     search_fields = ['room_number', 'room_id']
     ordering_fields = ['room_id', 'capacity']
+    
+    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 class LabViewSet(CachedModelViewSet):
     queryset = Lab.objects.select_related('department').all().order_by('lab_id')
@@ -148,12 +191,18 @@ class LabViewSet(CachedModelViewSet):
     filterset_fields = ['department']
     ordering_fields = ['lab_id', 'capacity']
     search_fields = ['lab_name', 'lab_id']
+    
+    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
 class TimetableViewSet(CachedModelViewSet):
-    queryset = Timetable.objects.all()
+    queryset = Timetable.objects.select_related(
+        'department', 'batch', 'generation_job', 'created_by'
+    ).prefetch_related('slots').all()
     serializer_class = TimetableSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['department', 'batch', 'semester', 'academic_year']
+    filterset_fields = ['department', 'batch', 'semester', 'academic_year', 'status']
     
     @action(detail=True, methods=['get'])
     def slots(self, request, pk=None):
@@ -163,16 +212,20 @@ class TimetableViewSet(CachedModelViewSet):
         return Response(serializer.data)
 
 class TimetableSlotViewSet(CachedModelViewSet):
-    queryset = TimetableSlot.objects.all()
+    queryset = TimetableSlot.objects.select_related(
+        'timetable', 'subject', 'faculty', 'classroom'
+    ).all()
     serializer_class = TimetableSlotSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['timetable', 'subject', 'faculty', 'classroom', 'day_of_week']
+    filterset_fields = ['timetable', 'subject', 'faculty', 'classroom', 'day']
 
 class AttendanceViewSet(viewsets.ModelViewSet):
-    queryset = Attendance.objects.all()
+    queryset = Attendance.objects.select_related(
+        'student', 'slot', 'marked_by'
+    ).all()
     serializer_class = AttendanceSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['student', 'slot', 'status', 'date']
+    filterset_fields = ['student', 'slot', 'is_present', 'date']
 
 
 # Authentication Views

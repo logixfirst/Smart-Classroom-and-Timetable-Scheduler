@@ -12,11 +12,17 @@ class User(AbstractUser):
         ('faculty', 'Faculty'),
         ('student', 'Student'),
     ]
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
-    department = models.CharField(max_length=100, blank=True, null=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student', db_index=True)
+    department = models.CharField(max_length=100, blank=True, null=True, db_index=True)
     
     class Meta:
         db_table = 'users'
+        indexes = [
+            models.Index(fields=['role', 'department'], name='users_role_dept_idx'),
+            models.Index(fields=['username'], name='users_username_idx'),
+            models.Index(fields=['email'], name='users_email_idx'),
+            models.Index(fields=['is_active', 'role'], name='users_active_role_idx'),
+        ]
 
 class Department(models.Model):
     """Department model based on departments.csv"""
