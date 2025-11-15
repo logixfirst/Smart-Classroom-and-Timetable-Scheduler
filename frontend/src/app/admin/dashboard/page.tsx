@@ -21,22 +21,36 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchDashboardData()
+    
+    // Auto-refresh every 5 seconds to catch Redis updates
+    const interval = setInterval(() => {
+      fetchDashboardData()
+    }, 5000)
+    
+    return () => clearInterval(interval)
   }, [])
 
   const fetchDashboardData = async () => {
     try {
+      // Add cache buster to force fresh data
+      const timestamp = Date.now()
       const [usersRes, coursesRes, facultyRes] = await Promise.all([
-        apiClient.getUsers(1),
-        apiClient.getCourses(),
-        apiClient.getFaculty(1)
+        apiClient.request(`/users/?page=1&_t=${timestamp}`),
+        apiClient.request(`/courses/?_t=${timestamp}`),
+        apiClient.request(`/faculty/?page=1&_t=${timestamp}`)
       ])
 
+      const totalUsers = usersRes.data?.count || usersRes.data?.results?.length || 0
+      const activeCourses = coursesRes.data?.length || coursesRes.data?.results?.length || 0
+      
       setStats({
-        totalUsers: usersRes.data?.count || usersRes.data?.results?.length || 0,
-        activeCourses: coursesRes.data?.length || coursesRes.data?.results?.length || 0,
+        totalUsers,
+        activeCourses,
         pendingApprovals: 0,
         systemHealth: 98
       })
+      
+      console.log('Dashboard updated:', { totalUsers, activeCourses })
 
       const facultyData = facultyRes.data?.results || facultyRes.data || []
       setFaculty(facultyData.slice(0, 3).map((f: any) => ({

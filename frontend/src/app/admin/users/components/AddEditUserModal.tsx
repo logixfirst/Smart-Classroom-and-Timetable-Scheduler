@@ -8,10 +8,11 @@ import { FormField, SelectField } from '@/components/FormFields'
 
 // Simple user schema for the form
 const simpleUserSchema = z.object({
-  first_name: z.string().min(1, 'Name is required'),
+  first_name: z.string().min(1, 'First name is required'),
+  last_name: z.string().min(1, 'Last name is required'),
   email: z.string().email('Valid email is required'),
   role: z.enum(['admin', 'staff', 'faculty', 'student']),
-  last_name: z.string().min(1, 'Department is required'),
+  department: z.string().min(1, 'Department is required'),
   is_active: z.union([z.boolean(), z.string()])
 })
 
@@ -31,19 +32,21 @@ export default function AddEditUserModal({ isOpen, onClose, user, onSave }: AddE
     resolver: zodResolver(simpleUserSchema),
     defaultValues: {
       first_name: '',
+      last_name: '',
       email: '',
       role: 'faculty',
-      last_name: '',
+      department: '',
       is_active: true
     }
   })
 
   useEffect(() => {
     if (user) {
-      setValue('first_name', user.first_name || user.name || '')
+      setValue('first_name', user.first_name || '')
+      setValue('last_name', user.last_name || '')
       setValue('email', user.email || '')
       setValue('role', user.role || 'faculty')
-      setValue('last_name', user.department || '')
+      setValue('department', user.department || '')
       setValue('is_active', user.is_active ?? true)
     } else {
       reset()
@@ -57,8 +60,6 @@ export default function AddEditUserModal({ isOpen, onClose, user, onSave }: AddE
       const userData = {
         ...data,
         username: data.email.split('@')[0], // Generate username from email
-        name: data.first_name, // Use first_name as name
-        department: data.last_name, // Use last_name as department
         is_active: data.is_active === 'true' || data.is_active === true
       }
       await onSave(userData)
@@ -76,14 +77,25 @@ export default function AddEditUserModal({ isOpen, onClose, user, onSave }: AddE
           <h3 className="card-title">{user ? 'Edit User' : 'Add New User'}</h3>
         </div>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            label="Name"
-            name="first_name"
-            register={register}
-            error={errors.first_name}
-            placeholder="Enter full name"
-            required
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField
+              label="First Name"
+              name="first_name"
+              register={register}
+              error={errors.first_name}
+              placeholder="Enter first name"
+              required
+            />
+            
+            <FormField
+              label="Last Name"
+              name="last_name"
+              register={register}
+              error={errors.last_name}
+              placeholder="Enter last name"
+              required
+            />
+          </div>
           
           <FormField
             label="Email"
@@ -109,12 +121,21 @@ export default function AddEditUserModal({ isOpen, onClose, user, onSave }: AddE
             required
           />
           
-          <FormField
+          <SelectField
             label="Department"
-            name="last_name"
+            name="department"
+            options={[
+              { value: 'Computer Science', label: 'Computer Science' },
+              { value: 'Information Technology', label: 'Information Technology' },
+              { value: 'Electronics', label: 'Electronics' },
+              { value: 'Mechanical', label: 'Mechanical' },
+              { value: 'Civil', label: 'Civil' },
+              { value: 'Mathematics', label: 'Mathematics' },
+              { value: 'Physics', label: 'Physics' },
+              { value: 'Chemistry', label: 'Chemistry' }
+            ]}
             register={register}
-            error={errors.last_name}
-            placeholder="Enter department"
+            error={errors.department}
             required
           />
           

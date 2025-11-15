@@ -63,8 +63,8 @@ export default function UsersPage() {
     
     setError(null)
     try {
-      // Build query params for backend filtering
-      let url = `/users/?page=${currentPage}`
+      // Build query params for backend filtering with cache buster
+      let url = `/users/?page=${currentPage}&_t=${Date.now()}`
       if (selectedRole) url += `&role=${selectedRole}`
       if (selectedDepartment) url += `&department=${selectedDepartment}`
       if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`
@@ -130,7 +130,10 @@ export default function UsersPage() {
         showToast('error', response.error)
       } else {
         showToast('success', 'User deleted successfully')
-        fetchUsers()
+        
+        // Force immediate refresh with cache bypass
+        await new Promise(resolve => setTimeout(resolve, 500))
+        await fetchUsers()
       }
     } catch (error) {
       showToast('error', 'Failed to delete user')
@@ -152,7 +155,10 @@ export default function UsersPage() {
         showToast('success', editingUser ? 'User updated successfully' : 'User created successfully')
         setShowModal(false)
         setEditingUser(null)
-        fetchUsers()
+        
+        // Force immediate refresh with cache bypass
+        await new Promise(resolve => setTimeout(resolve, 500))
+        await fetchUsers()
       }
     } catch (error) {
       showToast('error', 'Failed to save user')
@@ -254,10 +260,15 @@ export default function UsersPage() {
               </div>
             )}
             
-            {filteredUsers.map((user) => (
+            {filteredUsers.map((user, index) => (
               <div key={user.id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                        #{(currentPage - 1) * 100 + index + 1}
+                      </span>
+                    </div>
                     <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">
                       {user.first_name} {user.last_name}
                     </h4>
@@ -306,6 +317,7 @@ export default function UsersPage() {
             <table className="table">
               <thead className="table-header">
                 <tr>
+                  <th className="table-header-cell">S.No</th>
                   <th className="table-header-cell">Name</th>
                   <th className="table-header-cell">Email</th>
                   <th className="table-header-cell">Role</th>
@@ -315,8 +327,13 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((user) => (
+                {filteredUsers.map((user, index) => (
                   <tr key={user.id} className="table-row">
+                    <td className="table-cell">
+                      <div className="font-medium text-gray-800 dark:text-gray-200">
+                        {(currentPage - 1) * 100 + index + 1}
+                      </div>
+                    </td>
                     <td className="table-cell">
                       <div className="font-medium text-gray-800 dark:text-gray-200">
                         {user.first_name} {user.last_name}
