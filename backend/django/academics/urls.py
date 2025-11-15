@@ -36,6 +36,8 @@ router.register(r"generation-jobs", GenerationJobViewSet, basename="generation-j
 
 urlpatterns = [
     path("", include(router.urls)),
+    # Attendance management routes
+    path("attendance/", include("academics.attendance_urls")),
     # Auth endpoints - support both with and without trailing slash
     path("auth/login/", login_view, name="login"),
     path("auth/login", login_view, name="login-no-slash"),
