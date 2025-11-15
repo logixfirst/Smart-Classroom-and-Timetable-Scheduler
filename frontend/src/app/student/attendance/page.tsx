@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
-import { useToast } from '@/context/ToastContext'
+import { useToast } from '@/components/Toast'
 
 interface AttendanceRecord {
   id: number
@@ -53,7 +53,7 @@ export default function StudentAttendancePage() {
   const [alerts, setAlerts] = useState<AttendanceAlert[]>([])
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const { showToast } = useToast()
+  const { showSuccessToast, showErrorToast } = useToast()
 
   useEffect(() => {
     loadAttendanceData()
@@ -78,7 +78,7 @@ export default function StudentAttendancePage() {
       setSummary(data)
     } catch (error) {
       console.error('Failed to load attendance data:', error)
-      showToast('Failed to load attendance data', 'error')
+      showErrorToast('Failed to load attendance data')
     } finally {
       setLoading(false)
     }
@@ -115,7 +115,7 @@ export default function StudentAttendancePage() {
       })
       
       setAlerts(alerts.filter(a => a.id !== alertId))
-      showToast('Alert dismissed', 'success')
+      showSuccessToast('Alert dismissed')
     } catch (error) {
       console.error('Failed to acknowledge alert:', error)
     }
