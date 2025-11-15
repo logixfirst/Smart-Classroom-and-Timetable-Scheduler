@@ -207,6 +207,15 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 100,
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Rate Limiting (Industry-level security)
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',  # Anonymous users: 100 requests per hour
+        'user': '1000/hour',  # Authenticated users: 1000 requests per hour
+    },
 }
 
 # DRF Spectacular Settings (API Documentation)
@@ -228,13 +237,25 @@ SPECTACULAR_SETTINGS = {
     ],
 }
 
-# CORS Settings
+# CORS Settings (Industry-level security)
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "https://sih28.onrender.com",  # Production frontend
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # Cache Configuration with Redis
 REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1')
@@ -367,3 +388,49 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
     'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
+
+# =============================
+# INDUSTRY-LEVEL SECURITY SETTINGS
+# =============================
+
+# Session Security
+SESSION_COOKIE_SECURE = not DEBUG  # Use secure cookies in production (HTTPS only)
+SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookies
+SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+SESSION_COOKIE_AGE = 86400  # 24 hours
+
+# CSRF Protection
+CSRF_COOKIE_SECURE = not DEBUG  # Use secure cookies in production (HTTPS only)
+CSRF_COOKIE_HTTPONLY = True  # Prevent JavaScript access to CSRF token
+CSRF_COOKIE_SAMESITE = 'Lax'  # Additional CSRF protection
+CSRF_USE_SESSIONS = False  # Use cookie-based CSRF tokens
+CSRF_TRUSTED_ORIGINS = [
+    'https://sih28.onrender.com',
+]
+
+# Browser Security Headers
+SECURE_BROWSER_XSS_FILTER = True  # Enable browser's XSS filtering
+SECURE_CONTENT_TYPE_NOSNIFF = True  # Prevent MIME-type sniffing
+X_FRAME_OPTIONS = 'DENY'  # Prevent clickjacking attacks
+
+# HTTPS/SSL Settings (Production only)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True  # Redirect all HTTP to HTTPS
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Trust proxy headers
+    SECURE_HSTS_SECONDS = 31536000  # 1 year - Enable HTTP Strict Transport Security
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # Apply HSTS to all subdomains
+    SECURE_HSTS_PRELOAD = True  # Allow browser preloading of HSTS
+
+# Password Security
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.Argon2PasswordHasher',  # Most secure
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+]
+
+# Additional Security Settings
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB max upload size
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB max file upload
+SECURE_REFERRER_POLICY = 'same-origin'  # Control referrer information
+
