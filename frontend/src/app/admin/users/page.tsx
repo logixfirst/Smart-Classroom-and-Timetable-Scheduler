@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
 import apiClient from '@/lib/api'
+import AddEditUserModal from './components/AddEditUserModal'
+import { useToast } from '@/components/Toast'
 
 interface User {
   id: number
@@ -33,6 +35,9 @@ export default function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  const [showModal, setShowModal] = useState(false)
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const { showToast } = useToast()
 
   // Fetch users with debouncing for search
   useEffect(() => {
@@ -106,6 +111,54 @@ export default function UsersPage() {
     }
   }
 
+  const handleAddUser = () => {
+    setEditingUser(null)
+    setShowModal(true)
+  }
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user)
+    setShowModal(true)
+  }
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!confirm('Are you sure you want to delete this user?')) return
+    
+    try {
+      const response = await apiClient.deleteUser(userId.toString())
+      if (response.error) {
+        showToast('error', response.error)
+      } else {
+        showToast('success', 'User deleted successfully')
+        fetchUsers()
+      }
+    } catch (error) {
+      showToast('error', 'Failed to delete user')
+    }
+  }
+
+  const handleSaveUser = async (userData: any) => {
+    try {
+      let response
+      if (editingUser) {
+        response = await apiClient.updateUser(editingUser.id.toString(), userData)
+      } else {
+        response = await apiClient.createUser(userData)
+      }
+      
+      if (response.error) {
+        showToast('error', response.error)
+      } else {
+        showToast('success', editingUser ? 'User updated successfully' : 'User created successfully')
+        setShowModal(false)
+        setEditingUser(null)
+        fetchUsers()
+      }
+    } catch (error) {
+      showToast('error', 'Failed to save user')
+    }
+  }
+
   if (error) {
     return (
       <DashboardLayout role="admin">
@@ -132,7 +185,10 @@ export default function UsersPage() {
               Total: {totalCount} users | Page {currentPage} of {totalPages}
             </p>
           </div>
-          <button className="btn-primary w-full sm:w-auto px-6 py-3">
+          <button 
+            onClick={handleAddUser}
+            className="btn-primary w-full sm:w-auto px-6 py-3"
+          >
             <span className="mr-2 text-lg">➕</span>
             Add User
           </button>
@@ -217,8 +273,18 @@ export default function UsersPage() {
                     <span className="text-xs text-gray-500 dark:text-gray-400">{user.department}</span>
                   </div>
                   <div className="flex gap-1">
-                    <button className="btn-ghost text-xs px-2 py-1">Edit</button>
-                    <button className="btn-danger text-xs px-2 py-1">Delete</button>
+                    <button 
+                      onClick={() => handleEditUser(user)}
+                      className="btn-ghost text-xs px-2 py-1"
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteUser(user.id)}
+                      className="btn-danger text-xs px-2 py-1"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               </div>
@@ -269,8 +335,18 @@ export default function UsersPage() {
                     </td>
                     <td className="table-cell">
                       <div className="flex gap-1 sm:gap-2">
-                        <button className="btn-ghost text-xs px-2 py-1">Edit</button>
-                        <button className="btn-danger text-xs px-2 py-1">Del</button>
+                        <button 
+                          onClick={() => handleEditUser(user)}
+                          className="btn-ghost text-xs px-2 py-1"
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="btn-danger text-xs px-2 py-1"
+                        >
+                          Del
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -373,6 +449,16 @@ export default function UsersPage() {
             </div>
           )}
         </div>
+
+        <AddEditUserModal 
+          isOpen={showModal}
+          onClose={() => {
+            setShowModal(false)
+            setEditingUser(null)
+          }}
+          user={editingUser}
+          onSave={handleSaveUser}
+        />
       </div>
     </DashboardLayout>
   )
