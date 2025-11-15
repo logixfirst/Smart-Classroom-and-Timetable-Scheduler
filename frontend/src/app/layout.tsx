@@ -13,19 +13,13 @@ export const metadata: Metadata = {
   description: 'AI-powered timetable optimization for educational institutions',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ErrorBoundary>
           <ToastProvider>
-            <AuthProvider>
-              {children}
-            </AuthProvider>
+            <AuthProvider>{children}</AuthProvider>
           </ToastProvider>
         </ErrorBoundary>
       </body>

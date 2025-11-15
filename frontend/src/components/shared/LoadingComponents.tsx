@@ -8,7 +8,10 @@ interface TableLoadingOverlayProps {
   message?: string
 }
 
-export const TableLoadingOverlay = ({ isLoading, message = "Loading..." }: TableLoadingOverlayProps) => {
+export const TableLoadingOverlay = ({
+  isLoading,
+  message = 'Loading...',
+}: TableLoadingOverlayProps) => {
   if (!isLoading) return null
 
   return (
@@ -34,12 +37,12 @@ interface PaginationButtonProps {
   loadingText?: string
 }
 
-export const PaginationButton = ({ 
-  onClick, 
-  disabled, 
-  isLoading, 
-  children, 
-  loadingText = "Loading..." 
+export const PaginationButton = ({
+  onClick,
+  disabled,
+  isLoading,
+  children,
+  loadingText = 'Loading...',
 }: PaginationButtonProps) => {
   return (
     <button

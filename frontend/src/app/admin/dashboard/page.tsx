@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import DashboardLayout from '@/components/dashboard-layout'
 
@@ -12,7 +12,9 @@ export default function AdminDashboard() {
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
-                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">-</p>
+                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">
+                  -
+                </p>
               </div>
               <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#1a73e8] rounded-xl flex items-center justify-center flex-shrink-0">
                 <span className="text-xl lg:text-2xl text-white">👥</span>
@@ -27,8 +29,12 @@ export default function AdminDashboard() {
           <div className="card">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Courses</p>
-                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">-</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Active Courses
+                </p>
+                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">
+                  -
+                </p>
               </div>
               <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#34a853] rounded-xl flex items-center justify-center flex-shrink-0">
                 <span className="text-xl lg:text-2xl text-white">📚</span>
@@ -40,11 +46,18 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="card clickable-card" onClick={() => window.location.href='/admin/approvals'}>
+          <div
+            className="card clickable-card"
+            onClick={() => (window.location.href = '/admin/approvals')}
+          >
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending Approvals</p>
-                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">-</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Pending Approvals
+                </p>
+                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">
+                  -
+                </p>
               </div>
               <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#fbbc05] rounded-xl flex items-center justify-center flex-shrink-0">
                 <span className="text-xl lg:text-2xl text-white">⏳</span>
@@ -58,8 +71,12 @@ export default function AdminDashboard() {
           <div className="card">
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">System Health</p>
-                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">98%</p>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  System Health
+                </p>
+                <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">
+                  98%
+                </p>
               </div>
               <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#34a853] rounded-xl flex items-center justify-center flex-shrink-0">
                 <span className="text-xl lg:text-2xl text-white">❤️</span>
@@ -75,26 +92,45 @@ export default function AdminDashboard() {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Faculty Availability - Today</h3>
-            <p className="card-description">Mark faculty as available/unavailable for quick substitutions</p>
+            <p className="card-description">
+              Mark faculty as available/unavailable for quick substitutions
+            </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             {/* Static faculty data */}
             {[
-              { id: 1, name: 'Dr. Rajesh Kumar', department: 'Computer Science', isAvailable: true },
-              { id: 2, name: 'Dr. Priya Sharma', department: 'Computer Science', isAvailable: true },
-              { id: 3, name: 'Prof. Amit Singh', department: 'Mathematics', isAvailable: false }
+              {
+                id: 1,
+                name: 'Dr. Rajesh Kumar',
+                department: 'Computer Science',
+                isAvailable: true,
+              },
+              {
+                id: 2,
+                name: 'Dr. Priya Sharma',
+                department: 'Computer Science',
+                isAvailable: true,
+              },
+              { id: 3, name: 'Prof. Amit Singh', department: 'Mathematics', isAvailable: false },
             ].map((faculty: any) => (
-              <div key={faculty.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div
+                key={faculty.id}
+                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700"
+              >
                 <div className="flex-1 min-w-0 mr-3">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{faculty.name}</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{faculty.department}</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                    {faculty.name}
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                    {faculty.department}
+                  </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="sr-only peer" 
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
                     defaultChecked={faculty.isAvailable}
-                    onChange={(e) => {
+                    onChange={e => {
                       // Simple console log for demo purposes
                       console.log(`Faculty ${faculty.id} availability:`, e.target.checked)
                     }}
@@ -120,21 +156,27 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Django API</span>
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Django API
+                  </span>
                 </div>
                 <span className="badge badge-success">Online</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">FastAPI AI Service</span>
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    FastAPI AI Service
+                  </span>
                 </div>
                 <span className="badge badge-success">Online</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Database Connection</span>
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Database Connection
+                  </span>
                 </div>
                 <span className="badge badge-success">Healthy</span>
               </div>
@@ -189,31 +231,53 @@ export default function AdminDashboard() {
             <div className="space-y-3">
               <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Timetable Approved</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">priya.patel@sih28.edu</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Timetable Approved
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                    priya.patel@sih28.edu
+                  </p>
                 </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">2 min ago</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                  2 min ago
+                </span>
               </div>
               <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">User Role Changed</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">harsh.sharma@sih28.edu</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    User Role Changed
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                    harsh.sharma@sih28.edu
+                  </p>
                 </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">15 min ago</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                  15 min ago
+                </span>
               </div>
               <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Course Updated</p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">rajesh.kumar@sih28.edu</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Course Updated
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                    rajesh.kumar@sih28.edu
+                  </p>
                 </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">1h ago</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                  1h ago
+                </span>
               </div>
               <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Login Failed</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Login Failed
+                  </p>
                   <p className="text-xs text-gray-600 dark:text-gray-400 truncate">unknown</p>
                 </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">2h ago</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                  2h ago
+                </span>
               </div>
             </div>
           </div>
@@ -266,21 +330,27 @@ export default function AdminDashboard() {
             <div className="space-y-3">
               <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Academic Year</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Academic Year
+                  </p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">2024-25</p>
                 </div>
                 <button className="text-xs text-[#1a73e8] hover:underline">Edit</button>
               </div>
               <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Semester Dates</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Semester Dates
+                  </p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">Jul 1 - Dec 15</p>
                 </div>
                 <button className="text-xs text-[#1a73e8] hover:underline">Edit</button>
               </div>
               <div className="interactive-element flex items-center justify-between p-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Holiday List</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    Holiday List
+                  </p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">15 holidays configured</p>
                 </div>
                 <button className="text-xs text-[#1a73e8] hover:underline">Edit</button>
@@ -295,18 +365,26 @@ export default function AdminDashboard() {
             </div>
             <div className="space-y-4">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400 font-medium">Classroom Usage</span>
+                <span className="text-gray-600 dark:text-gray-400 font-medium">
+                  Classroom Usage
+                </span>
                 <span className="font-semibold text-[#34a853]">87%</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div className="bg-[#34a853] h-2 rounded-full transition-all duration-300" style={{width: '87%'}}></div>
+                <div
+                  className="bg-[#34a853] h-2 rounded-full transition-all duration-300"
+                  style={{ width: '87%' }}
+                ></div>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 dark:text-gray-400 font-medium">Faculty Load</span>
                 <span className="font-semibold text-[#fbbc05]">73%</span>
               </div>
               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div className="bg-[#fbbc05] h-2 rounded-full transition-all duration-300" style={{width: '73%'}}></div>
+                <div
+                  className="bg-[#fbbc05] h-2 rounded-full transition-all duration-300"
+                  style={{ width: '73%' }}
+                ></div>
               </div>
             </div>
           </div>
@@ -319,15 +397,21 @@ export default function AdminDashboard() {
             <div className="space-y-3">
               <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                 <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">3 Schedule conflicts</span>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  3 Schedule conflicts
+                </span>
               </div>
               <div className="flex items-center gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                 <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">5 Room overlaps</span>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  5 Room overlaps
+                </span>
               </div>
               <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">12 Resolved today</span>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  12 Resolved today
+                </span>
               </div>
             </div>
           </div>
@@ -341,16 +425,28 @@ export default function AdminDashboard() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-l-yellow-500 rounded-lg">
-              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">AI Engine Update</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Optimization algorithm improved by 15%</p>
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                AI Engine Update
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                Optimization algorithm improved by 15%
+              </p>
             </div>
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500 rounded-lg">
-              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">New Faculty Added</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">3 new faculty members registered</p>
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                New Faculty Added
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                3 new faculty members registered
+              </p>
             </div>
             <div className="p-4 bg-green-50 dark:bg-green-900/20 border-l-4 border-l-green-500 rounded-lg">
-              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Backup Complete</p>
-              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Daily system backup successful</p>
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                Backup Complete
+              </p>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                Daily system backup successful
+              </p>
             </div>
           </div>
         </div>
@@ -388,8 +484,6 @@ export default function AdminDashboard() {
             </button>
           </div>
         </div>
-
-
       </div>
     </DashboardLayout>
   )

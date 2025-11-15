@@ -26,7 +26,7 @@ export default function DataLayout({ children }: { children: React.ReactNode }) 
 
         <div className="border-b border-gray-200 dark:border-gray-700">
           <nav className="flex space-x-4 sm:space-x-8 overflow-x-auto">
-            {tabs.map((tab) => (
+            {tabs.map(tab => (
               <Link
                 key={tab.id}
                 href={tab.href}

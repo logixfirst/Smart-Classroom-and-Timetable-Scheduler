@@ -41,9 +41,12 @@ export default function UsersPage() {
       setCurrentPage(1)
     }
 
-    const timer = setTimeout(() => {
-      fetchUsers()
-    }, searchTerm ? 500 : 0) // Debounce only for text search, instant for dropdowns
+    const timer = setTimeout(
+      () => {
+        fetchUsers()
+      },
+      searchTerm ? 500 : 0
+    ) // Debounce only for text search, instant for dropdowns
 
     return () => clearTimeout(timer)
   }, [searchTerm, selectedRole, selectedDepartment, currentPage])
@@ -55,7 +58,7 @@ export default function UsersPage() {
     } else {
       setIsLoading(true)
     }
-    
+
     setError(null)
     try {
       // Build query params for backend filtering
@@ -63,7 +66,7 @@ export default function UsersPage() {
       if (selectedRole) url += `&role=${selectedRole}`
       if (selectedDepartment) url += `&department=${selectedDepartment}`
       if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`
-      
+
       const response = await apiClient.request<PaginatedResponse<User>>(url)
       if (response.error) {
         setError(response.error)
@@ -127,7 +130,9 @@ export default function UsersPage() {
       <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">User Management</h1>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">
+              User Management
+            </h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Total: {totalCount} users | Page {currentPage} of {totalPages}
             </p>
@@ -143,41 +148,47 @@ export default function UsersPage() {
             <h3 className="card-title">Users</h3>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
               <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
-                <input 
-                  placeholder="Search users..." 
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                  🔍
+                </span>
+                <input
+                  placeholder="Search users..."
                   className="input-primary pl-10"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={e => setSearchTerm(e.target.value)}
                 />
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
-                <select 
+                <select
                   className="input-primary w-full sm:w-32"
                   value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
+                  onChange={e => setSelectedRole(e.target.value)}
                   aria-label="Filter by role"
                 >
                   <option value="">All Roles</option>
                   {roles.map(role => (
-                    <option key={role} value={role}>{role}</option>
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
                   ))}
                 </select>
-                <select 
+                <select
                   className="input-primary w-full sm:w-36"
                   value={selectedDepartment}
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  onChange={e => setSelectedDepartment(e.target.value)}
                   aria-label="Filter by department"
                 >
                   <option value="">All Departments</option>
                   {departments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
                   ))}
                 </select>
               </div>
             </div>
           </div>
-          
+
           {/* Loading indicator */}
           {isLoading && (
             <div className="flex items-center justify-center py-8">
@@ -185,7 +196,7 @@ export default function UsersPage() {
               <span className="text-gray-600 dark:text-gray-400">Loading users...</span>
             </div>
           )}
-          
+
           {/* Mobile Card View */}
           <div className="block sm:hidden space-y-3 relative">
             {/* Mobile Loading Overlay */}
@@ -197,24 +208,33 @@ export default function UsersPage() {
                 </div>
               </div>
             )}
-            
-            {filteredUsers.map((user) => (
-              <div key={user.id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
+
+            {filteredUsers.map(user => (
+              <div
+                key={user.id}
+                className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]"
+              >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">
                       {user.first_name} {user.last_name}
                     </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{user.email}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                      {user.email}
+                    </p>
                   </div>
-                  <span className={`badge ${user.is_active ? 'badge-success' : 'badge-error'} ml-2`}>
+                  <span
+                    className={`badge ${user.is_active ? 'badge-success' : 'badge-error'} ml-2`}
+                  >
                     {user.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex gap-2">
                     <span className="badge badge-neutral">{user.role}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{user.department}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {user.department}
+                    </span>
                   </div>
                   <div className="flex gap-1">
                     <button className="btn-ghost text-xs px-2 py-1">Edit</button>
@@ -224,7 +244,7 @@ export default function UsersPage() {
               </div>
             ))}
           </div>
-          
+
           {/* Desktop Table View */}
           <div className="hidden sm:block overflow-x-auto relative">
             {/* Table Loading Overlay */}
@@ -236,7 +256,7 @@ export default function UsersPage() {
                 </div>
               </div>
             )}
-            
+
             <table className="table">
               <thead className="table-header">
                 <tr>
@@ -249,13 +269,15 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((user) => (
+                {filteredUsers.map(user => (
                   <tr key={user.id} className="table-row">
                     <td className="table-cell">
                       <div className="font-medium text-gray-800 dark:text-gray-200">
                         {user.first_name} {user.last_name}
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden">{user.email}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden">
+                        {user.email}
+                      </div>
                     </td>
                     <td className="table-cell">{user.email}</td>
                     <td className="table-cell">
@@ -263,7 +285,9 @@ export default function UsersPage() {
                     </td>
                     <td className="table-cell">{user.department}</td>
                     <td className="table-cell">
-                      <span className={`badge ${user.is_active ? 'badge-success' : 'badge-error'} text-xs`}>
+                      <span
+                        className={`badge ${user.is_active ? 'badge-success' : 'badge-error'} text-xs`}
+                      >
                         {user.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
@@ -296,7 +320,7 @@ export default function UsersPage() {
                   '← Previous'
                 )}
               </button>
-              
+
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600 dark:text-gray-400">
                   Page {currentPage} of {totalPages}
@@ -324,7 +348,13 @@ export default function UsersPage() {
                   <div className="flex gap-1">
                     {currentPage > 3 && (
                       <>
-                        <button onClick={() => handlePageChange(1)} disabled={isTableLoading} className="px-3 py-1 rounded text-sm bg-gray-200 dark:bg-[#3c4043] disabled:opacity-50">1</button>
+                        <button
+                          onClick={() => handlePageChange(1)}
+                          disabled={isTableLoading}
+                          className="px-3 py-1 rounded text-sm bg-gray-200 dark:bg-[#3c4043] disabled:opacity-50"
+                        >
+                          1
+                        </button>
                         <span className="px-2">...</span>
                       </>
                     )}
@@ -349,7 +379,13 @@ export default function UsersPage() {
                     {currentPage < totalPages - 2 && (
                       <>
                         <span className="px-2">...</span>
-                        <button onClick={() => handlePageChange(totalPages)} disabled={isTableLoading} className="px-3 py-1 rounded text-sm bg-gray-200 dark:bg-[#3c4043] disabled:opacity-50">{totalPages}</button>
+                        <button
+                          onClick={() => handlePageChange(totalPages)}
+                          disabled={isTableLoading}
+                          className="px-3 py-1 rounded text-sm bg-gray-200 dark:bg-[#3c4043] disabled:opacity-50"
+                        >
+                          {totalPages}
+                        </button>
                       </>
                     )}
                   </div>

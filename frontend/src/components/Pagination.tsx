@@ -21,15 +21,17 @@ export default function Pagination({
   onPageChange,
   onItemsPerPageChange,
   showItemsPerPage = true,
-  className = ''
+  className = '',
 }: PaginationProps) {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Only handle arrow keys if not focused on an input element
-      if (document.activeElement?.tagName === 'INPUT' || 
-          document.activeElement?.tagName === 'TEXTAREA' ||
-          document.activeElement?.tagName === 'SELECT') {
+      if (
+        document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA' ||
+        document.activeElement?.tagName === 'SELECT'
+      ) {
         return
       }
 
@@ -60,7 +62,7 @@ export default function Pagination({
   const getPageNumbers = () => {
     const pages: (number | string)[] = []
     const maxPagesToShow = 7
-    
+
     if (totalPages <= maxPagesToShow) {
       // Show all pages if total is less than max
       for (let i = 1; i <= totalPages; i++) {
@@ -69,27 +71,27 @@ export default function Pagination({
     } else {
       // Always show first page
       pages.push(1)
-      
+
       if (currentPage > 3) {
         pages.push('...')
       }
-      
+
       // Show pages around current page
       const start = Math.max(2, currentPage - 1)
       const end = Math.min(totalPages - 1, currentPage + 1)
-      
+
       for (let i = start; i <= end; i++) {
         pages.push(i)
       }
-      
+
       if (currentPage < totalPages - 2) {
         pages.push('...')
       }
-      
+
       // Always show last page
       pages.push(totalPages)
     }
-    
+
     return pages
   }
 
@@ -103,12 +105,11 @@ export default function Pagination({
           <span>No results found</span>
         ) : (
           <span>
-            Showing <span className="font-medium text-gray-800 dark:text-gray-200">{startItem}</span>
-            {' '}-{' '}
-            <span className="font-medium text-gray-800 dark:text-gray-200">{endItem}</span>
-            {' '}of{' '}
-            <span className="font-medium text-gray-800 dark:text-gray-200">{totalCount}</span>
-            {' '}results
+            Showing{' '}
+            <span className="font-medium text-gray-800 dark:text-gray-200">{startItem}</span> -{' '}
+            <span className="font-medium text-gray-800 dark:text-gray-200">{endItem}</span> of{' '}
+            <span className="font-medium text-gray-800 dark:text-gray-200">{totalCount}</span>{' '}
+            results
           </span>
         )}
       </div>
@@ -118,13 +119,16 @@ export default function Pagination({
         {/* Items per page selector */}
         {showItemsPerPage && onItemsPerPageChange && (
           <div className="flex items-center gap-2 mr-4">
-            <label htmlFor="items-per-page" className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
+            <label
+              htmlFor="items-per-page"
+              className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap"
+            >
               Per page:
             </label>
             <select
               id="items-per-page"
               value={itemsPerPage}
-              onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
+              onChange={e => onItemsPerPageChange(Number(e.target.value))}
               className="input-primary text-sm py-1 px-2 w-20"
             >
               <option value={10}>10</option>
@@ -185,9 +189,10 @@ export default function Pagination({
                 key={pageNum}
                 onClick={() => onPageChange(pageNum)}
                 className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors
-                  ${isActive
-                    ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  ${
+                    isActive
+                      ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                   }`}
                 title={`Page ${pageNum}`}
               >

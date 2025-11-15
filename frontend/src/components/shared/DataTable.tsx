@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 
@@ -16,12 +16,12 @@ interface DataTableProps {
   pageSize?: number
 }
 
-export default function DataTable({ 
-  data, 
-  columns, 
-  searchable = true, 
-  pagination = true, 
-  pageSize = 10 
+export default function DataTable({
+  data,
+  columns,
+  searchable = true,
+  pagination = true,
+  pageSize = 10,
 }: DataTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -38,10 +38,10 @@ export default function DataTable({
   // Sort data
   const sortedData = [...filteredData].sort((a, b) => {
     if (!sortColumn) return 0
-    
+
     const aValue = a[sortColumn]
     const bValue = b[sortColumn]
-    
+
     if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
     if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
     return 0
@@ -49,7 +49,7 @@ export default function DataTable({
 
   // Paginate data
   const totalPages = Math.ceil(sortedData.length / pageSize)
-  const paginatedData = pagination 
+  const paginatedData = pagination
     ? sortedData.slice((currentPage - 1) * pageSize, currentPage * pageSize)
     : sortedData
 
@@ -66,13 +66,15 @@ export default function DataTable({
     <div className="space-y-4">
       {searchable && (
         <div className="relative">
-          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500">🔍</span>
+          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500">
+            🔍
+          </span>
           <input
             type="text"
             placeholder="Search..."
             className="input-primary pl-10 w-full sm:w-64"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
       )}
@@ -81,20 +83,20 @@ export default function DataTable({
         <table className="table">
           <thead className="table-header">
             <tr>
-              {columns.map((column) => (
+              {columns.map(column => (
                 <th
                   key={column.key}
                   className={`table-header-cell ${
-                    column.sortable ? 'cursor-pointer hover:text-gray-700 dark:hover:text-gray-300' : ''
+                    column.sortable
+                      ? 'cursor-pointer hover:text-gray-700 dark:hover:text-gray-300'
+                      : ''
                   }`}
                   onClick={() => column.sortable && handleSort(column.key)}
                 >
                   <div className="flex items-center gap-1">
                     {column.label}
                     {column.sortable && sortColumn === column.key && (
-                      <span className="text-xs">
-                        {sortDirection === 'asc' ? '↑' : '↓'}
-                      </span>
+                      <span className="text-xs">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </div>
                 </th>
@@ -104,7 +106,7 @@ export default function DataTable({
           <tbody>
             {paginatedData.map((item, index) => (
               <tr key={index} className="table-row">
-                {columns.map((column) => (
+                {columns.map(column => (
                   <td key={column.key} className="table-cell">
                     {item[column.key]}
                   </td>
@@ -118,7 +120,8 @@ export default function DataTable({
       {pagination && totalPages > 1 && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, sortedData.length)} of {sortedData.length} results
+            Showing {(currentPage - 1) * pageSize + 1} to{' '}
+            {Math.min(currentPage * pageSize, sortedData.length)} of {sortedData.length} results
           </p>
           <div className="flex items-center gap-2">
             <button

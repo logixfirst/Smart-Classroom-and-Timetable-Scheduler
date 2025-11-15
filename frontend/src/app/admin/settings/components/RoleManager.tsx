@@ -3,7 +3,7 @@ export default function RoleManager() {
     { name: 'Admin', permissions: ['All Access'], users: 3 },
     { name: 'Staff', permissions: ['Approvals', 'Reports'], users: 8 },
     { name: 'Faculty', permissions: ['Schedule View', 'Preferences'], users: 45 },
-    { name: 'Student', permissions: ['Timetable View'], users: 1200 }
+    { name: 'Student', permissions: ['Timetable View'], users: 1200 },
   ]
 
   return (
@@ -14,10 +14,15 @@ export default function RoleManager() {
       </div>
       <div className="space-y-3">
         {roles.map((role, index) => (
-          <div key={index} className="interactive-element flex items-center justify-between p-4 border border-gray-200 dark:border-[#3c4043]">
+          <div
+            key={index}
+            className="interactive-element flex items-center justify-between p-4 border border-gray-200 dark:border-[#3c4043]"
+          >
             <div className="flex-1 min-w-0">
               <h4 className="font-medium text-gray-800 dark:text-gray-200">{role.name}</h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{role.permissions.join(', ')}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                {role.permissions.join(', ')}
+              </p>
             </div>
             <div className="text-right flex-shrink-0">
               <p className="font-medium text-gray-800 dark:text-gray-200">{role.users}</p>

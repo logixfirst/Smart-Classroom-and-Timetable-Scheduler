@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 
@@ -13,7 +13,7 @@ export default function AddEditUserModal({ isOpen, onClose, user }: AddEditUserM
     name: user?.name || '',
     email: user?.email || '',
     role: user?.role || 'faculty',
-    department: user?.department || ''
+    department: user?.department || '',
   })
 
   if (!isOpen) return null
@@ -27,28 +27,28 @@ export default function AddEditUserModal({ isOpen, onClose, user }: AddEditUserM
         <form className="space-y-4">
           <div className="form-group">
             <label className="form-label">Name</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               className="input-primary"
               value={formData.name}
-              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              onChange={e => setFormData({ ...formData, name: e.target.value })}
             />
           </div>
           <div className="form-group">
             <label className="form-label">Email</label>
-            <input 
-              type="email" 
+            <input
+              type="email"
               className="input-primary"
               value={formData.email}
-              onChange={(e) => setFormData({...formData, email: e.target.value})}
+              onChange={e => setFormData({ ...formData, email: e.target.value })}
             />
           </div>
           <div className="form-group">
             <label className="form-label">Role</label>
-            <select 
+            <select
               className="input-primary"
               value={formData.role}
-              onChange={(e) => setFormData({...formData, role: e.target.value})}
+              onChange={e => setFormData({ ...formData, role: e.target.value })}
             >
               <option value="admin">Admin</option>
               <option value="staff">Staff</option>
@@ -58,11 +58,11 @@ export default function AddEditUserModal({ isOpen, onClose, user }: AddEditUserM
           </div>
           <div className="form-group">
             <label className="form-label">Department</label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               className="input-primary"
               value={formData.department}
-              onChange={(e) => setFormData({...formData, department: e.target.value})}
+              onChange={e => setFormData({ ...formData, department: e.target.value })}
             />
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4">

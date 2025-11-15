@@ -16,7 +16,7 @@ export default function InContentNav({ items, activeItem, onItemClick }: InConte
   return (
     <div className="border-b border-gray-200 dark:border-gray-700 mb-4 sm:mb-6">
       <nav className="flex space-x-1 overflow-x-auto scrollbar-hide">
-        {items.map((item) => (
+        {items.map(item => (
           <button
             key={item.id}
             onClick={() => onItemClick(item.id)}
@@ -28,11 +28,13 @@ export default function InContentNav({ items, activeItem, onItemClick }: InConte
           >
             {item.label}
             {item.count !== undefined && (
-              <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-                activeItem === item.id
-                  ? 'bg-blue-100 text-blue-600 dark:bg-blue-800 dark:text-blue-300'
-                  : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-              }`}>
+              <span
+                className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                  activeItem === item.id
+                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-800 dark:text-blue-300'
+                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                }`}
+              >
                 {item.count}
               </span>
             )}

@@ -9,7 +9,7 @@ const DAYS = [
   { id: 'thursday', label: 'Thursday' },
   { id: 'friday', label: 'Friday' },
   { id: 'saturday', label: 'Saturday' },
-  { id: 'sunday', label: 'Sunday' }
+  { id: 'sunday', label: 'Sunday' },
 ]
 
 export default function WorkingDaysManager() {
@@ -36,10 +36,8 @@ export default function WorkingDaysManager() {
   }
 
   const handleDayToggle = (dayId: string) => {
-    setWorkingDays(prev => 
-      prev.includes(dayId) 
-        ? prev.filter(d => d !== dayId)
-        : [...prev, dayId]
+    setWorkingDays(prev =>
+      prev.includes(dayId) ? prev.filter(d => d !== dayId) : [...prev, dayId]
     )
   }
 
@@ -49,9 +47,9 @@ export default function WorkingDaysManager() {
       const response = await fetch('http://localhost:8000/api/v1/settings/working-days/update/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ working_days: workingDays })
+        body: JSON.stringify({ working_days: workingDays }),
       })
-      
+
       if (response.ok) {
         // Success feedback could be added here
       }
@@ -82,15 +80,18 @@ export default function WorkingDaysManager() {
         <h3 className="card-title">Academic Calendar Settings</h3>
         <p className="card-description">Configure working days for timetable generation</p>
       </div>
-      
+
       <div className="p-4 sm:p-6 space-y-4">
         <div className="space-y-3">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Working Days
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
-            {DAYS.map((day) => (
-              <label key={day.id} className="flex items-center gap-2 p-2 sm:p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors">
+            {DAYS.map(day => (
+              <label
+                key={day.id}
+                className="flex items-center gap-2 p-2 sm:p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+              >
                 <input
                   type="checkbox"
                   checked={workingDays.includes(day.id)}
@@ -104,7 +105,7 @@ export default function WorkingDaysManager() {
             ))}
           </div>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
           <button
             onClick={saveWorkingDays}

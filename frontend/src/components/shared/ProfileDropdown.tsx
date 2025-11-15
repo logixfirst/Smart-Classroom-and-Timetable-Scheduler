@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 
@@ -15,7 +15,7 @@ export default function ProfileDropdown({ user }: ProfileDropdownProps) {
 
   return (
     <div className="relative">
-      <button 
+      <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
       >

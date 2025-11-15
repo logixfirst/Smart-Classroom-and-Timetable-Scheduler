@@ -1,15 +1,10 @@
-'use client';
+'use client'
 
-import React from 'react';
+import React from 'react'
 
 // Base Skeleton component
 export function Skeleton({ className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={`animate-pulse bg-gray-200 rounded ${className}`}
-      {...props}
-    />
-  );
+  return <div className={`animate-pulse bg-gray-200 rounded ${className}`} {...props} />
 }
 
 // Table Skeleton
@@ -24,7 +19,7 @@ export function TableSkeleton({ rows = 5, columns = 6 }: { rows?: number; column
           ))}
         </div>
       </div>
-      
+
       {/* Table Rows */}
       <div className="space-y-3">
         {Array.from({ length: rows }).map((_, rowIndex) => (
@@ -40,7 +35,7 @@ export function TableSkeleton({ rows = 5, columns = 6 }: { rows?: number; column
         ))}
       </div>
     </div>
-  );
+  )
 }
 
 // Card Skeleton
@@ -52,7 +47,7 @@ export function CardSkeleton() {
       <Skeleton className="h-4 w-5/6 mb-2" />
       <Skeleton className="h-4 w-4/6" />
     </div>
-  );
+  )
 }
 
 // List Skeleton (for mobile card views)
@@ -71,7 +66,7 @@ export function ListSkeleton({ items = 5 }: { items?: number }) {
         </div>
       ))}
     </div>
-  );
+  )
 }
 
 // Form Skeleton
@@ -89,7 +84,7 @@ export function FormSkeleton({ fields = 6 }: { fields?: number }) {
         <Skeleton className="h-10 w-32 rounded-md" />
       </div>
     </div>
-  );
+  )
 }
 
 // Dashboard Stats Skeleton
@@ -104,7 +99,7 @@ export function StatsSkeleton({ count = 4 }: { count?: number }) {
         </div>
       ))}
     </div>
-  );
+  )
 }
 
 // Full Page Loading
@@ -116,20 +111,26 @@ export function PageLoader({ message = 'Loading...' }: { message?: string }) {
         <p className="text-gray-600 font-medium">{message}</p>
       </div>
     </div>
-  );
+  )
 }
 
 // Spinner Component
-export function Spinner({ size = 'md', className = '' }: { size?: 'sm' | 'md' | 'lg'; className?: string }) {
+export function Spinner({
+  size = 'md',
+  className = '',
+}: {
+  size?: 'sm' | 'md' | 'lg'
+  className?: string
+}) {
   const sizeClasses = {
     sm: 'h-4 w-4 border-2',
     md: 'h-8 w-8 border-3',
     lg: 'h-12 w-12 border-4',
-  };
+  }
 
   return (
     <div
       className={`inline-block animate-spin rounded-full border-gray-200 border-t-blue-600 ${sizeClasses[size]} ${className}`}
     />
-  );
+  )
 }

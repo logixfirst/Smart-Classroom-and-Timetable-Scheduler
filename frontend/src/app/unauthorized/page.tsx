@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useAuth } from '@/context/AuthContext'
 import { useRouter } from 'next/navigation'
@@ -26,8 +26,11 @@ export default function UnauthorizedPage() {
             You don't have permission to access this page.
           </p>
         </div>
-        
-        <button onClick={handleLogout} className="btn-primary btn-primary-light dark:btn-primary-dark w-full py-3 sm:py-4 text-sm sm:text-base font-semibold">
+
+        <button
+          onClick={handleLogout}
+          className="btn-primary btn-primary-light dark:btn-primary-dark w-full py-3 sm:py-4 text-sm sm:text-base font-semibold"
+        >
           Back to Login
         </button>
       </div>

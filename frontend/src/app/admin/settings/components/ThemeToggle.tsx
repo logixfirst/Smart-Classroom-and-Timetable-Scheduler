@@ -19,7 +19,7 @@ export default function ThemeToggle() {
         <h3 className="card-title">Appearance</h3>
         <p className="card-description">Choose how the interface looks to you</p>
       </div>
-      
+
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Light Theme */}

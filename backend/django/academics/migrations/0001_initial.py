@@ -9,201 +9,500 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('auth', '0012_alter_user_first_name_max_length'),
+        ("auth", "0012_alter_user_first_name_max_length"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Course',
+            name="Course",
             fields=[
-                ('course_id', models.CharField(max_length=10, primary_key=True, serialize=False)),
-                ('course_name', models.CharField(max_length=100)),
-                ('duration_years', models.IntegerField()),
-                ('level', models.CharField(max_length=10)),
+                (
+                    "course_id",
+                    models.CharField(max_length=10, primary_key=True, serialize=False),
+                ),
+                ("course_name", models.CharField(max_length=100)),
+                ("duration_years", models.IntegerField()),
+                ("level", models.CharField(max_length=10)),
             ],
             options={
-                'db_table': 'courses',
+                "db_table": "courses",
             },
         ),
         migrations.CreateModel(
-            name='Department',
+            name="Department",
             fields=[
-                ('department_id', models.CharField(max_length=10, primary_key=True, serialize=False)),
-                ('department_name', models.CharField(max_length=100)),
-                ('building_name', models.CharField(max_length=50)),
-                ('head_of_department', models.CharField(max_length=100)),
+                (
+                    "department_id",
+                    models.CharField(max_length=10, primary_key=True, serialize=False),
+                ),
+                ("department_name", models.CharField(max_length=100)),
+                ("building_name", models.CharField(max_length=50)),
+                ("head_of_department", models.CharField(max_length=100)),
             ],
             options={
-                'db_table': 'departments',
+                "db_table": "departments",
             },
         ),
         migrations.CreateModel(
-            name='User',
+            name="User",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('password', models.CharField(max_length=128, verbose_name='password')),
-                ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),
-                ('is_superuser', models.BooleanField(default=False, help_text='Designates that this user has all permissions without explicitly assigning them.', verbose_name='superuser status')),
-                ('username', models.CharField(error_messages={'unique': 'A user with that username already exists.'}, help_text='Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.', max_length=150, unique=True, validators=[django.contrib.auth.validators.UnicodeUsernameValidator()], verbose_name='username')),
-                ('first_name', models.CharField(blank=True, max_length=150, verbose_name='first name')),
-                ('last_name', models.CharField(blank=True, max_length=150, verbose_name='last name')),
-                ('email', models.EmailField(blank=True, max_length=254, verbose_name='email address')),
-                ('is_staff', models.BooleanField(default=False, help_text='Designates whether the user can log into this admin site.', verbose_name='staff status')),
-                ('is_active', models.BooleanField(default=True, help_text='Designates whether this user should be treated as active. Unselect this instead of deleting accounts.', verbose_name='active')),
-                ('date_joined', models.DateTimeField(default=django.utils.timezone.now, verbose_name='date joined')),
-                ('role', models.CharField(choices=[('admin', 'Admin'), ('staff', 'Staff'), ('faculty', 'Faculty'), ('student', 'Student')], default='student', max_length=20)),
-                ('department', models.CharField(blank=True, max_length=100, null=True)),
-                ('groups', models.ManyToManyField(blank=True, help_text='The groups this user belongs to. A user will get all permissions granted to each of their groups.', related_name='user_set', related_query_name='user', to='auth.group', verbose_name='groups')),
-                ('user_permissions', models.ManyToManyField(blank=True, help_text='Specific permissions for this user.', related_name='user_set', related_query_name='user', to='auth.permission', verbose_name='user permissions')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("password", models.CharField(max_length=128, verbose_name="password")),
+                (
+                    "last_login",
+                    models.DateTimeField(
+                        blank=True, null=True, verbose_name="last login"
+                    ),
+                ),
+                (
+                    "is_superuser",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Designates that this user has all permissions without explicitly assigning them.",
+                        verbose_name="superuser status",
+                    ),
+                ),
+                (
+                    "username",
+                    models.CharField(
+                        error_messages={
+                            "unique": "A user with that username already exists."
+                        },
+                        help_text="Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.",
+                        max_length=150,
+                        unique=True,
+                        validators=[
+                            django.contrib.auth.validators.UnicodeUsernameValidator()
+                        ],
+                        verbose_name="username",
+                    ),
+                ),
+                (
+                    "first_name",
+                    models.CharField(
+                        blank=True, max_length=150, verbose_name="first name"
+                    ),
+                ),
+                (
+                    "last_name",
+                    models.CharField(
+                        blank=True, max_length=150, verbose_name="last name"
+                    ),
+                ),
+                (
+                    "email",
+                    models.EmailField(
+                        blank=True, max_length=254, verbose_name="email address"
+                    ),
+                ),
+                (
+                    "is_staff",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Designates whether the user can log into this admin site.",
+                        verbose_name="staff status",
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        default=True,
+                        help_text="Designates whether this user should be treated as active. Unselect this instead of deleting accounts.",
+                        verbose_name="active",
+                    ),
+                ),
+                (
+                    "date_joined",
+                    models.DateTimeField(
+                        default=django.utils.timezone.now, verbose_name="date joined"
+                    ),
+                ),
+                (
+                    "role",
+                    models.CharField(
+                        choices=[
+                            ("admin", "Admin"),
+                            ("staff", "Staff"),
+                            ("faculty", "Faculty"),
+                            ("student", "Student"),
+                        ],
+                        default="student",
+                        max_length=20,
+                    ),
+                ),
+                ("department", models.CharField(blank=True, max_length=100, null=True)),
+                (
+                    "groups",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.group",
+                        verbose_name="groups",
+                    ),
+                ),
+                (
+                    "user_permissions",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="Specific permissions for this user.",
+                        related_name="user_set",
+                        related_query_name="user",
+                        to="auth.permission",
+                        verbose_name="user permissions",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'users',
+                "db_table": "users",
             },
             managers=[
-                ('objects', django.contrib.auth.models.UserManager()),
+                ("objects", django.contrib.auth.models.UserManager()),
             ],
         ),
         migrations.CreateModel(
-            name='Classroom',
+            name="Classroom",
             fields=[
-                ('room_id', models.CharField(max_length=10, primary_key=True, serialize=False)),
-                ('room_number', models.CharField(max_length=20)),
-                ('capacity', models.IntegerField()),
-                ('room_type', models.CharField(choices=[('lecture hall', 'Lecture Hall'), ('seminar room', 'Seminar Room'), ('tutorial room', 'Tutorial Room'), ('lab', 'Lab')], default='lecture hall', max_length=20)),
-                ('department', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='classrooms', to='academics.department')),
+                (
+                    "room_id",
+                    models.CharField(max_length=10, primary_key=True, serialize=False),
+                ),
+                ("room_number", models.CharField(max_length=20)),
+                ("capacity", models.IntegerField()),
+                (
+                    "room_type",
+                    models.CharField(
+                        choices=[
+                            ("lecture hall", "Lecture Hall"),
+                            ("seminar room", "Seminar Room"),
+                            ("tutorial room", "Tutorial Room"),
+                            ("lab", "Lab"),
+                        ],
+                        default="lecture hall",
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "department",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="classrooms",
+                        to="academics.department",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'classrooms',
+                "db_table": "classrooms",
             },
         ),
         migrations.CreateModel(
-            name='Batch',
+            name="Batch",
             fields=[
-                ('batch_id', models.CharField(max_length=10, primary_key=True, serialize=False)),
-                ('year', models.IntegerField()),
-                ('semester', models.IntegerField()),
-                ('no_of_students', models.IntegerField()),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='batches', to='academics.course')),
-                ('department', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='batches', to='academics.department')),
+                (
+                    "batch_id",
+                    models.CharField(max_length=10, primary_key=True, serialize=False),
+                ),
+                ("year", models.IntegerField()),
+                ("semester", models.IntegerField()),
+                ("no_of_students", models.IntegerField()),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="batches",
+                        to="academics.course",
+                    ),
+                ),
+                (
+                    "department",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="batches",
+                        to="academics.department",
+                    ),
+                ),
             ],
             options={
-                'verbose_name_plural': 'Batches',
-                'db_table': 'batches',
+                "verbose_name_plural": "Batches",
+                "db_table": "batches",
             },
         ),
         migrations.CreateModel(
-            name='Faculty',
+            name="Faculty",
             fields=[
-                ('faculty_id', models.CharField(max_length=10, primary_key=True, serialize=False)),
-                ('faculty_name', models.CharField(max_length=100)),
-                ('designation', models.CharField(max_length=50)),
-                ('specialization', models.CharField(max_length=100)),
-                ('max_workload_per_week', models.IntegerField()),
-                ('email', models.EmailField(blank=True, max_length=254, null=True)),
-                ('phone', models.CharField(blank=True, max_length=15, null=True)),
-                ('department', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='faculty_members', to='academics.department')),
+                (
+                    "faculty_id",
+                    models.CharField(max_length=10, primary_key=True, serialize=False),
+                ),
+                ("faculty_name", models.CharField(max_length=100)),
+                ("designation", models.CharField(max_length=50)),
+                ("specialization", models.CharField(max_length=100)),
+                ("max_workload_per_week", models.IntegerField()),
+                ("email", models.EmailField(blank=True, max_length=254, null=True)),
+                ("phone", models.CharField(blank=True, max_length=15, null=True)),
+                (
+                    "department",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="faculty_members",
+                        to="academics.department",
+                    ),
+                ),
             ],
             options={
-                'verbose_name_plural': 'Faculty',
-                'db_table': 'faculty',
+                "verbose_name_plural": "Faculty",
+                "db_table": "faculty",
             },
         ),
         migrations.CreateModel(
-            name='Lab',
+            name="Lab",
             fields=[
-                ('lab_id', models.CharField(max_length=10, primary_key=True, serialize=False)),
-                ('lab_name', models.CharField(max_length=100)),
-                ('capacity', models.IntegerField()),
-                ('department', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='labs', to='academics.department')),
+                (
+                    "lab_id",
+                    models.CharField(max_length=10, primary_key=True, serialize=False),
+                ),
+                ("lab_name", models.CharField(max_length=100)),
+                ("capacity", models.IntegerField()),
+                (
+                    "department",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="labs",
+                        to="academics.department",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'labs',
+                "db_table": "labs",
             },
         ),
         migrations.CreateModel(
-            name='Student',
+            name="Student",
             fields=[
-                ('student_id', models.CharField(max_length=10, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=100)),
-                ('electives', models.TextField()),
-                ('year', models.IntegerField()),
-                ('semester', models.IntegerField()),
-                ('email', models.EmailField(blank=True, max_length=254, null=True)),
-                ('phone', models.CharField(blank=True, max_length=15, null=True)),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='students', to='academics.course')),
-                ('department', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='students', to='academics.department')),
-                ('faculty_advisor', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='advised_students', to='academics.faculty')),
+                (
+                    "student_id",
+                    models.CharField(max_length=10, primary_key=True, serialize=False),
+                ),
+                ("name", models.CharField(max_length=100)),
+                ("electives", models.TextField()),
+                ("year", models.IntegerField()),
+                ("semester", models.IntegerField()),
+                ("email", models.EmailField(blank=True, max_length=254, null=True)),
+                ("phone", models.CharField(blank=True, max_length=15, null=True)),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="students",
+                        to="academics.course",
+                    ),
+                ),
+                (
+                    "department",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="students",
+                        to="academics.department",
+                    ),
+                ),
+                (
+                    "faculty_advisor",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="advised_students",
+                        to="academics.faculty",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'students',
+                "db_table": "students",
             },
         ),
         migrations.CreateModel(
-            name='Subject',
+            name="Subject",
             fields=[
-                ('subject_id', models.CharField(max_length=10, primary_key=True, serialize=False)),
-                ('subject_name', models.CharField(max_length=100)),
-                ('faculty_assigned', models.CharField(max_length=10)),
-                ('credits', models.IntegerField()),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='subjects', to='academics.course')),
-                ('department', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='subjects', to='academics.department')),
+                (
+                    "subject_id",
+                    models.CharField(max_length=10, primary_key=True, serialize=False),
+                ),
+                ("subject_name", models.CharField(max_length=100)),
+                ("faculty_assigned", models.CharField(max_length=10)),
+                ("credits", models.IntegerField()),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="subjects",
+                        to="academics.course",
+                    ),
+                ),
+                (
+                    "department",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="subjects",
+                        to="academics.department",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'subjects',
+                "db_table": "subjects",
             },
         ),
         migrations.CreateModel(
-            name='Timetable',
+            name="Timetable",
             fields=[
-                ('timetable_id', models.AutoField(primary_key=True, serialize=False)),
-                ('semester', models.IntegerField()),
-                ('academic_year', models.CharField(max_length=20)),
-                ('status', models.CharField(choices=[('draft', 'Draft'), ('pending', 'Pending Approval'), ('approved', 'Approved'), ('published', 'Published')], default='draft', max_length=20)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('batch', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='timetables', to='academics.batch')),
-                ('created_by', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='created_timetables', to=settings.AUTH_USER_MODEL)),
-                ('department', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='timetables', to='academics.department')),
+                ("timetable_id", models.AutoField(primary_key=True, serialize=False)),
+                ("semester", models.IntegerField()),
+                ("academic_year", models.CharField(max_length=20)),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("draft", "Draft"),
+                            ("pending", "Pending Approval"),
+                            ("approved", "Approved"),
+                            ("published", "Published"),
+                        ],
+                        default="draft",
+                        max_length=20,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "batch",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="timetables",
+                        to="academics.batch",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="created_timetables",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "department",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="timetables",
+                        to="academics.department",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'timetables',
+                "db_table": "timetables",
             },
         ),
         migrations.CreateModel(
-            name='TimetableSlot',
+            name="TimetableSlot",
             fields=[
-                ('slot_id', models.AutoField(primary_key=True, serialize=False)),
-                ('day', models.CharField(choices=[('monday', 'Monday'), ('tuesday', 'Tuesday'), ('wednesday', 'Wednesday'), ('thursday', 'Thursday'), ('friday', 'Friday'), ('saturday', 'Saturday')], max_length=10)),
-                ('time_slot', models.CharField(max_length=20)),
-                ('is_lab', models.BooleanField(default=False)),
-                ('classroom', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='academics.classroom')),
-                ('faculty', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='academics.faculty')),
-                ('subject', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='academics.subject')),
-                ('timetable', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='slots', to='academics.timetable')),
+                ("slot_id", models.AutoField(primary_key=True, serialize=False)),
+                (
+                    "day",
+                    models.CharField(
+                        choices=[
+                            ("monday", "Monday"),
+                            ("tuesday", "Tuesday"),
+                            ("wednesday", "Wednesday"),
+                            ("thursday", "Thursday"),
+                            ("friday", "Friday"),
+                            ("saturday", "Saturday"),
+                        ],
+                        max_length=10,
+                    ),
+                ),
+                ("time_slot", models.CharField(max_length=20)),
+                ("is_lab", models.BooleanField(default=False)),
+                (
+                    "classroom",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="academics.classroom",
+                    ),
+                ),
+                (
+                    "faculty",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="academics.faculty",
+                    ),
+                ),
+                (
+                    "subject",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="academics.subject",
+                    ),
+                ),
+                (
+                    "timetable",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="slots",
+                        to="academics.timetable",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'timetable_slots',
-                'unique_together': {('timetable', 'day', 'time_slot')},
+                "db_table": "timetable_slots",
+                "unique_together": {("timetable", "day", "time_slot")},
             },
         ),
         migrations.CreateModel(
-            name='Attendance',
+            name="Attendance",
             fields=[
-                ('attendance_id', models.AutoField(primary_key=True, serialize=False)),
-                ('date', models.DateField()),
-                ('is_present', models.BooleanField(default=False)),
-                ('marked_at', models.DateTimeField(auto_now_add=True)),
-                ('marked_by', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='academics.faculty')),
-                ('student', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='attendance_records', to='academics.student')),
-                ('slot', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='attendance_records', to='academics.timetableslot')),
+                ("attendance_id", models.AutoField(primary_key=True, serialize=False)),
+                ("date", models.DateField()),
+                ("is_present", models.BooleanField(default=False)),
+                ("marked_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "marked_by",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="academics.faculty",
+                    ),
+                ),
+                (
+                    "student",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="attendance_records",
+                        to="academics.student",
+                    ),
+                ),
+                (
+                    "slot",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="attendance_records",
+                        to="academics.timetableslot",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'attendance',
-                'unique_together': {('student', 'slot', 'date')},
+                "db_table": "attendance",
+                "unique_together": {("student", "slot", "date")},
             },
         ),
     ]

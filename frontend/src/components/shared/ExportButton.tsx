@@ -3,11 +3,11 @@
  * Provides multiple export options for timetable data
  */
 import { useState } from 'react'
-import { 
-  exportTimetableToPDF, 
-  exportTimetableToExcel, 
-  exportTimetableToCSV, 
-  exportTimetableToICS 
+import {
+  exportTimetableToPDF,
+  exportTimetableToExcel,
+  exportTimetableToCSV,
+  exportTimetableToICS,
 } from '@/lib/exportUtils'
 
 interface TimetableSlot {
@@ -34,12 +34,12 @@ interface ExportButtonProps {
   tableElementId?: string
 }
 
-export default function ExportButton({ 
-  slots, 
-  className = '', 
-  disabled = false, 
+export default function ExportButton({
+  slots,
+  className = '',
+  disabled = false,
   options = {},
-  tableElementId = 'timetable-grid'
+  tableElementId = 'timetable-grid',
 }: ExportButtonProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -56,7 +56,7 @@ export default function ExportButton({
     try {
       const exportOptions = {
         ...options,
-        filename: `timetable_${options.department || 'dept'}_${options.batch || 'batch'}_${new Date().toISOString().slice(0, 10)}`
+        filename: `timetable_${options.department || 'dept'}_${options.batch || 'batch'}_${new Date().toISOString().slice(0, 10)}`,
       }
 
       switch (format) {
@@ -66,17 +66,26 @@ export default function ExportButton({
           }
           await exportTimetableToPDF(tableElementId, slots, exportOptions)
           break
-        
+
         case 'excel':
-          exportTimetableToExcel(slots, { ...exportOptions, filename: exportOptions.filename + '.xlsx' })
+          exportTimetableToExcel(slots, {
+            ...exportOptions,
+            filename: exportOptions.filename + '.xlsx',
+          })
           break
-        
+
         case 'csv':
-          exportTimetableToCSV(slots, { ...exportOptions, filename: exportOptions.filename + '.csv' })
+          exportTimetableToCSV(slots, {
+            ...exportOptions,
+            filename: exportOptions.filename + '.csv',
+          })
           break
-        
+
         case 'ics':
-          exportTimetableToICS(slots, { ...exportOptions, filename: exportOptions.filename + '.ics' })
+          exportTimetableToICS(slots, {
+            ...exportOptions,
+            filename: exportOptions.filename + '.ics',
+          })
           break
       }
 
@@ -116,11 +125,8 @@ export default function ExportButton({
       {showDropdown && !isExporting && (
         <>
           {/* Backdrop */}
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setShowDropdown(false)}
-          />
-          
+          <div className="fixed inset-0 z-10" onClick={() => setShowDropdown(false)} />
+
           {/* Dropdown Menu */}
           <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-[#2d3136] border border-gray-200 dark:border-[#3c4043] rounded-lg shadow-lg z-20">
             <div className="py-1">
@@ -132,7 +138,7 @@ export default function ExportButton({
                 Export as PDF
                 <span className="ml-auto text-xs text-gray-500">High Quality</span>
               </button>
-              
+
               <button
                 onClick={() => handleExport('excel')}
                 className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-[#3c4043] flex items-center"
@@ -141,7 +147,7 @@ export default function ExportButton({
                 Export as Excel
                 <span className="ml-auto text-xs text-gray-500">Spreadsheet</span>
               </button>
-              
+
               <button
                 onClick={() => handleExport('csv')}
                 className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-[#3c4043] flex items-center"
@@ -150,9 +156,9 @@ export default function ExportButton({
                 Export as CSV
                 <span className="ml-auto text-xs text-gray-500">Data Only</span>
               </button>
-              
+
               <div className="border-t border-gray-200 dark:border-[#3c4043] my-1"></div>
-              
+
               <button
                 onClick={() => handleExport('ics')}
                 className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-[#3c4043] flex items-center"

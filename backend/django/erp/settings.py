@@ -20,21 +20,23 @@ from sentry_sdk.integrations.django import DjangoIntegration
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Load environment variables from backend/.env
-env_path = BASE_DIR.parent / '.env'
+env_path = BASE_DIR.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 # Sentry Configuration
-SENTRY_DSN = os.getenv('SENTRY_DSN', '')
-SENTRY_ENVIRONMENT = os.getenv('SENTRY_ENVIRONMENT', 'development')
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
+SENTRY_ENVIRONMENT = os.getenv("SENTRY_ENVIRONMENT", "development")
+
 
 def strip_local_variables(event, hint):
     """Remove local variables from stack frames to fix Python 3.13 compatibility"""
-    if 'exception' in event:
-        for exception in event['exception'].get('values', []):
-            if 'stacktrace' in exception:
-                for frame in exception['stacktrace'].get('frames', []):
-                    frame.pop('vars', None)
+    if "exception" in event:
+        for exception in event["exception"].get("values", []):
+            if "stacktrace" in exception:
+                for frame in exception["stacktrace"].get("frames", []):
+                    frame.pop("vars", None)
     return event
+
 
 if SENTRY_DSN:
     sentry_sdk.init(
@@ -52,12 +54,14 @@ if SENTRY_DSN:
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-h*8j!7q7-t70#m%q2b=ggq(w4=e*#v$af#h)pvdw!ag*5e#b5!')
+SECRET_KEY = os.getenv(
+    "SECRET_KEY", "django-insecure-h*8j!7q7-t70#m%q2b=ggq(w4=e*#v$af#h)pvdw!ag*5e#b5!"
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+DEBUG = os.getenv("DEBUG", "True") == "True"
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 print(f"ALLOWED_HOSTS: {ALLOWED_HOSTS}")
 
 # Disable trailing slash requirement for API endpoints
@@ -66,57 +70,57 @@ APPEND_SLASH = False
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     # Third party apps
-    'rest_framework',
-    'rest_framework.authtoken',
-    'rest_framework_simplejwt',
-    'drf_spectacular',
-    'corsheaders',
-    'django_filters',
+    "rest_framework",
+    "rest_framework.authtoken",
+    "rest_framework_simplejwt",
+    "drf_spectacular",
+    "corsheaders",
+    "django_filters",
     # Local apps
-    'core',
-    'academics',
+    "core",
+    "academics",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Custom logging middleware
-    'core.middleware.RequestResponseLoggingMiddleware',
-    'core.middleware.APIMetricsMiddleware',
+    "core.middleware.RequestResponseLoggingMiddleware",
+    "core.middleware.APIMetricsMiddleware",
 ]
 
-ROOT_URLCONF = 'erp.urls'
+ROOT_URLCONF = "erp.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'erp.wsgi.application'
+WSGI_APPLICATION = "erp.wsgi.application"
 
 
 # Database
@@ -125,28 +129,28 @@ WSGI_APPLICATION = 'erp.wsgi.application'
 import dj_database_url
 
 # Use DATABASE_URL if provided (CI/CD, Render), otherwise use individual env vars
-if os.getenv('DATABASE_URL'):
+if os.getenv("DATABASE_URL"):
     DATABASES = {
-        'default': dj_database_url.config(
-            default=os.getenv('DATABASE_URL'),
+        "default": dj_database_url.config(
+            default=os.getenv("DATABASE_URL"),
             conn_max_age=600,
             conn_health_checks=True,
         )
     }
 else:
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('DB_NAME'),
-            'USER': os.getenv('DB_USER'),
-            'PASSWORD': os.getenv('DB_PASSWORD'),
-            'HOST': os.getenv('DB_HOST'),
-            'PORT': os.getenv('DB_PORT', '5432'),
-            'ATOMIC_REQUESTS': True,
-            'CONN_MAX_AGE': 600,
-            'OPTIONS': {
-                'sslmode': 'require',  # Required for Neon database
-                'connect_timeout': 10,
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("DB_NAME"),
+            "USER": os.getenv("DB_USER"),
+            "PASSWORD": os.getenv("DB_PASSWORD"),
+            "HOST": os.getenv("DB_HOST"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+            "ATOMIC_REQUESTS": True,
+            "CONN_MAX_AGE": 600,
+            "OPTIONS": {
+                "sslmode": "require",  # Required for Neon database
+                "connect_timeout": 10,
             },
         }
     }
@@ -157,16 +161,16 @@ else:
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -174,9 +178,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -186,66 +190,66 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 # Media files
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Custom User Model
-AUTH_USER_MODEL = 'academics.User'
+AUTH_USER_MODEL = "academics.User"
 
 # REST Framework Settings
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
     ],
-    'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
-        'rest_framework.filters.OrderingFilter',
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 100,
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 100,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     # Rate Limiting (Industry-level security)
-    'DEFAULT_THROTTLE_CLASSES': [
-        'rest_framework.throttling.AnonRateThrottle',
-        'rest_framework.throttling.UserRateThrottle',
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
     ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',  # Anonymous users: 100 requests per hour
-        'user': '1000/hour',  # Authenticated users: 1000 requests per hour
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",  # Anonymous users: 100 requests per hour
+        "user": "1000/hour",  # Authenticated users: 1000 requests per hour
     },
 }
 
 # DRF Spectacular Settings (API Documentation)
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'SIH28 Timetable Optimization API',
-    'DESCRIPTION': 'AI-powered timetable generation and management system for educational institutions',
-    'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,
-    'COMPONENT_SPLIT_REQUEST': True,
-    'SCHEMA_PATH_PREFIX': '/api/',
-    'SWAGGER_UI_SETTINGS': {
-        'deepLinking': True,
-        'persistAuthorization': True,
-        'displayOperationId': True,
+    "TITLE": "SIH28 Timetable Optimization API",
+    "DESCRIPTION": "AI-powered timetable generation and management system for educational institutions",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": "/api/",
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+        "displayOperationId": True,
     },
-    'SERVERS': [
-        {'url': 'http://localhost:8000', 'description': 'Development server'},
-        {'url': 'https://sih28.onrender.com', 'description': 'Production server'},
+    "SERVERS": [
+        {"url": "http://localhost:8000", "description": "Development server"},
+        {"url": "https://sih28.onrender.com", "description": "Production server"},
     ],
 }
 
@@ -258,115 +262,115 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]
 
 # Cache Configuration with Redis
-REDIS_URL = os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1')
+REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1")
 
 CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': REDIS_URL,
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'IGNORE_EXCEPTIONS': True,  # Don't crash if Redis is unavailable
-            'CONNECTION_POOL_KWARGS': {
-                'max_connections': 50,
-                'retry_on_timeout': True,
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_URL,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "IGNORE_EXCEPTIONS": True,  # Don't crash if Redis is unavailable
+            "CONNECTION_POOL_KWARGS": {
+                "max_connections": 50,
+                "retry_on_timeout": True,
             },
-            'SOCKET_CONNECT_TIMEOUT': 5,
-            'SOCKET_TIMEOUT': 5,
+            "SOCKET_CONNECT_TIMEOUT": 5,
+            "SOCKET_TIMEOUT": 5,
         },
-        'KEY_PREFIX': 'sih28',
-        'TIMEOUT': 300,  # 5 minutes default
+        "KEY_PREFIX": "sih28",
+        "TIMEOUT": 300,  # 5 minutes default
     }
 }
 
 # Cache key prefix for different environments
-CACHE_MIDDLEWARE_ALIAS = 'default'
+CACHE_MIDDLEWARE_ALIAS = "default"
 CACHE_MIDDLEWARE_SECONDS = 300
-CACHE_MIDDLEWARE_KEY_PREFIX = f'sih28_{SENTRY_ENVIRONMENT}'
+CACHE_MIDDLEWARE_KEY_PREFIX = f"sih28_{SENTRY_ENVIRONMENT}"
 #     }
 # }
 
 # Logging Configuration
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
         },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
         },
-        'json': {
-            'format': '%(asctime)s %(name)s %(levelname)s %(message)s',
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
-        },
-        'file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'django.log'),
-            'maxBytes': 1024*1024*50,  # 50 MB
-            'backupCount': 5,
-            'formatter': 'verbose',
-        },
-        'api_requests_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'api_requests.log'),
-            'maxBytes': 1024*1024*100,  # 100 MB
-            'backupCount': 10,
-            'formatter': 'json',
-        },
-        'api_metrics_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'api_metrics.log'),
-            'maxBytes': 1024*1024*50,  # 50 MB
-            'backupCount': 5,
-            'formatter': 'json',
+        "json": {
+            "format": "%(asctime)s %(name)s %(levelname)s %(message)s",
         },
     },
-    'loggers': {
-        'django': {
-            'handlers': ['console', 'file'],
-            'level': 'INFO',
-            'propagate': False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
         },
-        'api_requests': {
-            'handlers': ['console', 'api_requests_file'],
-            'level': 'INFO',
-            'propagate': False,
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "logs", "django.log"),
+            "maxBytes": 1024 * 1024 * 50,  # 50 MB
+            "backupCount": 5,
+            "formatter": "verbose",
         },
-        'api_metrics': {
-            'handlers': ['api_metrics_file'],
-            'level': 'INFO',
-            'propagate': False,
+        "api_requests_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "logs", "api_requests.log"),
+            "maxBytes": 1024 * 1024 * 100,  # 100 MB
+            "backupCount": 10,
+            "formatter": "json",
         },
-        'academics': {
-            'handlers': ['console', 'file'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False,
+        "api_metrics_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": os.path.join(BASE_DIR, "logs", "api_metrics.log"),
+            "maxBytes": 1024 * 1024 * 50,  # 50 MB
+            "backupCount": 5,
+            "formatter": "json",
         },
     },
-    'root': {
-        'handlers': ['console'],
-        'level': 'WARNING',
+    "loggers": {
+        "django": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "api_requests": {
+            "handlers": ["console", "api_requests_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "api_metrics": {
+            "handlers": ["api_metrics_file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "academics": {
+            "handlers": ["console", "file"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
     },
 }
 
@@ -374,31 +378,26 @@ LOGGING = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'UPDATE_LAST_LOGIN': True,
-    
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'VERIFYING_KEY': None,
-    'AUDIENCE': None,
-    'ISSUER': None,
-    
-    'AUTH_HEADER_TYPES': ('Bearer',),
-    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
-    
-    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
-    'TOKEN_TYPE_CLAIM': 'token_type',
-    
-    'JTI_CLAIM': 'jti',
-    
-    'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
-    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
-    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    "VERIFYING_KEY": None,
+    "AUDIENCE": None,
+    "ISSUER": None,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "TOKEN_TYPE_CLAIM": "token_type",
+    "JTI_CLAIM": "jti",
+    "SLIDING_TOKEN_REFRESH_EXP_CLAIM": "refresh_exp",
+    "SLIDING_TOKEN_LIFETIME": timedelta(minutes=5),
+    "SLIDING_TOKEN_REFRESH_LIFETIME": timedelta(days=1),
 }
 
 # =============================
@@ -408,41 +407,40 @@ SIMPLE_JWT = {
 # Session Security
 SESSION_COOKIE_SECURE = not DEBUG  # Use secure cookies in production (HTTPS only)
 SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookies
-SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+SESSION_COOKIE_SAMESITE = "Lax"  # CSRF protection
 SESSION_COOKIE_AGE = 86400  # 24 hours
 
 # CSRF Protection
 CSRF_COOKIE_SECURE = not DEBUG  # Use secure cookies in production (HTTPS only)
 CSRF_COOKIE_HTTPONLY = True  # Prevent JavaScript access to CSRF token
-CSRF_COOKIE_SAMESITE = 'Lax'  # Additional CSRF protection
+CSRF_COOKIE_SAMESITE = "Lax"  # Additional CSRF protection
 CSRF_USE_SESSIONS = False  # Use cookie-based CSRF tokens
 CSRF_TRUSTED_ORIGINS = [
-    'https://sih28.onrender.com',
+    "https://sih28.onrender.com",
 ]
 
 # Browser Security Headers
 SECURE_BROWSER_XSS_FILTER = True  # Enable browser's XSS filtering
 SECURE_CONTENT_TYPE_NOSNIFF = True  # Prevent MIME-type sniffing
-X_FRAME_OPTIONS = 'DENY'  # Prevent clickjacking attacks
+X_FRAME_OPTIONS = "DENY"  # Prevent clickjacking attacks
 
 # HTTPS/SSL Settings (Production only)
 if not DEBUG:
     SECURE_SSL_REDIRECT = True  # Redirect all HTTP to HTTPS
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Trust proxy headers
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")  # Trust proxy headers
     SECURE_HSTS_SECONDS = 31536000  # 1 year - Enable HTTP Strict Transport Security
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True  # Apply HSTS to all subdomains
     SECURE_HSTS_PRELOAD = True  # Allow browser preloading of HSTS
 
 # Password Security
 PASSWORD_HASHERS = [
-    'django.contrib.auth.hashers.Argon2PasswordHasher',  # Most secure
-    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
-    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
-    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+    "django.contrib.auth.hashers.Argon2PasswordHasher",  # Most secure
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
 ]
 
 # Additional Security Settings
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB max upload size
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB max file upload
-SECURE_REFERRER_POLICY = 'same-origin'  # Control referrer information
-
+SECURE_REFERRER_POLICY = "same-origin"  # Control referrer information

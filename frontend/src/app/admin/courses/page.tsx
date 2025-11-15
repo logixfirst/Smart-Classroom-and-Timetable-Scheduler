@@ -42,26 +42,25 @@ export default function CoursesPage() {
       setIsLoading(true)
     }
     setError(null)
-    
+
     try {
       const response = await apiClient.getCourses()
       if (response.error) {
         setError(response.error)
       } else if (response.data) {
         // Handle both paginated and non-paginated responses
-        let courseData = Array.isArray(response.data) 
-          ? response.data 
-          : response.data.results || []
-          
+        let courseData = Array.isArray(response.data) ? response.data : response.data.results || []
+
         // Filter by search term
         if (searchTerm) {
-          courseData = courseData.filter((course: Course) =>
-            course.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            course.course_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            course.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
+          courseData = courseData.filter(
+            (course: Course) =>
+              course.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              course.course_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              course.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
           )
         }
-        
+
         setCourses(courseData)
       }
     } catch (err) {
@@ -108,7 +107,9 @@ export default function CoursesPage() {
     <DashboardLayout role="admin">
       <div className="space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">Course Management</h1>
+          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">
+            Course Management
+          </h1>
           <button className="btn-primary w-full sm:w-auto px-6 py-3">
             <span className="mr-2 text-lg">📚</span>
             Add Course
@@ -120,12 +121,14 @@ export default function CoursesPage() {
             <h3 className="card-title">Courses</h3>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
               <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
-                <input 
-                  placeholder="Search courses..." 
-                  className="input-primary pl-10 w-full" 
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                  🔍
+                </span>
+                <input
+                  placeholder="Search courses..."
+                  className="input-primary pl-10 w-full"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={e => setSearchTerm(e.target.value)}
                 />
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
@@ -147,19 +150,28 @@ export default function CoursesPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Mobile Card View */}
           <div className="block sm:hidden space-y-3">
-            {courses.map((course) => (
-              <div key={course.course_id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
+            {courses.map(course => (
+              <div
+                key={course.course_id}
+                className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]"
+              >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="badge badge-neutral text-xs">{course.course_id}</span>
-                      <span className="text-xs text-gray-600 dark:text-gray-400">{course.duration_years} years</span>
+                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                        {course.duration_years} years
+                      </span>
                     </div>
-                    <h4 className="font-medium text-sm text-gray-800 dark:text-gray-200">{course.course_name}</h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">{course.department.department_name}</p>
+                    <h4 className="font-medium text-sm text-gray-800 dark:text-gray-200">
+                      {course.course_name}
+                    </h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      {course.department.department_name}
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -169,7 +181,7 @@ export default function CoursesPage() {
               </div>
             ))}
           </div>
-          
+
           {/* Desktop Table View */}
           <div className="hidden sm:block overflow-x-auto relative">
             {/* Table Loading Overlay */}
@@ -181,7 +193,7 @@ export default function CoursesPage() {
                 </div>
               </div>
             )}
-            
+
             <table className="table">
               <thead className="table-header">
                 <tr>
@@ -194,13 +206,17 @@ export default function CoursesPage() {
                 </tr>
               </thead>
               <tbody>
-                {courses.map((course) => (
+                {courses.map(course => (
                   <tr key={course.course_id} className="table-row">
                     <td className="table-cell">
-                      <span className="font-medium text-gray-800 dark:text-gray-200">{course.course_id}</span>
+                      <span className="font-medium text-gray-800 dark:text-gray-200">
+                        {course.course_id}
+                      </span>
                     </td>
                     <td className="table-cell">
-                      <div className="font-medium text-gray-800 dark:text-gray-200">{course.course_name}</div>
+                      <div className="font-medium text-gray-800 dark:text-gray-200">
+                        {course.course_name}
+                      </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400 md:hidden">
                         {course.duration_years} years • {course.department.department_name}
                       </div>
@@ -212,8 +228,12 @@ export default function CoursesPage() {
                     </td>
                     <td className="table-cell">
                       <div className="flex gap-1 sm:gap-2">
-                        <button className="btn-ghost text-xs px-2 py-1" disabled={isTableLoading}>Edit</button>
-                        <button className="btn-danger text-xs px-2 py-1" disabled={isTableLoading}>Del</button>
+                        <button className="btn-ghost text-xs px-2 py-1" disabled={isTableLoading}>
+                          Edit
+                        </button>
+                        <button className="btn-danger text-xs px-2 py-1" disabled={isTableLoading}>
+                          Del
+                        </button>
                       </div>
                     </td>
                   </tr>

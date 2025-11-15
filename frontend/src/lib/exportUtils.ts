@@ -29,8 +29,8 @@ interface ExportOptions {
  * Export timetable to PDF using html2canvas and jsPDF
  */
 export const exportTimetableToPDF = async (
-  elementId: string, 
-  slots: TimetableSlot[], 
+  elementId: string,
+  slots: TimetableSlot[],
   options: ExportOptions = {}
 ): Promise<void> => {
   try {
@@ -44,14 +44,14 @@ export const exportTimetableToPDF = async (
       scale: 2, // Higher quality
       useCORS: true,
       allowTaint: true,
-      backgroundColor: '#ffffff'
+      backgroundColor: '#ffffff',
     })
 
     const imgData = canvas.toDataURL('image/png')
     const pdf = new jsPDF({
       orientation: 'landscape',
       unit: 'mm',
-      format: 'a4'
+      format: 'a4',
     })
 
     // Calculate dimensions
@@ -64,14 +64,14 @@ export const exportTimetableToPDF = async (
     pdf.setFontSize(20)
     pdf.setFont('helvetica', 'bold')
     pdf.text(options.title || 'Timetable', 148.5, 30, { align: 'center' })
-    
+
     if (options.department || options.batch) {
       pdf.setFontSize(14)
       pdf.setFont('helvetica', 'normal')
       const subtitle = `${options.department || ''} - ${options.batch || ''} - Semester ${options.semester || ''}`
       pdf.text(subtitle, 148.5, 45, { align: 'center' })
     }
-    
+
     if (options.academicYear) {
       pdf.setFontSize(12)
       pdf.text(`Academic Year: ${options.academicYear}`, 148.5, 55, { align: 'center' })
@@ -79,7 +79,14 @@ export const exportTimetableToPDF = async (
 
     // Add timetable image
     let position = 70
-    pdf.addImage(imgData, 'PNG', 10, position, imgWidth - 20, (imgHeight * (imgWidth - 20)) / imgWidth)
+    pdf.addImage(
+      imgData,
+      'PNG',
+      10,
+      position,
+      imgWidth - 20,
+      (imgHeight * (imgWidth - 20)) / imgWidth
+    )
 
     // Add page numbers and metadata
     const pageCount = pdf.getNumberOfPages()
@@ -103,13 +110,13 @@ export const exportTimetableToPDF = async (
  * Export timetable to Excel format
  */
 export const exportTimetableToExcel = (
-  slots: TimetableSlot[], 
+  slots: TimetableSlot[],
   options: ExportOptions = {}
 ): void => {
   try {
     // Create workbook
     const wb = XLSX.utils.book_new()
-    
+
     // Convert slots to Excel format
     const worksheetData = [
       // Header row
@@ -121,8 +128,8 @@ export const exportTimetableToExcel = (
         slot.subject_name,
         slot.faculty_name,
         slot.classroom_number,
-        slot.batch_id
-      ])
+        slot.batch_id,
+      ]),
     ]
 
     // Create worksheet
@@ -133,11 +140,11 @@ export const exportTimetableToExcel = (
     for (let col = range.s.c; col <= range.e.c; col++) {
       const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
       if (!ws[cellAddress]) continue
-      
+
       ws[cellAddress].s = {
         font: { bold: true },
         fill: { fgColor: { rgb: 'CCCCCC' } },
-        alignment: { horizontal: 'center' }
+        alignment: { horizontal: 'center' },
       }
     }
 
@@ -148,7 +155,7 @@ export const exportTimetableToExcel = (
       { width: 25 }, // Subject
       { width: 20 }, // Faculty
       { width: 15 }, // Classroom
-      { width: 12 }  // Batch
+      { width: 12 }, // Batch
     ]
 
     // Add metadata sheet
@@ -160,11 +167,11 @@ export const exportTimetableToExcel = (
       ['Batch:', options.batch || 'N/A'],
       ['Semester:', options.semester?.toString() || 'N/A'],
       ['Academic Year:', options.academicYear || 'N/A'],
-      ['Total Classes:', slots.length.toString()]
+      ['Total Classes:', slots.length.toString()],
     ]
-    
+
     const metaWs = XLSX.utils.aoa_to_sheet(metaData)
-    
+
     // Add worksheets to workbook
     XLSX.utils.book_append_sheet(wb, ws, 'Timetable')
     XLSX.utils.book_append_sheet(wb, metaWs, 'Information')
@@ -181,23 +188,24 @@ export const exportTimetableToExcel = (
 /**
  * Export timetable to CSV format
  */
-export const exportTimetableToCSV = (
-  slots: TimetableSlot[], 
-  options: ExportOptions = {}
-): void => {
+export const exportTimetableToCSV = (slots: TimetableSlot[], options: ExportOptions = {}): void => {
   try {
     // Create CSV content
     const headers = ['Day', 'Time Slot', 'Subject', 'Faculty', 'Classroom', 'Batch']
     const csvContent = [
       headers.join(','),
-      ...slots.map(slot => [
-        slot.day,
-        slot.time_slot,
-        slot.subject_name,
-        slot.faculty_name,
-        slot.classroom_number,
-        slot.batch_id
-      ].map(field => `"${field}"`).join(','))
+      ...slots.map(slot =>
+        [
+          slot.day,
+          slot.time_slot,
+          slot.subject_name,
+          slot.faculty_name,
+          slot.classroom_number,
+          slot.batch_id,
+        ]
+          .map(field => `"${field}"`)
+          .join(',')
+      ),
     ].join('\n')
 
     // Create blob and save
@@ -213,15 +221,17 @@ export const exportTimetableToCSV = (
 /**
  * Export timetable to iCalendar (.ics) format for calendar applications
  */
-export const exportTimetableToICS = (
-  slots: TimetableSlot[], 
-  options: ExportOptions = {}
-): void => {
+export const exportTimetableToICS = (slots: TimetableSlot[], options: ExportOptions = {}): void => {
   try {
     // Map day names to numbers (0 = Sunday)
     const dayMap: { [key: string]: number } = {
-      'sunday': 0, 'monday': 1, 'tuesday': 2, 'wednesday': 3,
-      'thursday': 4, 'friday': 5, 'saturday': 6
+      sunday: 0,
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
     }
 
     let icsContent = [
@@ -229,18 +239,18 @@ export const exportTimetableToICS = (
       'VERSION:2.0',
       'PRODID:-//Timetable System//Timetable Export//EN',
       'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH'
+      'METHOD:PUBLISH',
     ]
 
     slots.forEach((slot, index) => {
       const dayName = slot.day.toLowerCase()
       const dayNumber = dayMap[dayName]
-      
+
       if (dayNumber === undefined) return
 
       // Parse time slot (assuming format like "09:00-10:00")
       const [startTime, endTime] = slot.time_slot.split('-')
-      
+
       // Create a date for this week (starting from Monday)
       const now = new Date()
       const monday = new Date(now.setDate(now.getDate() - now.getDay() + 1))
@@ -250,10 +260,10 @@ export const exportTimetableToICS = (
       // Set start and end times
       const [startHour, startMin] = startTime.split(':').map(Number)
       const [endHour, endMin] = endTime.split(':').map(Number)
-      
+
       const startDateTime = new Date(eventDate)
       startDateTime.setHours(startHour, startMin, 0)
-      
+
       const endDateTime = new Date(eventDate)
       endDateTime.setHours(endHour, endMin, 0)
 

@@ -31,7 +31,7 @@ export default function LabsPage() {
     lab_id: '',
     lab_name: '',
     capacity: '',
-    department: ''
+    department: '',
   })
 
   useEffect(() => {
@@ -53,9 +53,7 @@ export default function LabsPage() {
     try {
       const response = await apiClient.getDepartments()
       if (response.data) {
-        const deptData = Array.isArray(response.data) 
-          ? response.data 
-          : response.data.results || []
+        const deptData = Array.isArray(response.data) ? response.data : response.data.results || []
         setDepartments(deptData)
       }
     } catch (err) {
@@ -70,26 +68,25 @@ export default function LabsPage() {
       setIsLoading(true)
     }
     setError(null)
-    
+
     try {
       const response = await apiClient.getLabs()
       if (response.error) {
         setError(response.error)
       } else if (response.data) {
         // Handle both paginated and non-paginated responses
-        let labData = Array.isArray(response.data) 
-          ? response.data 
-          : response.data.results || []
-          
+        let labData = Array.isArray(response.data) ? response.data : response.data.results || []
+
         // Filter by search term
         if (searchTerm) {
-          labData = labData.filter((lab: Lab) =>
-            lab.lab_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            lab.lab_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            lab.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
+          labData = labData.filter(
+            (lab: Lab) =>
+              lab.lab_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              lab.lab_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              lab.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
           )
         }
-        
+
         setLabs(labData)
       }
     } catch (err) {
@@ -110,10 +107,10 @@ export default function LabsPage() {
         lab_id: formData.lab_id,
         lab_name: formData.lab_name,
         capacity: parseInt(formData.capacity),
-        department_id: formData.department
+        department_id: formData.department,
       }
 
-      const response = editingId 
+      const response = editingId
         ? await apiClient.updateLab(editingId, labPayload)
         : await apiClient.createLab(labPayload)
 
@@ -134,7 +131,7 @@ export default function LabsPage() {
       lab_id: lab.lab_id,
       lab_name: lab.lab_name,
       capacity: lab.capacity.toString(),
-      department: lab.department.department_id
+      department: lab.department.department_id,
     })
     setEditingId(lab.lab_id)
     setShowForm(true)
@@ -142,7 +139,7 @@ export default function LabsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this lab?')) return
-    
+
     try {
       const response = await apiClient.deleteLab(id)
       if (response.error) {
@@ -207,14 +204,18 @@ export default function LabsPage() {
           <h3 className="card-title">Labs</h3>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
             <div className="relative flex-1">
-              <label htmlFor="lab-search" className="sr-only">Search labs</label>
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
+              <label htmlFor="lab-search" className="sr-only">
+                Search labs
+              </label>
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                🔍
+              </span>
               <input
                 id="lab-search"
                 placeholder="Search labs..."
                 className="input-primary pl-10"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
@@ -227,24 +228,33 @@ export default function LabsPage() {
               No Labs Found
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              {labs.length === 0 ? 'No lab data has been imported yet.' : 'No labs match your search criteria.'}
+              {labs.length === 0
+                ? 'No lab data has been imported yet.'
+                : 'No labs match your search criteria.'}
             </p>
           </div>
         ) : (
           <div>
             {/* Mobile Card View */}
             <div className="block lg:hidden space-y-3">
-              {filteredLabs.map((lab) => (
-                <div key={lab.lab_id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
+              {filteredLabs.map(lab => (
+                <div
+                  key={lab.lab_id}
+                  className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]"
+                >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-gray-800 dark:text-gray-200">{lab.lab_name}</h4>
+                      <h4 className="font-medium text-gray-800 dark:text-gray-200">
+                        {lab.lab_name}
+                      </h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">{lab.lab_id}</p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <div className="flex gap-2">
-                      <span className="badge badge-neutral text-xs">{lab.department.department_name}</span>
+                      <span className="badge badge-neutral text-xs">
+                        {lab.department.department_name}
+                      </span>
                       <span className="badge badge-info text-xs">Capacity: {lab.capacity}</span>
                     </div>
                   </div>
@@ -263,7 +273,7 @@ export default function LabsPage() {
                   </div>
                 </div>
               )}
-              
+
               <table className="table">
                 <thead className="table-header">
                   <tr>
@@ -274,16 +284,20 @@ export default function LabsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLabs.map((lab) => (
+                  {filteredLabs.map(lab => (
                     <tr key={lab.lab_id} className="table-row">
                       <td className="table-cell">
                         <span className="font-mono text-sm">{lab.lab_id}</span>
                       </td>
                       <td className="table-cell">
-                        <div className="font-medium text-gray-800 dark:text-gray-200">{lab.lab_name}</div>
+                        <div className="font-medium text-gray-800 dark:text-gray-200">
+                          {lab.lab_name}
+                        </div>
                       </td>
                       <td className="table-cell">
-                        <span className="badge badge-neutral text-xs">{lab.department.department_name}</span>
+                        <span className="badge badge-neutral text-xs">
+                          {lab.department.department_name}
+                        </span>
                       </td>
                       <td className="table-cell">
                         <span className="badge badge-info text-xs">{lab.capacity}</span>

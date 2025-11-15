@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 
@@ -26,36 +26,58 @@ interface SubstitutionModalProps {
   onConfirmSubstitution: (slotData: TimeSlot, newFacultyId: number) => void
 }
 
-export default function SubstitutionModal({ 
-  isOpen, 
-  onClose, 
-  slot, 
-  onConfirmSubstitution 
+export default function SubstitutionModal({
+  isOpen,
+  onClose,
+  slot,
+  onConfirmSubstitution,
 }: SubstitutionModalProps) {
   const [selectedFacultyId, setSelectedFacultyId] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   // Mock available faculty data - in real app, this would come from API
   const availableFaculty: Faculty[] = [
-    { id: 1, name: 'Dr. Rajesh Kumar', isAvailable: true, subjects: ['Data Structures', 'Algorithms'] },
-    { id: 2, name: 'Prof. Meera Sharma', isAvailable: true, subjects: ['Database Systems', 'Data Structures'] },
-    { id: 4, name: 'Dr. Anita Verma', isAvailable: true, subjects: ['Machine Learning', 'Data Science'] },
-    { id: 5, name: 'Prof. Suresh Reddy', isAvailable: true, subjects: ['Web Development', 'Software Engineering'] },
+    {
+      id: 1,
+      name: 'Dr. Rajesh Kumar',
+      isAvailable: true,
+      subjects: ['Data Structures', 'Algorithms'],
+    },
+    {
+      id: 2,
+      name: 'Prof. Meera Sharma',
+      isAvailable: true,
+      subjects: ['Database Systems', 'Data Structures'],
+    },
+    {
+      id: 4,
+      name: 'Dr. Anita Verma',
+      isAvailable: true,
+      subjects: ['Machine Learning', 'Data Science'],
+    },
+    {
+      id: 5,
+      name: 'Prof. Suresh Reddy',
+      isAvailable: true,
+      subjects: ['Web Development', 'Software Engineering'],
+    },
   ]
 
   // Filter faculty who can teach the subject
-  const qualifiedFaculty = availableFaculty.filter(faculty => 
-    faculty.isAvailable && 
-    slot?.subject && 
-    faculty.subjects.some(subject => 
-      subject.toLowerCase().includes(slot.subject.toLowerCase()) ||
-      slot.subject.toLowerCase().includes(subject.toLowerCase())
-    )
+  const qualifiedFaculty = availableFaculty.filter(
+    faculty =>
+      faculty.isAvailable &&
+      slot?.subject &&
+      faculty.subjects.some(
+        subject =>
+          subject.toLowerCase().includes(slot.subject.toLowerCase()) ||
+          slot.subject.toLowerCase().includes(subject.toLowerCase())
+      )
   )
 
   const handleConfirm = async () => {
     if (!slot || !selectedFacultyId) return
-    
+
     setIsLoading(true)
     try {
       // TODO: API call to update timetable
@@ -79,7 +101,7 @@ export default function SubstitutionModal({
           <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
             Faculty Substitution
           </h3>
-          <button 
+          <button
             onClick={onClose}
             className="w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400"
           >
@@ -105,7 +127,9 @@ export default function SubstitutionModal({
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Day:</span>
-                <span className="font-medium text-gray-800 dark:text-gray-200 capitalize">{slot.day}</span>
+                <span className="font-medium text-gray-800 dark:text-gray-200 capitalize">
+                  {slot.day}
+                </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Batch:</span>
@@ -113,11 +137,15 @@ export default function SubstitutionModal({
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Classroom:</span>
-                <span className="font-medium text-gray-800 dark:text-gray-200">{slot.classroom}</span>
+                <span className="font-medium text-gray-800 dark:text-gray-200">
+                  {slot.classroom}
+                </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Current Faculty:</span>
-                <span className="font-medium text-red-600 dark:text-red-400">{slot.faculty} (Unavailable)</span>
+                <span className="font-medium text-red-600 dark:text-red-400">
+                  {slot.faculty} (Unavailable)
+                </span>
               </div>
             </div>
           </div>
@@ -129,8 +157,8 @@ export default function SubstitutionModal({
             </h4>
             {qualifiedFaculty.length > 0 ? (
               <div className="space-y-2">
-                {qualifiedFaculty.map((faculty) => (
-                  <label 
+                {qualifiedFaculty.map(faculty => (
+                  <label
                     key={faculty.id}
                     className="flex items-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
                   >
@@ -156,7 +184,9 @@ export default function SubstitutionModal({
             ) : (
               <div className="text-center py-4 text-gray-500 dark:text-gray-400">
                 <p className="text-sm">No qualified faculty available for this subject.</p>
-                <p className="text-xs mt-1">Please check faculty availability or subject mappings.</p>
+                <p className="text-xs mt-1">
+                  Please check faculty availability or subject mappings.
+                </p>
               </div>
             )}
           </div>
@@ -164,14 +194,14 @@ export default function SubstitutionModal({
 
         {/* Footer */}
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700">
-          <button 
+          <button
             onClick={onClose}
             className="btn-secondary flex-1 sm:flex-none order-2 sm:order-1"
             disabled={isLoading}
           >
             Cancel
           </button>
-          <button 
+          <button
             onClick={handleConfirm}
             disabled={!selectedFacultyId || isLoading || qualifiedFaculty.length === 0}
             className="btn-primary flex-1 sm:flex-none order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed"

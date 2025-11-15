@@ -26,12 +26,12 @@ export default function TimetableGeneratePage() {
   const [currentJob, setCurrentJob] = useState<GenerationJob | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [progressInterval, setProgressInterval] = useState<NodeJS.Timeout | null>(null)
-  
+
   const [formData, setFormData] = useState({
     department_id: '',
     batch_id: '',
     semester: '1',
-    academic_year: '2024-25'
+    academic_year: '2024-25',
   })
 
   useEffect(() => {
@@ -52,16 +52,20 @@ export default function TimetableGeneratePage() {
     try {
       const [deptResponse, batchResponse] = await Promise.all([
         apiClient.getDepartments(),
-        apiClient.getBatches()
+        apiClient.getBatches(),
       ])
-      
+
       if (deptResponse.data) {
-        const deptData = Array.isArray(deptResponse.data) ? deptResponse.data : deptResponse.data.results || []
+        const deptData = Array.isArray(deptResponse.data)
+          ? deptResponse.data
+          : deptResponse.data.results || []
         setDepartments(deptData)
       }
-      
+
       if (batchResponse.data) {
-        const batchData = Array.isArray(batchResponse.data) ? batchResponse.data : batchResponse.data.results || []
+        const batchData = Array.isArray(batchResponse.data)
+          ? batchResponse.data
+          : batchResponse.data.results || []
         setBatches(batchData)
       }
     } catch (error) {
@@ -74,19 +78,22 @@ export default function TimetableGeneratePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsGenerating(true)
-    
+
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/generation-jobs/generate/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-        credentials: 'include'
-      })
-      
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/generation-jobs/generate/`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+          credentials: 'include',
+        }
+      )
+
       const data = await response.json()
-      
+
       if (data.success && data.job) {
         setCurrentJob(data.job)
         // Start polling for progress
@@ -110,15 +117,17 @@ export default function TimetableGeneratePage() {
           { credentials: 'include' }
         )
         const data = await response.json()
-        
+
         if (data.success) {
-          setCurrentJob(prev => prev ? { ...prev, progress: data.progress, status: data.status } : null)
-          
+          setCurrentJob(prev =>
+            prev ? { ...prev, progress: data.progress, status: data.status } : null
+          )
+
           // Stop polling if completed or failed
           if (data.status === 'completed' || data.status === 'failed') {
             clearInterval(interval)
             setIsGenerating(false)
-            
+
             if (data.status === 'completed') {
               // Show success message
               alert('Timetable generation completed successfully!')
@@ -129,55 +138,60 @@ export default function TimetableGeneratePage() {
         console.error('Error fetching progress:', error)
       }
     }, 3000) // Poll every 3 seconds
-    
+
     setProgressInterval(interval)
   }
 
   const handleRerun = async () => {
     if (!currentJob) return
-    
+
     // For rerun, we need to use the original form data or try to find IDs from names
     // If IDs are available, use them; otherwise, find by names
     let departmentId = currentJob.department_id || formData.department_id
     let batchId = currentJob.batch_id || formData.batch_id
-    
+
     // If IDs not available, try to find them by names
     if (!departmentId) {
       const dept = departments.find(d => d.department_name === currentJob.department_name)
       departmentId = dept?.department_id || ''
     }
-    
+
     if (!batchId) {
       const batch = batches.find(b => b.batch_id === currentJob.batch_name)
       batchId = batch?.batch_id || ''
     }
-    
+
     if (!departmentId || !batchId) {
-      alert('Cannot re-run: Department or Batch information not found. Please start a new generation.')
+      alert(
+        'Cannot re-run: Department or Batch information not found. Please start a new generation.'
+      )
       return
     }
-    
+
     const rerunData = {
       department_id: departmentId,
       batch_id: batchId,
       semester: currentJob.semester,
-      academic_year: currentJob.academic_year
+      academic_year: currentJob.academic_year,
     }
-    
+
     setIsGenerating(true)
-    
+
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/generation-jobs/generate/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(rerunData),
-        credentials: 'include'
-      })
-      
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/generation-jobs/generate/`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(rerunData),
+          credentials: 'include',
+        }
+      )
+
       const data = await response.json()
-      
+
       if (data.success && data.job) {
         setCurrentJob(data.job)
         // Start polling for progress
@@ -195,24 +209,24 @@ export default function TimetableGeneratePage() {
 
   const getStatusColor = (status: string) => {
     const colors: { [key: string]: string } = {
-      'queued': 'bg-gray-500',
-      'running': 'bg-blue-500',
-      'completed': 'bg-green-500',
-      'failed': 'bg-red-500',
-      'approved': 'bg-purple-500',
-      'rejected': 'bg-orange-500'
+      queued: 'bg-gray-500',
+      running: 'bg-blue-500',
+      completed: 'bg-green-500',
+      failed: 'bg-red-500',
+      approved: 'bg-purple-500',
+      rejected: 'bg-orange-500',
     }
     return colors[status] || 'bg-gray-500'
   }
 
   const getStatusText = (status: string) => {
     const statusMap: { [key: string]: string } = {
-      'queued': 'Queued',
-      'running': 'Generating...',
-      'completed': 'Completed',
-      'failed': 'Failed',
-      'approved': 'Approved',
-      'rejected': 'Rejected'
+      queued: 'Queued',
+      running: 'Generating...',
+      completed: 'Completed',
+      failed: 'Failed',
+      approved: 'Approved',
+      rejected: 'Rejected',
     }
     return statusMap[status] || status
   }
@@ -253,13 +267,13 @@ export default function TimetableGeneratePage() {
               <select
                 id="department_id"
                 value={formData.department_id}
-                onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
+                onChange={e => setFormData({ ...formData, department_id: e.target.value })}
                 className="input-primary"
                 required
                 disabled={isGenerating}
               >
                 <option value="">Select Department</option>
-                {departments.map((dept) => (
+                {departments.map(dept => (
                   <option key={dept.department_id} value={dept.department_id}>
                     {dept.department_name}
                   </option>
@@ -275,13 +289,13 @@ export default function TimetableGeneratePage() {
               <select
                 id="batch_id"
                 value={formData.batch_id}
-                onChange={(e) => setFormData({ ...formData, batch_id: e.target.value })}
+                onChange={e => setFormData({ ...formData, batch_id: e.target.value })}
                 className="input-primary"
                 required
                 disabled={isGenerating}
               >
                 <option value="">Select Batch</option>
-                {batches.map((batch) => (
+                {batches.map(batch => (
                   <option key={batch.batch_id} value={batch.batch_id}>
                     {batch.batch_id}
                   </option>
@@ -297,12 +311,12 @@ export default function TimetableGeneratePage() {
               <select
                 id="semester"
                 value={formData.semester}
-                onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                onChange={e => setFormData({ ...formData, semester: e.target.value })}
                 className="input-primary"
                 required
                 disabled={isGenerating}
               >
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
                   <option key={sem} value={sem}>
                     Semester {sem}
                   </option>
@@ -319,7 +333,7 @@ export default function TimetableGeneratePage() {
                 id="academic_year"
                 type="text"
                 value={formData.academic_year}
-                onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
+                onChange={e => setFormData({ ...formData, academic_year: e.target.value })}
                 className="input-primary"
                 placeholder="2024-25"
                 required
@@ -416,7 +430,7 @@ export default function TimetableGeneratePage() {
                 </button>
               </div>
             )}
-            
+
             {currentJob.status === 'rejected' && (
               <div className="flex gap-3 pt-4">
                 <button
@@ -438,7 +452,7 @@ export default function TimetableGeneratePage() {
                 </button>
               </div>
             )}
-            
+
             {currentJob.status === 'failed' && (
               <div className="flex gap-3 pt-4">
                 <button

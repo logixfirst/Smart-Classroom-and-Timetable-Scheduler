@@ -1,13 +1,41 @@
-"use client"
+'use client'
 
 import DashboardLayout from '@/components/dashboard-layout'
 
 export default function AdminApprovals() {
   const pendingApprovals = [
-    { id: 1, type: 'Timetable', requester: 'Dr. Smith', department: 'Computer Science', date: '2024-01-15', priority: 'High' },
-    { id: 2, type: 'Room Change', requester: 'Prof. Johnson', department: 'Mathematics', date: '2024-01-14', priority: 'Medium' },
-    { id: 3, type: 'Faculty Leave', requester: 'Dr. Brown', department: 'Physics', date: '2024-01-13', priority: 'Low' },
-    { id: 4, type: 'Course Update', requester: 'Prof. Davis', department: 'Chemistry', date: '2024-01-12', priority: 'High' },
+    {
+      id: 1,
+      type: 'Timetable',
+      requester: 'Dr. Smith',
+      department: 'Computer Science',
+      date: '2024-01-15',
+      priority: 'High',
+    },
+    {
+      id: 2,
+      type: 'Room Change',
+      requester: 'Prof. Johnson',
+      department: 'Mathematics',
+      date: '2024-01-14',
+      priority: 'Medium',
+    },
+    {
+      id: 3,
+      type: 'Faculty Leave',
+      requester: 'Dr. Brown',
+      department: 'Physics',
+      date: '2024-01-13',
+      priority: 'Low',
+    },
+    {
+      id: 4,
+      type: 'Course Update',
+      requester: 'Prof. Davis',
+      department: 'Chemistry',
+      date: '2024-01-12',
+      priority: 'High',
+    },
   ]
 
   const handleApprove = (id: number) => {
@@ -61,7 +89,7 @@ export default function AdminApprovals() {
               </div>
             </div>
           </div>
-          
+
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
@@ -73,7 +101,7 @@ export default function AdminApprovals() {
               </div>
             </div>
           </div>
-          
+
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
@@ -85,7 +113,7 @@ export default function AdminApprovals() {
               </div>
             </div>
           </div>
-          
+
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
@@ -102,26 +130,37 @@ export default function AdminApprovals() {
         {/* Approvals Table */}
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">
-              Pending Requests
-            </h3>
+            <h3 className="card-title">Pending Requests</h3>
           </div>
-          
+
           {/* Mobile View */}
           <div className="block sm:hidden space-y-3">
-            {pendingApprovals.map((approval) => (
-              <div key={approval.id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
+            {pendingApprovals.map(approval => (
+              <div
+                key={approval.id}
+                className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]"
+              >
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">{approval.type}</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{approval.requester}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{approval.department}</p>
+                    <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">
+                      {approval.type}
+                    </h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                      {approval.requester}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {approval.department}
+                    </p>
                   </div>
-                  <span className={`badge ml-2 ${
-                    approval.priority === 'High' ? 'badge-danger' :
-                    approval.priority === 'Medium' ? 'badge-warning' :
-                    'badge-success'
-                  }`}>
+                  <span
+                    className={`badge ml-2 ${
+                      approval.priority === 'High'
+                        ? 'badge-danger'
+                        : approval.priority === 'Medium'
+                          ? 'badge-warning'
+                          : 'badge-success'
+                    }`}
+                  >
                     {approval.priority}
                   </span>
                 </div>
@@ -160,20 +199,26 @@ export default function AdminApprovals() {
                 </tr>
               </thead>
               <tbody>
-                {pendingApprovals.map((approval) => (
+                {pendingApprovals.map(approval => (
                   <tr key={approval.id} className="table-row">
                     <td className="table-cell">
-                      <div className="font-medium text-gray-800 dark:text-gray-200">{approval.type}</div>
+                      <div className="font-medium text-gray-800 dark:text-gray-200">
+                        {approval.type}
+                      </div>
                     </td>
                     <td className="table-cell">{approval.requester}</td>
                     <td className="table-cell">{approval.department}</td>
                     <td className="table-cell">{approval.date}</td>
                     <td className="table-cell">
-                      <span className={`badge ${
-                        approval.priority === 'High' ? 'badge-danger' :
-                        approval.priority === 'Medium' ? 'badge-warning' :
-                        'badge-success'
-                      }`}>
+                      <span
+                        className={`badge ${
+                          approval.priority === 'High'
+                            ? 'badge-danger'
+                            : approval.priority === 'Medium'
+                              ? 'badge-warning'
+                              : 'badge-success'
+                        }`}
+                      >
                         {approval.priority}
                       </span>
                     </td>
@@ -202,9 +247,7 @@ export default function AdminApprovals() {
 
         {/* Quick Actions */}
         <div className="card">
-          <h3 className="card-title mb-4">
-            Quick Actions
-          </h3>
+          <h3 className="card-title mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <button className="btn-success flex flex-col items-center gap-2 p-4">
               <span className="text-lg">✅</span>

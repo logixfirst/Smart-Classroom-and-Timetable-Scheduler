@@ -1,14 +1,10 @@
-"use client"
+'use client'
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 
-export default function StudentLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function StudentLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
   const router = useRouter()
 

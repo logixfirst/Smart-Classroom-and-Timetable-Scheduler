@@ -32,8 +32,14 @@ export default function SubjectsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const { showSuccessToast, showErrorToast } = useToast()
-  
-  const { register, handleSubmit: handleFormSubmit, formState: { errors, isSubmitting }, reset, setValue } = useForm<SubjectInput>({
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+    setValue,
+  } = useForm<SubjectInput>({
     resolver: zodResolver(subjectSchema),
     defaultValues: {
       subject_name: '',
@@ -42,8 +48,8 @@ export default function SubjectsPage() {
       course_id: '',
       credits: 3,
       lecture_hours: 3,
-      lab_hours: 0
-    }
+      lab_hours: 0,
+    },
   })
 
   useEffect(() => {
@@ -67,27 +73,26 @@ export default function SubjectsPage() {
       setIsLoading(true)
     }
     setError(null)
-    
+
     try {
       const response = await apiClient.getSubjects()
       if (response.error) {
         setError(response.error)
       } else if (response.data) {
         // Handle both paginated and non-paginated responses
-        let subjectData = Array.isArray(response.data) 
-          ? response.data 
-          : response.data.results || []
-          
+        let subjectData = Array.isArray(response.data) ? response.data : response.data.results || []
+
         // Filter by search term
         if (searchTerm) {
-          subjectData = subjectData.filter((subject: Subject) =>
-            subject.subject_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            subject.subject_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            subject.course.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            subject.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
+          subjectData = subjectData.filter(
+            (subject: Subject) =>
+              subject.subject_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              subject.subject_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              subject.course.course_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              subject.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
           )
         }
-        
+
         setSubjects(subjectData)
       }
     } catch (err) {
@@ -102,19 +107,21 @@ export default function SubjectsPage() {
   }
 
   const onSubmit = async (data: SubjectInput) => {
-    const url = editingId 
+    const url = editingId
       ? `http://localhost:8000/api/v1/subjects/${editingId}/`
       : 'http://localhost:8000/api/v1/subjects/'
-    
+
     try {
       const response = await fetch(url, {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       })
-      
+
       if (response.ok) {
-        showSuccessToast(editingId ? 'Subject updated successfully!' : 'Subject created successfully!')
+        showSuccessToast(
+          editingId ? 'Subject updated successfully!' : 'Subject created successfully!'
+        )
         loadSubjects()
         resetForm()
       } else {
@@ -141,12 +148,12 @@ export default function SubjectsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this subject?')) return
-    
+
     try {
       const response = await fetch(`http://localhost:8000/api/v1/subjects/${id}/`, {
-        method: 'DELETE'
+        method: 'DELETE',
       })
-      
+
       if (response.ok) {
         showSuccessToast('Subject deleted successfully!')
         loadSubjects()
@@ -175,10 +182,7 @@ export default function SubjectsPage() {
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200">
           Subjects ({subjects.length})
         </h2>
-        <button
-          onClick={() => setShowForm(true)}
-          className="btn-primary w-full sm:w-auto"
-        >
+        <button onClick={() => setShowForm(true)} className="btn-primary w-full sm:w-auto">
           Add Subject
         </button>
       </div>
@@ -192,7 +196,7 @@ export default function SubjectsPage() {
                 type="text"
                 placeholder="Search by subject name, ID, course, or department..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
                 className="input-primary w-full"
               />
             </div>
@@ -215,7 +219,7 @@ export default function SubjectsPage() {
                 placeholder="e.g., Data Structures"
                 required
               />
-              
+
               <FormField
                 label="Subject ID"
                 name="subject_id"
@@ -225,7 +229,7 @@ export default function SubjectsPage() {
                 required
                 helpText="Uppercase letters and numbers only"
               />
-              
+
               <FormField
                 label="Course ID"
                 name="course_id"
@@ -234,16 +238,16 @@ export default function SubjectsPage() {
                 placeholder="e.g., BTECH-CS"
                 required
               />
-              
+
               <FormField
                 label="Department ID"
                 name="department_id"
                 register={register}
                 error={errors.department_id}
-                  placeholder="e.g., CS"
+                placeholder="e.g., CS"
                 required
               />
-              
+
               <FormField
                 label="Credits"
                 name="credits"
@@ -254,7 +258,7 @@ export default function SubjectsPage() {
                 required
                 helpText="Number of credits (1-10)"
               />
-              
+
               <FormField
                 label="Lecture Hours"
                 name="lecture_hours"
@@ -264,7 +268,7 @@ export default function SubjectsPage() {
                 placeholder="0-20"
                 helpText="Lecture hours per week"
               />
-              
+
               <FormField
                 label="Lab Hours"
                 name="lab_hours"
@@ -275,18 +279,18 @@ export default function SubjectsPage() {
                 helpText="Lab hours per week"
               />
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="btn-primary w-full sm:w-auto"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? 'Saving...' : editingId ? 'Update Subject' : 'Create Subject'}
               </button>
-              <button 
-                type="button" 
-                onClick={resetForm} 
+              <button
+                type="button"
+                onClick={resetForm}
                 className="btn-secondary w-full sm:w-auto"
                 disabled={isSubmitting}
               >
@@ -308,7 +312,7 @@ export default function SubjectsPage() {
               </div>
             </div>
           )}
-          
+
           <table className="table">
             <thead className="table-header">
               <tr>
@@ -322,7 +326,7 @@ export default function SubjectsPage() {
               </tr>
             </thead>
             <tbody>
-              {subjects.map((subject) => (
+              {subjects.map(subject => (
                 <tr key={subject.subject_id} className="table-row">
                   <td className="table-cell font-medium">{subject.subject_name}</td>
                   <td className="table-cell">

@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { useState } from 'react'
 import Header from '@/components/layout/Header'
@@ -16,16 +16,18 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
 
   return (
     <>
-      <div className={`min-h-screen bg-[#FFFFFF] dark:bg-[#121212] transition-colors duration-300 ${showSignOutDialog ? 'blur-sm' : ''}`}>
-        <Header 
+      <div
+        className={`min-h-screen bg-[#FFFFFF] dark:bg-[#121212] transition-colors duration-300 ${showSignOutDialog ? 'blur-sm' : ''}`}
+      >
+        <Header
           sidebarOpen={sidebarOpen}
           sidebarCollapsed={sidebarCollapsed}
           setSidebarOpen={setSidebarOpen}
           setSidebarCollapsed={setSidebarCollapsed}
           setShowSignOutDialog={setShowSignOutDialog}
         />
-        
-        <Sidebar 
+
+        <Sidebar
           sidebarOpen={sidebarOpen}
           sidebarCollapsed={sidebarCollapsed}
           setSidebarOpen={setSidebarOpen}
@@ -33,15 +35,19 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
         />
 
         {/* Main content */}
-        <div className={`transition-all duration-300 ease-out ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-56'}`}>
-          <main className={`min-h-[calc(100vh-4rem)] mt-16 ${sidebarCollapsed ? 'p-2 lg:p-4' : 'p-4 lg:p-6'}`}>
+        <div
+          className={`transition-all duration-300 ease-out ${sidebarCollapsed ? 'md:ml-16' : 'md:ml-56'}`}
+        >
+          <main
+            className={`min-h-[calc(100vh-4rem)] mt-16 ${sidebarCollapsed ? 'p-2 lg:p-4' : 'p-4 lg:p-6'}`}
+          >
             <div className={`mx-auto ${sidebarCollapsed ? 'max-w-1xl px-1 lg:px-1' : 'max-w-7xl'}`}>
               {children}
             </div>
           </main>
         </div>
       </div>
-      
+
       {/* Sign Out Confirmation Dialog */}
       {showSignOutDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
@@ -53,16 +59,10 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
               Are you sure you want to sign out?
             </p>
             <div className="flex gap-3 justify-end">
-              <button 
-                onClick={() => setShowSignOutDialog(false)}
-                className="btn-secondary"
-              >
+              <button onClick={() => setShowSignOutDialog(false)} className="btn-secondary">
                 Cancel
               </button>
-              <button 
-                onClick={() => window.location.href = '/login'}
-                className="btn-danger"
-              >
+              <button onClick={() => (window.location.href = '/login')} className="btn-danger">
                 Sign Out
               </button>
             </div>

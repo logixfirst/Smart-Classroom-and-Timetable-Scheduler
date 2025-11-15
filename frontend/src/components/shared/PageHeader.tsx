@@ -17,11 +17,7 @@ export default function PageHeader({ title, description, children }: PageHeaderP
           </p>
         )}
       </div>
-      {children && (
-        <div className="flex-shrink-0">
-          {children}
-        </div>
-      )}
+      {children && <div className="flex-shrink-0">{children}</div>}
     </div>
   )
 }

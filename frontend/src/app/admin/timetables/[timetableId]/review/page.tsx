@@ -36,7 +36,7 @@ export default function ReviewTimetablePage() {
   const params = useParams()
   const router = useRouter()
   const timetableId = params.timetableId as string
-  
+
   const [timetableData, setTimetableData] = useState<TimetableData | null>(null)
   const [selectedOption, setSelectedOption] = useState<TimetableOption | null>(null)
   const [showModal, setShowModal] = useState(false)
@@ -71,7 +71,7 @@ export default function ReviewTimetablePage() {
       await fetch(`http://localhost:8000/api/v1/timetables/${timetableId}/approve/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ option_id: optionId })
+        body: JSON.stringify({ option_id: optionId }),
       })
       alert('Timetable approved successfully!')
       router.push('/admin/timetables')
@@ -87,7 +87,7 @@ export default function ReviewTimetablePage() {
     setActionLoading(true)
     try {
       await fetch(`http://localhost:8000/api/v1/timetables/${timetableId}/reject/`, {
-        method: 'POST'
+        method: 'POST',
       })
       alert('All options rejected. Generate new timetable.')
       router.push('/admin/timetables')
@@ -110,8 +110,10 @@ export default function ReviewTimetablePage() {
   }
 
   const getScoreBg = (score: number) => {
-    if (score >= 8.5) return 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-    if (score >= 7.5) return 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+    if (score >= 8.5)
+      return 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+    if (score >= 7.5)
+      return 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
     return 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
   }
 
@@ -153,7 +155,8 @@ export default function ReviewTimetablePage() {
               Review Generated Options
             </h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {timetableData.department} • Semester {timetableData.semester} • {timetableData.options.length} Options Generated
+              {timetableData.department} • Semester {timetableData.semester} •{' '}
+              {timetableData.options.length} Options Generated
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
@@ -183,28 +186,32 @@ export default function ReviewTimetablePage() {
                     {option.score.toFixed(1)}
                   </span>
                 </div>
-                
+
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   {option.name}
                 </h4>
-                
+
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
                   {option.description}
                 </p>
-                
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600 dark:text-gray-400">Classes:</span>
-                    <span className="font-medium text-gray-800 dark:text-gray-200">{option.schedule.length}</span>
+                    <span className="font-medium text-gray-800 dark:text-gray-200">
+                      {option.schedule.length}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600 dark:text-gray-400">Conflicts:</span>
-                    <span className={`font-medium ${option.conflicts.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                    <span
+                      className={`font-medium ${option.conflicts.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}
+                    >
                       {option.conflicts.length}
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
                   <button className="w-full text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors">
                     👁️ View Details
@@ -234,9 +241,7 @@ export default function ReviewTimetablePage() {
                 Rejecting...
               </>
             ) : (
-              <>
-                ❌ Reject All & Regenerate
-              </>
+              <>❌ Reject All & Regenerate</>
             )}
           </button>
         </div>
@@ -253,8 +258,20 @@ export default function ReviewTimetablePage() {
                   {selectedOption.name}
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Score: <span className={`font-semibold ${getScoreColor(selectedOption.score)}`}>{selectedOption.score.toFixed(1)}</span> • 
-                  Conflicts: <span className={selectedOption.conflicts.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}>{selectedOption.conflicts.length}</span>
+                  Score:{' '}
+                  <span className={`font-semibold ${getScoreColor(selectedOption.score)}`}>
+                    {selectedOption.score.toFixed(1)}
+                  </span>{' '}
+                  • Conflicts:{' '}
+                  <span
+                    className={
+                      selectedOption.conflicts.length > 0
+                        ? 'text-red-600 dark:text-red-400'
+                        : 'text-green-600 dark:text-green-400'
+                    }
+                  >
+                    {selectedOption.conflicts.length}
+                  </span>
                 </p>
               </div>
               <button
@@ -269,7 +286,9 @@ export default function ReviewTimetablePage() {
             <div className="p-4 sm:p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
               {/* Description */}
               <div className="mb-6">
-                <p className="text-sm text-gray-700 dark:text-gray-300">{selectedOption.description}</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  {selectedOption.description}
+                </p>
               </div>
 
               {/* Conflicts */}
@@ -288,7 +307,9 @@ export default function ReviewTimetablePage() {
 
               {/* Timetable Grid */}
               <div className="mb-6">
-                <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-3">📅 Full Schedule:</h4>
+                <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-3">
+                  📅 Full Schedule:
+                </h4>
                 <div className="overflow-x-auto">
                   <TimetableGrid schedule={selectedOption.schedule} />
                 </div>
@@ -314,9 +335,7 @@ export default function ReviewTimetablePage() {
                     Approving...
                   </>
                 ) : (
-                  <>
-                    ✅ Approve This Option
-                  </>
+                  <>✅ Approve This Option</>
                 )}
               </button>
             </div>

@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { User } from '@/types'
@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const savedUser = localStorage.getItem('user')
     const token = localStorage.getItem('auth_token')
-    
+
     if (savedUser && token) {
       try {
         setUser(JSON.parse(savedUser))
@@ -38,30 +38,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (username: string, password: string) => {
     setError(null)
     setIsLoading(true)
-    
+
     try {
       const response = await apiClient.login({ username, password })
-      
+
       if (response.error || !response.data) {
         setError(response.error || 'Login failed')
         setIsLoading(false)
         throw new Error(response.error || 'Invalid credentials')
       }
-      
+
       const { token, user: userData } = response.data
-      
+
       // Set token in API client and localStorage
       apiClient.setToken(token)
       localStorage.setItem('auth_token', token)
-      
+
       // Store user data
       const userWithoutPassword = {
         id: userData.id,
         username: userData.username,
         email: userData.email,
-        role: userData.role
+        role: userData.role,
       }
-      
+
       setUser(userWithoutPassword)
       localStorage.setItem('user', JSON.stringify(userWithoutPassword))
       setIsLoading(false)

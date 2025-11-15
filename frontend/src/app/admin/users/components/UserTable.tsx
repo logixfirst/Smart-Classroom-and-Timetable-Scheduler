@@ -16,11 +16,13 @@ export default function UserTable({ users }: UserTableProps) {
     <>
       {/* Mobile Card View */}
       <div className="block sm:hidden space-y-3">
-        {users.map((user) => (
+        {users.map(user => (
           <div key={user.id} className="card">
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1 min-w-0">
-                <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">{user.name}</h4>
+                <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">
+                  {user.name}
+                </h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{user.email}</p>
               </div>
               <span className="badge badge-success ml-2">{user.status}</span>
@@ -32,13 +34,15 @@ export default function UserTable({ users }: UserTableProps) {
               </div>
               <div className="flex gap-1">
                 <button className="btn-ghost text-xs px-2 py-1">Edit</button>
-                <button className="btn-ghost text-xs px-2 py-1 text-red-600 dark:text-red-400">Delete</button>
+                <button className="btn-ghost text-xs px-2 py-1 text-red-600 dark:text-red-400">
+                  Delete
+                </button>
               </div>
             </div>
           </div>
         ))}
       </div>
-      
+
       {/* Desktop Table View */}
       <div className="hidden sm:block overflow-x-auto">
         <table className="table">
@@ -53,11 +57,13 @@ export default function UserTable({ users }: UserTableProps) {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {users.map(user => (
               <tr key={user.id} className="table-row">
                 <td className="table-cell">
                   <div className="font-medium text-gray-800 dark:text-gray-200">{user.name}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden">{user.email}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden">
+                    {user.email}
+                  </div>
                 </td>
                 <td className="table-cell hidden md:table-cell">{user.email}</td>
                 <td className="table-cell">
@@ -69,8 +75,12 @@ export default function UserTable({ users }: UserTableProps) {
                 </td>
                 <td className="table-cell">
                   <div className="flex gap-1 sm:gap-2">
-                    <button className="btn-ghost text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2">Edit</button>
-                    <button className="btn-ghost text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2 text-red-600 dark:text-red-400">Del</button>
+                    <button className="btn-ghost text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2">
+                      Edit
+                    </button>
+                    <button className="btn-ghost text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2 text-red-600 dark:text-red-400">
+                      Del
+                    </button>
                   </div>
                 </td>
               </tr>

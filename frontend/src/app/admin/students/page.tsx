@@ -64,7 +64,7 @@ export default function StudentsPage() {
     } else {
       setIsLoading(true)
     }
-    
+
     setError(null)
     try {
       const response = await apiClient.getStudents(currentPage)
@@ -86,9 +86,11 @@ export default function StudentsPage() {
   }
 
   const filteredStudents = students.filter(student => {
-    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.student_id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesDepartment = !selectedDepartment || student.department.department_name === selectedDepartment
+    const matchesSearch =
+      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.student_id.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesDepartment =
+      !selectedDepartment || student.department.department_name === selectedDepartment
     const matchesYear = !selectedYear || student.year.toString() === selectedYear
     return matchesSearch && matchesDepartment && matchesYear
   })
@@ -144,45 +146,57 @@ export default function StudentsPage() {
             <h3 className="card-title">Students</h3>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
               <div className="relative flex-1">
-                <label htmlFor="student-search" className="sr-only">Search students</label>
-                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
-                <input 
+                <label htmlFor="student-search" className="sr-only">
+                  Search students
+                </label>
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                  🔍
+                </span>
+                <input
                   id="student-search"
-                  placeholder="Search students..." 
+                  placeholder="Search students..."
                   className="input-primary pl-10"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={e => setSearchTerm(e.target.value)}
                 />
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
-                <label htmlFor="department-filter" className="sr-only">Filter by department</label>
-                <select 
+                <label htmlFor="department-filter" className="sr-only">
+                  Filter by department
+                </label>
+                <select
                   id="department-filter"
                   className="input-primary w-full sm:w-36"
                   value={selectedDepartment}
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  onChange={e => setSelectedDepartment(e.target.value)}
                 >
                   <option value="">All Departments</option>
                   {departments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
                   ))}
                 </select>
-                <label htmlFor="year-filter" className="sr-only">Filter by year</label>
-                <select 
+                <label htmlFor="year-filter" className="sr-only">
+                  Filter by year
+                </label>
+                <select
                   id="year-filter"
                   className="input-primary w-full sm:w-32"
                   value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
+                  onChange={e => setSelectedYear(e.target.value)}
                 >
                   <option value="">All Years</option>
                   {years.map(year => (
-                    <option key={year} value={year}>Year {year}</option>
+                    <option key={year} value={year}>
+                      Year {year}
+                    </option>
                   ))}
                 </select>
               </div>
             </div>
           </div>
-          
+
           {filteredStudents.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-4xl sm:text-6xl mb-4">🎓</div>
@@ -190,7 +204,9 @@ export default function StudentsPage() {
                 No Students Found
               </h3>
               <p className="text-gray-600 dark:text-gray-400">
-                {students.length === 0 ? 'No student data has been imported yet.' : 'No students match your search criteria.'}
+                {students.length === 0
+                  ? 'No student data has been imported yet.'
+                  : 'No students match your search criteria.'}
               </p>
             </div>
           ) : (
@@ -206,31 +222,47 @@ export default function StudentsPage() {
                     </div>
                   </div>
                 )}
-                
-                {filteredStudents.map((student) => (
-                  <div key={student.id} className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]">
+
+                {filteredStudents.map(student => (
+                  <div
+                    key={student.id}
+                    className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]"
+                  >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">{student.name}</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{student.student_id}</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-500">{student.course.course_name}</p>
+                        <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">
+                          {student.name}
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {student.student_id}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500">
+                          {student.course.course_name}
+                        </p>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <div className="flex gap-2">
-                        <span className="badge badge-neutral text-xs">{student.department.department_name}</span>
+                        <span className="badge badge-neutral text-xs">
+                          {student.department.department_name}
+                        </span>
                         <span className="badge badge-info text-xs">Year {student.year}</span>
                         <span className="badge badge-success text-xs">Sem {student.semester}</span>
                       </div>
                       <div className="text-xs text-gray-600 dark:text-gray-400">
-                        <p><strong>Electives:</strong> {student.electives || 'None'}</p>
-                        <p><strong>Faculty:</strong> {student.faculty_advisor?.faculty_name || 'Not assigned'}</p>
+                        <p>
+                          <strong>Electives:</strong> {student.electives || 'None'}
+                        </p>
+                        <p>
+                          <strong>Faculty:</strong>{' '}
+                          {student.faculty_advisor?.faculty_name || 'Not assigned'}
+                        </p>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-              
+
               {/* Desktop Table View */}
               <div className="hidden lg:block overflow-x-auto relative">
                 {/* Table Loading Overlay */}
@@ -242,7 +274,7 @@ export default function StudentsPage() {
                     </div>
                   </div>
                 )}
-                
+
                 <table className="table">
                   <thead className="table-header">
                     <tr>
@@ -257,36 +289,44 @@ export default function StudentsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStudents.map((student) => (
+                    {filteredStudents.map(student => (
                       <tr key={student.id} className="table-row">
                         <td className="table-cell">
                           <span className="font-mono text-sm">{student.student_id}</span>
                         </td>
                         <td className="table-cell">
-                          <div className="font-medium text-gray-800 dark:text-gray-200">{student.name}</div>
+                          <div className="font-medium text-gray-800 dark:text-gray-200">
+                            {student.name}
+                          </div>
                         </td>
                         <td className="table-cell">
-                          <span className="badge badge-neutral text-xs">{student.department.department_name}</span>
+                          <span className="badge badge-neutral text-xs">
+                            {student.department.department_name}
+                          </span>
                         </td>
                         <td className="table-cell">{student.course.course_name}</td>
                         <td className="table-cell">
                           <span className="badge badge-info text-xs">Year {student.year}</span>
                         </td>
                         <td className="table-cell">
-                          <span className="badge badge-success text-xs">Sem {student.semester}</span>
+                          <span className="badge badge-success text-xs">
+                            Sem {student.semester}
+                          </span>
                         </td>
                         <td className="table-cell">
                           <div className="max-w-xs truncate" title={student.electives || 'None'}>
                             {student.electives || 'None'}
                           </div>
                         </td>
-                        <td className="table-cell">{student.faculty_advisor?.faculty_name || 'Not assigned'}</td>
+                        <td className="table-cell">
+                          {student.faculty_advisor?.faculty_name || 'Not assigned'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              
+
               {/* Pagination Controls */}
               {totalPages > 1 && (
                 <div className="mt-6 pt-4 border-t border-gray-200 dark:border-[#3c4043]">

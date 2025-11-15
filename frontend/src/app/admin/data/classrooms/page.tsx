@@ -26,7 +26,7 @@ export default function ClassroomsPage() {
     room_number: '',
     capacity: '',
     room_type: 'lecture hall',
-    department: ''
+    department: '',
   })
 
   useEffect(() => {
@@ -50,26 +50,27 @@ export default function ClassroomsPage() {
       setIsLoading(true)
     }
     setError(null)
-    
+
     try {
       const response = await apiClient.getClassrooms()
       if (response.error) {
         setError(response.error)
       } else if (response.data) {
         // Handle both paginated and non-paginated responses
-        let classroomData = Array.isArray(response.data) 
-          ? response.data 
+        let classroomData = Array.isArray(response.data)
+          ? response.data
           : response.data.results || []
-        
+
         // Filter by search term
         if (searchTerm) {
-          classroomData = classroomData.filter((classroom: Classroom) =>
-            classroom.room_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            classroom.room_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            classroom.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
+          classroomData = classroomData.filter(
+            (classroom: Classroom) =>
+              classroom.room_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              classroom.room_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+              classroom.department.department_name.toLowerCase().includes(searchTerm.toLowerCase())
           )
         }
-        
+
         setClassrooms(classroomData)
       }
     } catch (err) {
@@ -85,17 +86,17 @@ export default function ClassroomsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const url = editingId 
+    const url = editingId
       ? `http://localhost:8000/api/v1/classrooms/${editingId}/`
       : 'http://localhost:8000/api/v1/classrooms/'
-    
+
     try {
       const response = await fetch(url, {
         method: editingId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(formData),
       })
-      
+
       if (response.ok) {
         loadClassrooms()
         resetForm()
@@ -110,7 +111,7 @@ export default function ClassroomsPage() {
       room_number: classroom.room_number,
       capacity: classroom.capacity.toString(),
       room_type: classroom.room_type,
-      department: classroom.department.department_id
+      department: classroom.department.department_id,
     })
     setEditingId(classroom.room_id)
     setShowForm(true)
@@ -118,7 +119,7 @@ export default function ClassroomsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this classroom?')) return
-    
+
     try {
       const response = await apiClient.deleteClassroom(id)
       if (response.error) {
@@ -150,10 +151,7 @@ export default function ClassroomsPage() {
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200">
           Classrooms ({filteredClassrooms.length})
         </h2>
-        <button
-          onClick={() => setShowForm(true)}
-          className="btn-primary w-full sm:w-auto"
-        >
+        <button onClick={() => setShowForm(true)} className="btn-primary w-full sm:w-auto">
           Add Classroom
         </button>
       </div>
@@ -167,7 +165,7 @@ export default function ClassroomsPage() {
                 type="text"
                 placeholder="Search by room number, type, or department..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
                 className="input-primary w-full"
               />
             </div>
@@ -183,33 +181,39 @@ export default function ClassroomsPage() {
           <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="room_number" className="block text-sm font-medium mb-2">Room Number</label>
+                <label htmlFor="room_number" className="block text-sm font-medium mb-2">
+                  Room Number
+                </label>
                 <input
                   id="room_number"
                   type="text"
                   value={formData.room_number}
-                  onChange={(e) => setFormData({...formData, room_number: e.target.value})}
+                  onChange={e => setFormData({ ...formData, room_number: e.target.value })}
                   className="input-primary"
                   required
                 />
               </div>
               <div>
-                <label htmlFor="capacity" className="block text-sm font-medium mb-2">Capacity</label>
+                <label htmlFor="capacity" className="block text-sm font-medium mb-2">
+                  Capacity
+                </label>
                 <input
                   id="capacity"
                   type="number"
                   value={formData.capacity}
-                  onChange={(e) => setFormData({...formData, capacity: e.target.value})}
+                  onChange={e => setFormData({ ...formData, capacity: e.target.value })}
                   className="input-primary"
                   required
                 />
               </div>
               <div>
-                <label htmlFor="room_type" className="block text-sm font-medium mb-2">Type</label>
+                <label htmlFor="room_type" className="block text-sm font-medium mb-2">
+                  Type
+                </label>
                 <select
                   id="room_type"
                   value={formData.room_type}
-                  onChange={(e) => setFormData({...formData, room_type: e.target.value})}
+                  onChange={e => setFormData({ ...formData, room_type: e.target.value })}
                   className="input-primary"
                 >
                   <option value="lecture">Lecture</option>
@@ -217,8 +221,16 @@ export default function ClassroomsPage() {
                 </select>
               </div>
               <div>
-                <label htmlFor="department" className="block text-sm font-medium mb-2">Department</label>
-                <input id="department" type="text" value={formData.department} onChange={(e) => setFormData({...formData, department: e.target.value})} className="input-primary" />
+                <label htmlFor="department" className="block text-sm font-medium mb-2">
+                  Department
+                </label>
+                <input
+                  id="department"
+                  type="text"
+                  value={formData.department}
+                  onChange={e => setFormData({ ...formData, department: e.target.value })}
+                  className="input-primary"
+                />
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -244,7 +256,7 @@ export default function ClassroomsPage() {
               </div>
             </div>
           )}
-          
+
           <table className="table">
             <thead className="table-header">
               <tr>
@@ -256,7 +268,7 @@ export default function ClassroomsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredClassrooms.map((classroom) => (
+              {filteredClassrooms.map(classroom => (
                 <tr key={classroom.room_id} className="table-row">
                   <td className="table-cell font-medium">{classroom.room_number}</td>
                   <td className="table-cell">{classroom.capacity}</td>
