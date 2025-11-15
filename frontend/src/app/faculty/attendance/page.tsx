@@ -256,8 +256,32 @@ export default function FacultyAttendancePage() {
         )}
 
         {/* My Classes Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {myClasses.map(subject => (
+        {myClasses.length === 0 ? (
+          <div className="card text-center py-16">
+            <div className="max-w-md mx-auto">
+              <div className="text-6xl mb-4">📚</div>
+              <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                No Classes Assigned Yet
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                You don't have any classes assigned to you yet. Contact your administrator to get subjects assigned.
+              </p>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-left">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-2">
+                  📌 Once assigned, you can:
+                </h4>
+                <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
+                  <li>• Mark attendance for your classes</li>
+                  <li>• Import attendance from CSV/Excel files</li>
+                  <li>• Generate class attendance reports</li>
+                  <li>• Track student attendance trends</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {myClasses.map(subject => (
             <div
               key={subject.subject_id}
               onClick={() => setSelectedSubject(
@@ -315,7 +339,8 @@ export default function FacultyAttendancePage() {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
 
         {/* Pending Sessions List */}
         {pendingSessions.length > 0 && (

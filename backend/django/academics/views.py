@@ -326,7 +326,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 @permission_classes([AllowAny])
 def login_view(request):
     """
-    Login endpoint - accepts username and password, returns token and user data
+    Login endpoint - accepts username/email and password, returns token and user data
     """
     username = request.data.get("username")
     password = request.data.get("password")
@@ -337,11 +337,20 @@ def login_view(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # Try authenticating with username first
     user = authenticate(username=username, password=password)
+    
+    # If failed and username looks like email, try finding user by email
+    if user is None and '@' in username:
+        try:
+            user_obj = User.objects.get(email=username)
+            user = authenticate(username=user_obj.username, password=password)
+        except User.DoesNotExist:
+            pass
 
     if user is None:
         return Response(
-            {"error": "Invalid username or password"},
+            {"error": "Invalid username/email or password"},
             status=status.HTTP_401_UNAUTHORIZED,
         )
 

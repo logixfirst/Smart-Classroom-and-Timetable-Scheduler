@@ -179,8 +179,40 @@ export default function StudentAttendancePage() {
   if (!summary) {
     return (
       <DashboardLayout role="student">
-        <div className="text-center py-12">
-          <p className="text-gray-600 dark:text-gray-400">No attendance data available</p>
+        <div className="space-y-6">
+          {/* Header */}
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200">
+              My Attendance
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Track your attendance across all subjects
+            </p>
+          </div>
+
+          {/* Empty State */}
+          <div className="card text-center py-16">
+            <div className="max-w-md mx-auto">
+              <div className="text-6xl mb-4">📊</div>
+              <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                No Attendance Data Yet
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Your attendance records will appear here once your faculty starts marking attendance for your enrolled subjects.
+              </p>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-left">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-300 mb-2">
+                  📌 What you can expect:
+                </h4>
+                <ul className="text-sm text-blue-800 dark:text-blue-300 space-y-1">
+                  <li>• View attendance percentage for each subject</li>
+                  <li>• Track your overall attendance status</li>
+                  <li>• Receive alerts for low attendance</li>
+                  <li>• Download attendance reports</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       </DashboardLayout>
     )
