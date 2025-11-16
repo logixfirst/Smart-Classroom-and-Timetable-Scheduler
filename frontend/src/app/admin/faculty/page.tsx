@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
 import Pagination from '@/components/Pagination'
+import AddEditFacultyModal from './components/AddEditFacultyModal'
+import { SimpleFacultyInput } from '@/lib/validations'
 import apiClient from '@/lib/api'
+import { useToast } from '@/components/Toast'
 
 interface Faculty {
   id: number
@@ -17,12 +20,15 @@ interface Faculty {
   }
   max_workload: number
   status: string
+  email?: string
+  phone?: string
 }
 
 export default function FacultyManagePage() {
+  const { showToast } = useToast()
   const [faculty, setFaculty] = useState<Faculty[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isTableLoading, setIsTableLoading] = useState(false) // New: Table-specific loading
+  const [isTableLoading, setIsTableLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('')
@@ -30,6 +36,11 @@ export default function FacultyManagePage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [itemsPerPage, setItemsPerPage] = useState(25)
+  
+  // Modal states
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null)
+  const [isDeleting, setIsDeleting] = useState<number | null>(null)
 
   useEffect(() => {
     fetchFaculty()
@@ -49,7 +60,6 @@ export default function FacultyManagePage() {
   }
 
   const fetchFaculty = async () => {
-    // For initial load, show full loading. For pagination, show table loading only
     if (currentPage > 1) {
       setIsTableLoading(true)
     } else {
@@ -72,7 +82,86 @@ export default function FacultyManagePage() {
       setError('Failed to fetch faculty')
     } finally {
       setIsLoading(false)
-      setIsTableLoading(false) // Stop both loading states
+      setIsTableLoading(false)
+    }
+  }
+
+  const handleAddFaculty = () => {
+    setSelectedFaculty(null)
+    setIsModalOpen(true)
+  }
+
+  const handleEditFaculty = (facultyMember: Faculty) => {
+    setSelectedFaculty(facultyMember)
+    setIsModalOpen(true)
+  }
+
+  const handleSaveFaculty = async (facultyData: SimpleFacultyInput) => {
+    try {
+      if (selectedFaculty) {
+        const response = await apiClient.updateFaculty(selectedFaculty.id, {
+          faculty_id: facultyData.faculty_id,
+          faculty_name: facultyData.faculty_name,
+          designation: facultyData.designation,
+          specialization: facultyData.specialization,
+          max_workload_per_week: facultyData.max_workload_per_week,
+          email: facultyData.email,
+          phone: facultyData.phone || '',
+          department: facultyData.department,
+          status: facultyData.status
+        })
+
+        if (response.error) {
+          showToast('error', response.error)
+        } else {
+          showToast('success', '✅ Faculty updated successfully')
+          await fetchFaculty()
+        }
+      } else {
+        const response = await apiClient.createFaculty({
+          faculty_id: facultyData.faculty_id,
+          faculty_name: facultyData.faculty_name,
+          designation: facultyData.designation,
+          specialization: facultyData.specialization,
+          max_workload_per_week: facultyData.max_workload_per_week,
+          email: facultyData.email,
+          phone: facultyData.phone || '',
+          department: facultyData.department,
+          status: facultyData.status
+        })
+
+        if (response.error) {
+          showToast('error', response.error)
+        } else {
+          showToast('success', '✅ Faculty created successfully! User account also created.')
+          await fetchFaculty()
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save faculty:', error)
+      showToast('error', 'Failed to save faculty')
+    }
+  }
+
+  const handleDeleteFaculty = async (id: number, facultyName: string) => {
+    if (!confirm(`⚠️ Are you sure you want to delete ${facultyName}?\n\nThis will also delete their user account and cannot be undone.`)) {
+      return
+    }
+
+    setIsDeleting(id)
+    try {
+      const response = await apiClient.deleteFaculty(id)
+      if (response.error) {
+        showToast('error', response.error)
+      } else {
+        showToast('success', '✅ Faculty deleted successfully')
+        await fetchFaculty()
+      }
+    } catch (error) {
+      console.error('Failed to delete faculty:', error)
+      showToast('error', 'Failed to delete faculty')
+    } finally {
+      setIsDeleting(null)
     }
   }
 
@@ -128,6 +217,13 @@ export default function FacultyManagePage() {
               Total: {filteredFaculty.length} faculty members
             </p>
           </div>
+          <button 
+            onClick={handleAddFaculty}
+            className="btn-primary w-full sm:w-auto px-6 py-3"
+          >
+            <span className="mr-2 text-lg">➕</span>
+            Add Faculty
+          </button>
         </div>
 
         <div className="card">
@@ -220,6 +316,21 @@ export default function FacultyManagePage() {
                         </p>
                       </div>
                     </div>
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <button 
+                        onClick={() => handleEditFaculty(member)}
+                        className="btn-ghost text-xs px-2 py-1"
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteFaculty(member.id, member.faculty_name)}
+                        disabled={isDeleting === member.id}
+                        className="btn-danger text-xs px-2 py-1"
+                      >
+                        {isDeleting === member.id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -246,6 +357,7 @@ export default function FacultyManagePage() {
                       <th className="table-header-cell">Specialization</th>
                       <th className="table-header-cell">Workload</th>
                       <th className="table-header-cell">Status</th>
+                      <th className="table-header-cell">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -272,6 +384,23 @@ export default function FacultyManagePage() {
                         <td className="table-cell">
                           <span className="badge badge-success text-xs">{member.status}</span>
                         </td>
+                        <td className="table-cell">
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => handleEditFaculty(member)}
+                              className="btn-ghost text-xs px-2 py-1"
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteFaculty(member.id, member.faculty_name)}
+                              disabled={isDeleting === member.id}
+                              className="btn-danger text-xs px-2 py-1"
+                            >
+                              {isDeleting === member.id ? 'Deleting...' : 'Del'}
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -296,6 +425,14 @@ export default function FacultyManagePage() {
           )}
         </div>
       </div>
+
+      {/* Add/Edit Faculty Modal */}
+      <AddEditFacultyModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        faculty={selectedFaculty}
+        onSave={handleSaveFaculty}
+      />
     </DashboardLayout>
   )
 }

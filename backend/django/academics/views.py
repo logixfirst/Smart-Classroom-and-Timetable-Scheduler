@@ -9,6 +9,7 @@ from django.views.decorators.cache import cache_page
 from django.core.cache import cache
 
 from django_filters.rest_framework import DjangoFilterBackend
+from .mixins import SmartCachedViewSet, DataSyncMixin, PerformanceMetricsMixin
 from .models import (
     User,
     Department,
@@ -39,56 +40,16 @@ from .serializers import (
 )
 
 
-class CachedModelViewSet(viewsets.ModelViewSet):
-    """Base ViewSet with caching and cache invalidation"""
-
-    @method_decorator(cache_page(60 * 5))  # Cache for 5 minutes
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
-    def invalidate_cache(self):
-        """Clear related cache when data changes"""
-        try:
-            # Clear all cached pages - this ensures fresh data after changes
-            from django_redis import get_redis_connection
-
-            redis_conn = get_redis_connection("default")
-
-            # Delete all cache keys with our prefix
-            pattern = "sih28:1:views.decorators.cache.cache_page*"
-            keys = redis_conn.keys(pattern)
-            if keys:
-                redis_conn.delete(*keys)
-
-        except Exception as e:
-            # Fallback: clear entire cache if pattern delete fails
-            try:
-                cache.clear()
-            except Exception:  # nosec B110 - Cache errors are non-critical
-                pass  # Ignore cache errors gracefully
-
-    def create(self, request, *args, **kwargs):
-        response = super().create(request, *args, **kwargs)
-        self.invalidate_cache()
-        return response
-
-    def update(self, request, *args, **kwargs):
-        response = super().update(request, *args, **kwargs)
-        self.invalidate_cache()
-        return response
-
-    def partial_update(self, request, *args, **kwargs):
-        response = super().partial_update(request, *args, **kwargs)
-        self.invalidate_cache()
-        return response
-
-    def destroy(self, request, *args, **kwargs):
-        response = super().destroy(request, *args, **kwargs)
-        self.invalidate_cache()
-        return response
+# =============================
+# VIEWSETS WITH SMART CACHING
+# =============================
 
 
-class UserViewSet(CachedModelViewSet):
+class UserViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet):
+    """
+    Enhanced User ViewSet with automatic sync to Faculty/Student
+    and intelligent caching
+    """
     queryset = (
         User.objects.all()
         .order_by("id")
@@ -112,36 +73,38 @@ class UserViewSet(CachedModelViewSet):
     filterset_fields = ["role", "department"]
     search_fields = ["username", "email", "first_name", "last_name"]
     ordering_fields = ["id", "username", "role"]
+    
+    def get_model_stats(self, queryset):
+        """Additional stats for User model"""
+        return {
+            'by_role': {
+                'admin': queryset.filter(role='admin').count(),
+                'faculty': queryset.filter(role='faculty').count(),
+                'staff': queryset.filter(role='staff').count(),
+                'student': queryset.filter(role='student').count(),
+            },
+            'active_users': queryset.filter(is_active=True).count()
+        }
 
-    def get_queryset(self):
-        """Optimize queryset with defer for better performance"""
-        return super().get_queryset()
 
-
-class DepartmentViewSet(CachedModelViewSet):
+class DepartmentViewSet(SmartCachedViewSet):
     queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["department_name", "department_id"]
-
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+    cache_timeout = 900  # 15 minutes
 
 
-class CourseViewSet(CachedModelViewSet):
+class CourseViewSet(SmartCachedViewSet):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ["level", "duration_years"]
     search_fields = ["course_name", "course_id"]
-
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+    cache_timeout = 900  # 15 minutes
 
 
-class SubjectViewSet(CachedModelViewSet):
+class SubjectViewSet(SmartCachedViewSet):
     queryset = (
         Subject.objects.select_related("course", "department")
         .all()
@@ -156,13 +119,14 @@ class SubjectViewSet(CachedModelViewSet):
     filterset_fields = ["course", "department"]
     search_fields = ["subject_name", "subject_id"]
     ordering_fields = ["subject_id", "subject_name"]
-
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+    cache_timeout = 600  # 10 minutes
 
 
-class FacultyViewSet(CachedModelViewSet):
+class FacultyViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet):
+    """
+    Enhanced Faculty ViewSet with automatic sync to User
+    and intelligent caching
+    """
     queryset = Faculty.objects.select_related("department").order_by("faculty_id")
     serializer_class = FacultySerializer
     filter_backends = [
@@ -174,19 +138,30 @@ class FacultyViewSet(CachedModelViewSet):
     search_fields = ["faculty_name", "faculty_id", "email", "specialization"]
     ordering_fields = ["faculty_id", "faculty_name"]
 
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
     @action(detail=True, methods=["get"])
     def timetable(self, request, pk=None):
         faculty = self.get_object()
         slots = TimetableSlot.objects.filter(faculty=faculty)
         serializer = TimetableSlotSerializer(slots, many=True)
         return Response(serializer.data)
+    
+    def get_model_stats(self, queryset):
+        """Additional stats for Faculty model"""
+        from django.db.models import Avg
+        return {
+            'by_department': {
+                dept: queryset.filter(department__department_id=dept).count()
+                for dept in queryset.values_list('department__department_id', flat=True).distinct()
+            },
+            'avg_workload': queryset.aggregate(Avg('max_workload_per_week'))['max_workload_per_week__avg']
+        }
 
 
-class StudentViewSet(CachedModelViewSet):
+class StudentViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet):
+    """
+    Enhanced Student ViewSet with automatic sync to User
+    and intelligent caching
+    """
     queryset = (
         Student.objects.select_related("department", "course", "faculty_advisor")
         .only(
@@ -220,19 +195,32 @@ class StudentViewSet(CachedModelViewSet):
     search_fields = ["name", "student_id", "email"]
     ordering_fields = ["student_id", "name", "year", "semester"]
 
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
     @action(detail=True, methods=["get"])
     def attendance(self, request, pk=None):
         student = self.get_object()
         attendance = Attendance.objects.filter(student=student)
         serializer = AttendanceSerializer(attendance, many=True)
         return Response(serializer.data)
+    
+    def get_model_stats(self, queryset):
+        """Additional stats for Student model"""
+        return {
+            'by_year': {
+                year: queryset.filter(year=year).count()
+                for year in range(1, 5)
+            },
+            'by_semester': {
+                sem: queryset.filter(semester=sem).count()
+                for sem in range(1, 9)
+            },
+            'by_course': {
+                course: queryset.filter(course__course_id=course).count()
+                for course in queryset.values_list('course__course_id', flat=True).distinct()
+            }
+        }
 
 
-class BatchViewSet(CachedModelViewSet):
+class BatchViewSet(SmartCachedViewSet):
     queryset = (
         Batch.objects.select_related("course", "department").all().order_by("batch_id")
     )
@@ -245,13 +233,10 @@ class BatchViewSet(CachedModelViewSet):
     filterset_fields = ["course", "department", "semester", "year"]
     search_fields = ["batch_id"]
     ordering_fields = ["batch_id", "year", "semester"]
-
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+    cache_timeout = 600  # 10 minutes
 
 
-class ClassroomViewSet(CachedModelViewSet):
+class ClassroomViewSet(SmartCachedViewSet):
     queryset = Classroom.objects.select_related("department").all().order_by("room_id")
     serializer_class = ClassroomSerializer
     filter_backends = [
@@ -262,13 +247,10 @@ class ClassroomViewSet(CachedModelViewSet):
     filterset_fields = ["department", "room_type"]
     search_fields = ["room_number", "room_id"]
     ordering_fields = ["room_id", "capacity"]
-
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+    cache_timeout = 900  # 15 minutes
 
 
-class LabViewSet(CachedModelViewSet):
+class LabViewSet(SmartCachedViewSet):
     queryset = Lab.objects.select_related("department").all().order_by("lab_id")
     serializer_class = LabSerializer
     filter_backends = [
@@ -279,13 +261,10 @@ class LabViewSet(CachedModelViewSet):
     filterset_fields = ["department"]
     ordering_fields = ["lab_id", "capacity"]
     search_fields = ["lab_name", "lab_id"]
-
-    @method_decorator(cache_page(60 * 15))  # Cache for 15 minutes
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+    cache_timeout = 900  # 15 minutes
 
 
-class TimetableViewSet(CachedModelViewSet):
+class TimetableViewSet(SmartCachedViewSet):
     queryset = (
         Timetable.objects.select_related(
             "department", "batch", "generation_job", "created_by"
@@ -296,6 +275,7 @@ class TimetableViewSet(CachedModelViewSet):
     serializer_class = TimetableSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["department", "batch", "semester", "academic_year", "status"]
+    cache_timeout = 300  # 5 minutes
 
     @action(detail=True, methods=["get"])
     def slots(self, request, pk=None):
@@ -305,13 +285,14 @@ class TimetableViewSet(CachedModelViewSet):
         return Response(serializer.data)
 
 
-class TimetableSlotViewSet(CachedModelViewSet):
+class TimetableSlotViewSet(SmartCachedViewSet):
     queryset = TimetableSlot.objects.select_related(
         "timetable", "subject", "faculty", "classroom"
     ).all()
     serializer_class = TimetableSlotSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["timetable", "subject", "faculty", "classroom", "day"]
+    cache_timeout = 300  # 5 minutes
 
 
 class AttendanceViewSet(viewsets.ModelViewSet):

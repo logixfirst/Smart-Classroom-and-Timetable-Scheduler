@@ -3,12 +3,17 @@
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
 import Pagination from '@/components/Pagination'
+import AddEditStudentModal from './components/AddEditStudentModal'
+import { SimpleStudentInput } from '@/lib/validations'
 import apiClient from '@/lib/api'
+import { useToast } from '@/components/Toast'
 
 interface Student {
   id: number
   student_id: string
   name: string
+  email?: string
+  phone?: string
   department: {
     department_id: string
     department_name: string
@@ -27,9 +32,10 @@ interface Student {
 }
 
 export default function StudentsPage() {
+  const { showToast } = useToast()
   const [students, setStudents] = useState<Student[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isTableLoading, setIsTableLoading] = useState(false) // New: Table-specific loading
+  const [isTableLoading, setIsTableLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('')
@@ -38,6 +44,11 @@ export default function StudentsPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [itemsPerPage, setItemsPerPage] = useState(25)
+
+  // Modal states
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [isDeleting, setIsDeleting] = useState<number | null>(null)
 
   useEffect(() => {
     fetchStudents()
@@ -82,6 +93,83 @@ export default function StudentsPage() {
     } finally {
       setIsLoading(false)
       setIsTableLoading(false) // Stop both loading states
+    }
+  }
+
+  // CRUD Handlers
+  const handleAddStudent = () => {
+    setSelectedStudent(null)
+    setIsModalOpen(true)
+  }
+
+  const handleEditStudent = (student: Student) => {
+    setSelectedStudent(student)
+    setIsModalOpen(true)
+  }
+
+  const handleSaveStudent = async (studentData: SimpleStudentInput) => {
+    try {
+      if (selectedStudent) {
+        // Update existing student
+        const response = await apiClient.updateStudent(selectedStudent.id, {
+          student_id: studentData.student_id,
+          name: studentData.name,
+          email: studentData.email || '',
+          phone: studentData.phone || '',
+          year: studentData.year,
+          semester: studentData.semester,
+          electives: studentData.electives || '',
+        })
+        
+        if (response.error) {
+          showToast('error', `❌ Failed to update student: ${response.error}`)
+        } else {
+          showToast('success', '✅ Student updated successfully')
+          await fetchStudents()
+        }
+      } else {
+        // Create new student
+        const response = await apiClient.createStudent({
+          student_id: studentData.student_id,
+          name: studentData.name,
+          email: studentData.email || '',
+          phone: studentData.phone || '',
+          year: studentData.year,
+          semester: studentData.semester,
+          electives: studentData.electives || '',
+        })
+        
+        if (response.error) {
+          showToast('error', `❌ Failed to create student: ${response.error}`)
+        } else {
+          showToast('success', '✅ Student created successfully! User account also created.')
+          await fetchStudents()
+        }
+      }
+      setIsModalOpen(false)
+      setSelectedStudent(null)
+    } catch (err) {
+      showToast('error', '❌ An unexpected error occurred')
+    }
+  }
+
+  const handleDeleteStudent = async (id: number, name: string) => {
+    const confirmed = confirm(`Are you sure you want to delete student "${name}"? This will also delete their user account.`)
+    if (!confirmed) return
+
+    setIsDeleting(id)
+    try {
+      const response = await apiClient.deleteStudent(id)
+      if (response.error) {
+        showToast('error', `❌ Failed to delete student: ${response.error}`)
+      } else {
+        showToast('success', '✅ Student deleted successfully')
+        await fetchStudents()
+      }
+    } catch (err) {
+      showToast('error', '❌ Failed to delete student')
+    } finally {
+      setIsDeleting(null)
     }
   }
 
@@ -139,6 +227,13 @@ export default function StudentsPage() {
               Total: {totalCount} students | Page {currentPage} of {totalPages}
             </p>
           </div>
+          <button 
+            onClick={handleAddStudent}
+            className="btn-primary w-full sm:w-auto px-6 py-3"
+          >
+            <span className="mr-2 text-lg">➕</span>
+            Add Student
+          </button>
         </div>
 
         <div className="card">
@@ -258,6 +353,22 @@ export default function StudentsPage() {
                           {student.faculty_advisor?.faculty_name || 'Not assigned'}
                         </p>
                       </div>
+                      <div className="flex gap-1">
+                        <button 
+                          onClick={() => handleEditStudent(student)}
+                          className="btn-ghost text-xs px-2 py-1"
+                          disabled={isDeleting === student.id}
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteStudent(student.id, student.name)}
+                          className="btn-danger text-xs px-2 py-1"
+                          disabled={isDeleting === student.id}
+                        >
+                          {isDeleting === student.id ? 'Deleting...' : 'Delete'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -286,6 +397,7 @@ export default function StudentsPage() {
                       <th className="table-header-cell">Semester</th>
                       <th className="table-header-cell">Electives</th>
                       <th className="table-header-cell">Faculty</th>
+                      <th className="table-header-cell">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -321,6 +433,24 @@ export default function StudentsPage() {
                         <td className="table-cell">
                           {student.faculty_advisor?.faculty_name || 'Not assigned'}
                         </td>
+                        <td className="table-cell">
+                          <div className="flex gap-1 sm:gap-2">
+                            <button 
+                              onClick={() => handleEditStudent(student)}
+                              className="btn-ghost text-xs px-2 py-1"
+                              disabled={isDeleting === student.id}
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteStudent(student.id, student.name)}
+                              className="btn-danger text-xs px-2 py-1"
+                              disabled={isDeleting === student.id}
+                            >
+                              {isDeleting === student.id ? 'Deleting...' : 'Del'}
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -345,6 +475,16 @@ export default function StudentsPage() {
           )}
         </div>
       </div>
+
+      <AddEditStudentModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          setSelectedStudent(null)
+        }}
+        onSave={handleSaveStudent}
+        student={selectedStudent}
+      />
     </DashboardLayout>
   )
 }

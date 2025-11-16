@@ -21,27 +21,31 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchDashboardData()
-    
-    // Auto-refresh every 5 seconds to catch Redis updates
-    const interval = setInterval(() => {
-      fetchDashboardData()
-    }, 5000)
-    
-    return () => clearInterval(interval)
   }, [])
 
   const fetchDashboardData = async () => {
     try {
       // Add cache buster to force fresh data
       const timestamp = Date.now()
-      const [usersRes, coursesRes, facultyRes] = await Promise.all([
-        apiClient.request(`/users/?page=1&_t=${timestamp}`),
-        apiClient.request(`/courses/?_t=${timestamp}`),
-        apiClient.request(`/faculty/?page=1&_t=${timestamp}`)
+      const [usersRes, studentsRes, facultyRes, coursesRes] = await Promise.all([
+        apiClient.request(`/users/?_t=${timestamp}`),
+        apiClient.request(`/students/?_t=${timestamp}`),
+        apiClient.request(`/faculty/?_t=${timestamp}`),
+        apiClient.request(`/courses/?_t=${timestamp}`)
       ])
 
-      const totalUsers = usersRes.data?.count || usersRes.data?.results?.length || 0
-      const activeCourses = coursesRes.data?.length || coursesRes.data?.results?.length || 0
+      // Calculate total users: Admin/Staff from users table + Faculty + Students
+      const usersData = (usersRes.data as any)
+      const allUsers = usersData?.results || []
+      const adminStaffCount = allUsers.filter((u: any) => u.role === 'admin' || u.role === 'staff').length
+      
+      const totalFaculty = (facultyRes.data as any)?.count || (facultyRes.data as any)?.results?.length || 0
+      const totalStudents = (studentsRes.data as any)?.count || (studentsRes.data as any)?.results?.length || 0
+      
+      // Total users = Admin/Staff + Faculty + Students (no duplicates)
+      const totalUsers = adminStaffCount + totalFaculty + totalStudents
+      
+      const activeCourses = (coursesRes.data as any)?.length || (coursesRes.data as any)?.results?.length || 0
       
       setStats({
         totalUsers,
@@ -50,9 +54,9 @@ export default function AdminDashboard() {
         systemHealth: 98
       })
       
-      console.log('Dashboard updated:', { totalUsers, activeCourses })
+      console.log('Dashboard updated:', { totalUsers, adminStaffCount, totalFaculty, totalStudents, activeCourses })
 
-      const facultyData = facultyRes.data?.results || facultyRes.data || []
+      const facultyData = (facultyRes.data as any)?.results || facultyRes.data || []
       setFaculty(facultyData.slice(0, 3).map((f: any) => ({
         id: f.faculty_id || f.id,
         name: f.faculty_name || f.name || 'Unknown',

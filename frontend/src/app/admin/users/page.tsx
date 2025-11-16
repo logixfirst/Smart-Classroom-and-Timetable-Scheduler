@@ -24,10 +24,10 @@ interface PaginatedResponse<T> {
   previous?: string
 }
 
-export default function UsersPage() {
+export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isTableLoading, setIsTableLoading] = useState(false) // New: Table-specific loading
+  const [isTableLoading, setIsTableLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedRole, setSelectedRole] = useState('')
@@ -39,7 +39,7 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const { showToast } = useToast()
 
-  // Fetch users with debouncing for search
+  // Fetch users with debouncing for search - ONLY admin and staff roles
   useEffect(() => {
     // Reset to page 1 when search filters change
     if (searchTerm || selectedRole || selectedDepartment) {
@@ -51,13 +51,12 @@ export default function UsersPage() {
         fetchUsers()
       },
       searchTerm ? 500 : 0
-    ) // Debounce only for text search, instant for dropdowns
+    )
 
     return () => clearTimeout(timer)
   }, [searchTerm, selectedRole, selectedDepartment, currentPage])
 
   const fetchUsers = async (isPageChange = false) => {
-    // For initial load, show full loading. For pagination/search, show table loading only
     if (isPageChange || searchTerm || selectedRole || selectedDepartment || currentPage > 1) {
       setIsTableLoading(true)
     } else {
@@ -66,27 +65,38 @@ export default function UsersPage() {
 
     setError(null)
     try {
-      // Build query params for backend filtering with cache buster
+      // Build query params - FILTER ONLY admin and staff
       let url = `/users/?page=${currentPage}&_t=${Date.now()}`
-      if (selectedRole) url += `&role=${selectedRole}`
+      
+      // Filter by role if selected, otherwise get both admin and staff
+      if (selectedRole) {
+        url += `&role=${selectedRole}`
+      } else {
+        // Default: show only admin and staff users
+        url += `&role=admin`
+      }
+      
       if (selectedDepartment) url += `&department=${selectedDepartment}`
       if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`
 
       const response = await apiClient.request<PaginatedResponse<User>>(url)
+      
       if (response.error) {
         setError(response.error)
       } else if (response.data) {
-        setUsers(response.data.results || [])
-        setTotalCount(response.data.count || 0)
-        if (response.data.count) {
-          setTotalPages(Math.ceil(response.data.count / 100))
-        }
+        // Additional client-side filter to ensure only admin/staff
+        const adminStaffUsers = (response.data.results || []).filter(
+          u => u.role === 'admin' || u.role === 'staff'
+        )
+        setUsers(adminStaffUsers)
+        setTotalCount(adminStaffUsers.length)
+        setTotalPages(Math.ceil(adminStaffUsers.length / 100))
       }
     } catch (err) {
-      setError('Failed to fetch users')
+      setError('Failed to fetch admin users')
     } finally {
       setIsLoading(false)
-      setIsTableLoading(false) // Stop both loading states
+      setIsTableLoading(false)
     }
   }
 
@@ -95,7 +105,7 @@ export default function UsersPage() {
 
   // Get unique departments and roles from current page
   const departments = [...new Set(users.map(u => u.department))].filter(Boolean)
-  const roles = ['admin', 'staff', 'faculty', 'student'] // Fixed roles
+  const roles = ['admin', 'staff'] // Only admin and staff roles
 
   // Pagination handlers with table loading
   const handlePageChange = (newPage: number) => {
@@ -145,26 +155,33 @@ export default function UsersPage() {
 
   const handleSaveUser = async (userData: any) => {
     try {
+      // Validate that role is admin or staff
+      if (userData.role !== 'admin' && userData.role !== 'staff') {
+        showToast('error', 'Only admin and staff users can be created on this page')
+        return
+      }
+
       let response
       if (editingUser) {
         response = await apiClient.updateUser(editingUser.id.toString(), userData)
       } else {
+        // Create admin/staff user
         response = await apiClient.createUser(userData)
       }
       
       if (response.error) {
         showToast('error', response.error)
       } else {
-        showToast('success', editingUser ? 'User updated successfully' : 'User created successfully')
+        showToast('success', editingUser ? 'Admin user updated successfully' : 'Admin user created successfully')
         setShowModal(false)
         setEditingUser(null)
         
-        // Force immediate refresh with cache bypass
+        // Force immediate refresh
         await new Promise(resolve => setTimeout(resolve, 500))
         await fetchUsers()
       }
     } catch (error) {
-      showToast('error', 'Failed to save user')
+      showToast('error', 'Failed to save admin user')
     }
   }
 
@@ -190,10 +207,10 @@ export default function UsersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">
-              User Management
+              Admin Users Management
             </h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Total: {totalCount} users | Page {currentPage} of {totalPages}
+              Manage admin and staff accounts | Total: {totalCount} users
             </p>
           </div>
           <button 
@@ -201,13 +218,14 @@ export default function UsersPage() {
             className="btn-primary w-full sm:w-auto px-6 py-3"
           >
             <span className="mr-2 text-lg">➕</span>
-            Add User
+            Add Admin User
           </button>
         </div>
 
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">Users</h3>
+            <h3 className="card-title">Admin & Staff Users</h3>
+            <p className="card-description">Administrative personnel only</p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
               <div className="relative flex-1">
                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
