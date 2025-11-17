@@ -14,24 +14,29 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from core.health_checks import health_check as comprehensive_health_check
+from core.health_checks import liveness_probe, metrics, readiness_probe
+from core.views import ping
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import include, path
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
     TokenVerifyView,
 )
-from drf_spectacular.views import (
-    SpectacularAPIView,
-    SpectacularSwaggerView,
-    SpectacularRedocView,
-)
-from core.views import health_check, ping
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     # Health check endpoints (no authentication required)
-    path("health/", health_check, name="health_check"),
+    path("health/", comprehensive_health_check, name="comprehensive_health_check"),
+    path("health/live/", liveness_probe, name="liveness_probe"),
+    path("health/ready/", readiness_probe, name="readiness_probe"),
+    path("health/metrics/", metrics, name="metrics"),
     path("ping/", ping, name="ping"),
     path("api/", include("academics.urls")),
     # JWT Authentication endpoints
