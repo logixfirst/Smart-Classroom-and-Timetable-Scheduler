@@ -71,7 +71,8 @@ class Command(BaseCommand):
             semester=semester,
             subject_type="core",
             is_active=True,
-        )[:2
+        )[
+            :2
         ]  # Limit to 2 core subjects
 
         for subject in core_subjects:

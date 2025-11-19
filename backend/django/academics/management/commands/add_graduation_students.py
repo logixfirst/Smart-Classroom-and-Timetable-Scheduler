@@ -18,7 +18,8 @@ class Command(BaseCommand):
             # Get all active departments for graduation programs
             graduation_depts = Department.objects.filter(
                 organization=org, is_active=True
-            )[:5
+            )[
+                :5
             ]  # Take first 5 departments
 
             if not graduation_depts.exists():

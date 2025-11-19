@@ -1,8 +1,9 @@
 import csv
 import os
-from django.core.management.base import BaseCommand
+
+from academics.models import Batch, Classroom, Course, Department, Lab, User
 from django.contrib.auth.hashers import make_password
-from academics.models import User, Department, Course, Batch, Classroom, Lab
+from django.core.management.base import BaseCommand
 
 
 class Command(BaseCommand):

@@ -114,22 +114,26 @@ class Command(BaseCommand):
             semester=semester,
             subject_type="core",
             is_active=True,
-        )[:2
+        )[
+            :2
         ]  # Max 2 core subjects per NEP
 
         dept_electives = Subject.objects.filter(
             department=student.department, subject_type="elective", is_active=True
-        )[:1
+        )[
+            :1
         ]  # 1 department elective
 
         open_electives = Subject.objects.filter(
             subject_type="open_elective", is_active=True
-        ).exclude(department=student.department)[:1
+        ).exclude(department=student.department)[
+            :1
         ]  # 1 open elective
 
         skill_courses = Subject.objects.filter(
             subject_type="ability_enhancement", is_active=True
-        )[:1
+        )[
+            :1
         ]  # 1 skill course
 
         # Enroll in core subjects

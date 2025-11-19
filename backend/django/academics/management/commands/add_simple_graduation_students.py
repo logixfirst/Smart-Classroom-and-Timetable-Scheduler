@@ -18,7 +18,8 @@ class Command(BaseCommand):
                 return
 
             # Get first 10 departments for testing
-            departments = Department.objects.filter(organization=org, is_active=True)[:10
+            departments = Department.objects.filter(organization=org, is_active=True)[
+                :10
             ]
 
             if not departments.exists():
