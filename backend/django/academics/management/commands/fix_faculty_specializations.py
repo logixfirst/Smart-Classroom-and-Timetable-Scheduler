@@ -8,7 +8,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         # Get all faculty with problematic specializations
         faculty_to_fix = Faculty.objects.filter(
-            specialization__icontains="Department of"
+            specialization__icontains="Department o"
         )
 
         fixed_count = 0

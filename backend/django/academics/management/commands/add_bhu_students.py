@@ -4,7 +4,6 @@ Maps students to real subjects offered by BHU departments
 """
 
 from django.core.management.base import BaseCommand
-from django.db import transaction
 from django.db.models.signals import post_save, post_delete
 from datetime import date, datetime
 import random
@@ -21,7 +20,6 @@ from academics.models import (
     BatchSubjectEnrollment,
     Faculty,
 )
-from academics import signals
 
 
 class Command(BaseCommand):
@@ -187,7 +185,7 @@ class Command(BaseCommand):
             # Print summary
             self.stdout.write("\n" + "="*90)
             self.stdout.write(self.style.SUCCESS(
-                f"✅ Student Enrollment Complete!\n"
+                "✅ Student Enrollment Complete!\n"
                 f"   Batches Created: {total_batches_created}\n"
                 f"   Students Created: {total_students_created}\n"
                 f"   Batch-Subject Enrollments: {total_enrollments_created}\n"

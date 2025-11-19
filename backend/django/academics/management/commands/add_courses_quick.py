@@ -1,7 +1,6 @@
 """Add MCom and BCA courses and fix data quickly"""
 from django.core.management.base import BaseCommand
 from academics.models import Course, Subject, Faculty, Department
-from django.db import transaction
 
 
 class Command(BaseCommand):

@@ -2,7 +2,6 @@ import re
 
 from academics.models import Department, Faculty
 from django.core.management.base import BaseCommand
-from django.db import transaction
 
 
 class Command(BaseCommand):
@@ -57,7 +56,7 @@ class Command(BaseCommand):
         count = 0
         for faculty in faculties:
             original = faculty.specialization
-            if "Department of" in original or "specialist" in original:
+            if "Department o" in original or "specialist" in original:
                 cleaned = re.sub(
                     r"Department of |specialist", "", original, flags=re.IGNORECASE
                 ).strip()

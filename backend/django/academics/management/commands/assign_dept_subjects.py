@@ -1,7 +1,6 @@
 """Assign department-appropriate subjects to all faculty"""
 from django.core.management.base import BaseCommand
 from academics.models import Faculty, Subject
-from django.db import transaction
 
 
 class Command(BaseCommand):

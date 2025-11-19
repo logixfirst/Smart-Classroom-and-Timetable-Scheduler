@@ -1,8 +1,6 @@
 """Smart subject assignment based on departments"""
 from django.core.management.base import BaseCommand
 from academics.models import Faculty, Subject, Department
-from django.db import transaction
-from collections import defaultdict
 
 
 class Command(BaseCommand):

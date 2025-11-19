@@ -3,7 +3,6 @@ from datetime import date
 
 from academics.models import Batch, Department, Organization, Program, Student, User
 from django.core.management.base import BaseCommand
-from django.db import transaction
 
 
 class Command(BaseCommand):
@@ -19,8 +18,7 @@ class Command(BaseCommand):
                 return
 
             # Get first 10 departments for testing
-            departments = Department.objects.filter(organization=org, is_active=True)[
-                :10
+            departments = Department.objects.filter(organization=org, is_active=True)[:10
             ]
 
             if not departments.exists():

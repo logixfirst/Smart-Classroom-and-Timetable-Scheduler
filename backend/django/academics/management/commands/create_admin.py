@@ -46,7 +46,7 @@ class Command(BaseCommand):
         self.stdout.write("="*70)
         self.stdout.write(f"Username: {user.username}")
         self.stdout.write(f"Email: {user.email}")
-        self.stdout.write(f"Password: m@dhubala")
+        self.stdout.write("Password: m@dhubala")
         self.stdout.write(f"Role: {user.role}")
         self.stdout.write(f"Is Staff: {user.is_staff}")
         self.stdout.write(f"Is Superuser: {user.is_superuser}")

@@ -1,6 +1,5 @@
 from academics.models import Department, Faculty, Subject
 from django.core.management.base import BaseCommand
-from django.db import transaction
 
 
 class Command(BaseCommand):
@@ -45,14 +44,13 @@ class Command(BaseCommand):
             dept = Department.objects.get(pk=dept_id)
 
             # Get unassigned faculty or reassign existing
-            available_faculty = Faculty.objects.filter(department=dept)[
-                : allocation["allocated_faculty"]
+            available_faculty = Faculty.objects.filter(department=dept)[: allocation["allocated_faculty"]
             ]
 
             if not available_faculty.exists():
                 # If no faculty in this dept, assign from other depts
                 available_faculty = Faculty.objects.all()[
-                    faculty_assigned : faculty_assigned
+                    faculty_assigned: faculty_assigned
                     + allocation["allocated_faculty"]
                 ]
                 # Update their department

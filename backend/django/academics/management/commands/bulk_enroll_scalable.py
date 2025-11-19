@@ -1,7 +1,6 @@
 from academics.models import Student, Subject
 from academics.scalable_enrollment import StudentSubjectEnrollment
 from django.core.management.base import BaseCommand
-from django.db import transaction
 
 
 class Command(BaseCommand):
@@ -18,7 +17,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             stats = self.bulk_enroll_students(semester, academic_year)
 
-            self.stdout.write(self.style.SUCCESS(f"Enrollment completed:"))
+            self.stdout.write(self.style.SUCCESS("Enrollment completed:"))
             self.stdout.write(f'Students processed: {stats["students_processed"]}')
             self.stdout.write(f'Total enrollments: {stats["total_enrollments"]}')
             self.stdout.write(f'Average per student: {stats["avg_per_student"]:.1f}')

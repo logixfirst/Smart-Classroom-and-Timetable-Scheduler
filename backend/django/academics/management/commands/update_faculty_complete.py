@@ -1,8 +1,6 @@
-from collections import defaultdict
 
 from academics.models import Department, Faculty, Subject
 from django.core.management.base import BaseCommand
-from django.db import transaction
 
 
 class Command(BaseCommand):

@@ -3,7 +3,6 @@ from datetime import date
 
 from academics.models import Batch, Department, Organization, Program, Student, User
 from django.core.management.base import BaseCommand
-from django.db import transaction
 
 
 class Command(BaseCommand):

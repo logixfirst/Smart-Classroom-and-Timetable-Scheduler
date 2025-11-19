@@ -1,19 +1,16 @@
 import random
-from datetime import date, datetime
+from datetime import date
 
-from academics import signals
 from academics.models import (
     Batch,
     Department,
     Organization,
     Program,
-    School,
     Student,
     User,
 )
 from django.core.management.base import BaseCommand
-from django.db import transaction
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_save
 
 
 class Command(BaseCommand):
@@ -189,7 +186,7 @@ class Command(BaseCommand):
                     )
                     created_count += 1
                     students_created += 1
-            except Exception as e:
+            except Exception:
                 # Skip on any error and try next
                 pass
 

@@ -1,7 +1,6 @@
 """Assign subjects to all faculty and update specializations"""
 from django.core.management.base import BaseCommand
 from academics.models import Faculty, Subject, Department
-from django.db import transaction
 
 
 class Command(BaseCommand):

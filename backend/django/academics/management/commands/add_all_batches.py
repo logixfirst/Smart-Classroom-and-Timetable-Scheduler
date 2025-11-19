@@ -2,12 +2,9 @@
 Add batches to all BHU programs that have zero batches
 """
 
-from datetime import datetime
 
-from academics import signals
 from academics.models import Batch, Organization, Program, Subject
 from django.core.management.base import BaseCommand
-from django.db import transaction
 from django.db.models import Count
 from django.db.models.signals import post_delete, post_save
 
@@ -119,7 +116,7 @@ class Command(BaseCommand):
             total_batches = Batch.objects.filter(organization=org).count()
 
             self.stdout.write(self.style.SUCCESS(
-                f"✅ Batch Addition Complete!\n"
+                "✅ Batch Addition Complete!\n"
                 f"   Programs with batches: {programs_with_batches}/{Program.objects.filter(organization=org).count()}\n"
                 f"   Total batches: {total_batches}"
             ))

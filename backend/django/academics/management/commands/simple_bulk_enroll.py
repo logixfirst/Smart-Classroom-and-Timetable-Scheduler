@@ -1,6 +1,5 @@
 from academics.models import Student, StudentElectiveChoice, Subject
 from django.core.management.base import BaseCommand
-from django.db import transaction
 
 
 class Command(BaseCommand):
@@ -72,8 +71,7 @@ class Command(BaseCommand):
             semester=semester,
             subject_type="core",
             is_active=True,
-        )[
-            :2
+        )[:2
         ]  # Limit to 2 core subjects
 
         for subject in core_subjects:

@@ -84,7 +84,7 @@ class Command(BaseCommand):
                 default_dept = Department.objects.create(
                     name="General", code="GEN", organization_id=1  # Assuming first org
                 )
-        except:
+        except Exception:
             default_dept = None
 
         for faculty in faculties:
@@ -104,7 +104,7 @@ class Command(BaseCommand):
 
         # Common department-like terms to remove
         dept_terms = [
-            "Department of",
+            "Department o",
             "Dept of",
             "Faculty of",
             "School of",

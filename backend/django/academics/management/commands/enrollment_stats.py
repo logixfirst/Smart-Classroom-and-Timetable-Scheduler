@@ -83,7 +83,7 @@ class Command(BaseCommand):
             if total_subjects > 0
             else 0
         )
-        self.stdout.write(f"\n=== COVERAGE ANALYSIS ===")
+        self.stdout.write("\n=== COVERAGE ANALYSIS ===")
         self.stdout.write(
             f"Subject coverage: {coverage_percentage:.1f}% ({unique_subjects_enrolled}/{total_subjects})"
         )

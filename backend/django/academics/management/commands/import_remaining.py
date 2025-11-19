@@ -126,11 +126,11 @@ class Command(BaseCommand):
                 "role": "admin",
                 "first_name": "Admin",
                 "last_name": "User",
-                "is_staff": True,
+                "is_staf": True,
                 "is_superuser": True,
             },
             {
-                "username": "staff",
+                "username": "staf",
                 "email": "staff@sih28.com",
                 "password": "sih28",
                 "role": "staff",
@@ -167,7 +167,7 @@ class Command(BaseCommand):
                     "first_name": user_data["first_name"],
                     "last_name": user_data["last_name"],
                     "department": user_data.get("department", ""),
-                    "is_staff": user_data.get("is_staff", False),
+                    "is_staf": user_data.get("is_staff", False),
                     "is_superuser": user_data.get("is_superuser", False),
                 },
             )
