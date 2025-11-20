@@ -195,19 +195,14 @@ export default function AdminTimetablesPage() {
   }
 
   return (
-    <DashboardLayout role="admin">
+    <DashboardLayout
+      role="admin"
+      pageTitle="Timetable Management"
+      pageDescription="Manage and optimize timetables across all departments"
+    >
       <div className="space-y-6">
-        {/* Modern Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#2C2C2C] dark:text-[#FFFFFF]">
-              Timetable Management
-            </h1>
-            <p className="text-sm sm:text-base text-[#6B6B6B] dark:text-[#B3B3B3]">
-              Manage and optimize timetables across all departments
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-end">
+          <div className="flex flex-col sm:flex-row gap-3 ml-auto">
             <a
               href="/admin/timetables/new"
               className="btn-primary flex items-center justify-center gap-2"

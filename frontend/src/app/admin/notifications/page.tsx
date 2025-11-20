@@ -4,17 +4,14 @@ import DashboardLayout from '@/components/dashboard-layout'
 
 export default function AdminNotifications() {
   return (
-    <DashboardLayout role="admin">
+    <DashboardLayout
+      role="admin"
+      pageTitle="Notifications"
+      pageDescription="System alerts and updates"
+    >
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200">
-              Notifications
-            </h2>
-            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
-              System alerts and updates
-            </p>
-          </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
+          <div className="flex-1"></div>
           <button className="btn-secondary">
             <span className="mr-2">✅</span>Mark All Read
           </button>

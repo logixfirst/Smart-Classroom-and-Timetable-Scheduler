@@ -119,13 +119,11 @@ export default function Sidebar({
       <div
         className={`fixed top-0 bottom-0 left-0 z-[60] bg-white dark:bg-[#2a2a2a] transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        } ${
-          sidebarCollapsed ? 'md:w-16' : 'md:w-56'
-        } w-56 border-r border-gray-200 dark:border-gray-800`}
+        } ${sidebarCollapsed ? 'md:w-16' : 'md:w-56'} w-56`}
       >
         <div className="flex flex-col h-full">
           {/* Logo & Toggle */}
-          <div className="p-3 border-b border-gray-200 dark:border-gray-800">
+          <div className="p-3">
             <div className="flex items-center justify-between">
               <button
                 onClick={() => {
@@ -252,7 +250,7 @@ export default function Sidebar({
           </nav>
 
           {/* User info */}
-          <div className="p-3 border-t border-gray-200 dark:border-gray-800">
+          <div className="p-3">
             <div
               className={`flex items-center gap-2 ${sidebarCollapsed ? 'md:justify-center' : ''}`}
             >

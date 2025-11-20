@@ -47,19 +47,14 @@ export default function AdminApprovals() {
   }
 
   return (
-    <DashboardLayout role="admin">
+    <DashboardLayout
+      role="admin"
+      pageTitle="Pending Approvals"
+      pageDescription="Review and approve pending requests"
+    >
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">
-              Pending Approvals
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Review and approve pending requests
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
+          <div className="flex flex-col sm:flex-row gap-2 ml-auto">
             <select className="input-primary w-full sm:w-36" aria-label="Filter by approval type">
               <option>All Types</option>
               <option>Timetable</option>

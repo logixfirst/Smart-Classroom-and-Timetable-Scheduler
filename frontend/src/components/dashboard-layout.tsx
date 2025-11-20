@@ -6,9 +6,16 @@ import Sidebar from '@/components/layout/Sidebar'
 interface DashboardLayoutProps {
   children: React.ReactNode
   role: 'admin' | 'staff' | 'faculty' | 'student'
+  pageTitle?: string
+  pageDescription?: string
 }
 
-export default function DashboardLayout({ children, role }: DashboardLayoutProps) {
+export default function DashboardLayout({
+  children,
+  role,
+  pageTitle,
+  pageDescription,
+}: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showSignOutDialog, setShowSignOutDialog] = useState(false)
@@ -35,16 +42,21 @@ export default function DashboardLayout({ children, role }: DashboardLayoutProps
           }`}
         >
           {/* Centered Navbar Header */}
-          <div className="bg-white/80 dark:bg-[#0f0f0f]/80 backdrop-blur-md py-4 border-b border-gray-200 dark:border-gray-800">
-            <h1 className="text-2xl font-bold text-center text-[#0f0f0f] dark:text-white">SIH28</h1>
+          <div className="bg-white/80 dark:bg-[#0f0f0f]/80 backdrop-blur-md py-4">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-[#0f0f0f] dark:text-white">
+                {pageTitle || 'SIH28'}
+              </h1>
+              {pageDescription && (
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{pageDescription}</p>
+              )}
+            </div>
           </div>
 
           <main
             className={`min-h-[calc(100vh-4rem)] ${sidebarCollapsed ? 'p-2 lg:p-4' : 'p-4 lg:p-6'}`}
           >
-            <div className={`mx-auto ${sidebarCollapsed ? 'max-w-1xl px-1 lg:px-1' : 'max-w-7xl'}`}>
-              {children}
-            </div>
+            <div className="mx-auto max-w-7xl">{children}</div>
           </main>
         </div>
       </div>

@@ -45,13 +45,10 @@ export default function LogsPage() {
   ]
 
   return (
-    <DashboardLayout role="admin">
+    <DashboardLayout role="admin" pageTitle="System Logs">
       <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">
-            System Logs
-          </h1>
-          <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
+          <div className="flex flex-col sm:flex-row gap-2 ml-auto">
             <label htmlFor="level-filter" className="sr-only">
               Filter by log level
             </label>
