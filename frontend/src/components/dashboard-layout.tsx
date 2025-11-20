@@ -53,11 +53,7 @@ export default function DashboardLayout({
             </div>
           </div>
 
-          <main
-            className={`min-h-[calc(100vh-4rem)] ${sidebarCollapsed ? 'p-2 lg:p-4' : 'p-4 lg:p-6'}`}
-          >
-            <div className="mx-auto max-w-7xl">{children}</div>
-          </main>
+          <main className="min-h-[calc(100vh-4rem)] p-4 lg:p-6">{children}</main>
         </div>
       </div>
 
