@@ -126,13 +126,7 @@ export default function Sidebar({
           <div className="p-3">
             <div className="flex items-center justify-between">
               <button
-                onClick={() => {
-                  if (window.innerWidth >= 768) {
-                    setSidebarCollapsed(!sidebarCollapsed)
-                  } else {
-                    setSidebarOpen(!sidebarOpen)
-                  }
-                }}
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                 className="w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center transition-colors"
                 title="Toggle menu"
               >
@@ -178,11 +172,6 @@ export default function Sidebar({
                 </Link>
               )
             })}
-
-            {/* Divider */}
-            <div className="py-2">
-              <div className="border-t border-gray-200 dark:border-gray-700"></div>
-            </div>
 
             {/* Notifications */}
             <Link

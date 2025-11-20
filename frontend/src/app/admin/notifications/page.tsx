@@ -10,8 +10,7 @@ export default function AdminNotifications() {
       pageDescription="System alerts and updates"
     >
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
-          <div className="flex-1"></div>
+        <div className="flex justify-end">
           <button className="btn-secondary">
             <span className="mr-2">✅</span>Mark All Read
           </button>
