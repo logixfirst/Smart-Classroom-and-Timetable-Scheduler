@@ -1,6 +1,7 @@
 /**
  * Simplified Component Tests
  * Tests basic component rendering
+ * added tests for LoadingSkeletons and Pagination components
  */
 import { render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom'
