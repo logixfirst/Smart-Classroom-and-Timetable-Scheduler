@@ -30,10 +30,11 @@ describe('Pagination Component', () => {
         onPageChange={handlePageChange}
         totalCount={50}
         itemsPerPage={10}
+        showItemsPerPage={false}
       />
     )
 
-    expect(screen.getByText('1')).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.getByTitle('Page 1')).toBeInTheDocument()
+    expect(screen.getByTitle('Page 2')).toBeInTheDocument()
   })
 })
