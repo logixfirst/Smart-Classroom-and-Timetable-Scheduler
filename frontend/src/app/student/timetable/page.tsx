@@ -1,75 +1,47 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
-import TimetableGrid from '@/components/shared/TimetableGrid'
 
 export default function StudentTimetable() {
-  const schedule = [
-    {
-      day: 'monday',
-      time: '9:00-10:00',
-      subject: 'Data Structures',
-      faculty: 'Dr. Rajesh Kumar',
-      classroom: 'Lab 1',
-      batch: 'CS-A',
-    },
-    {
-      day: 'wednesday',
-      time: '9:00-10:00',
-      subject: 'Database Systems',
-      faculty: 'Prof. Meera Sharma',
-      classroom: 'Room 205',
-      batch: 'CS-A',
-    },
-    {
-      day: 'friday',
-      time: '9:00-10:00',
-      subject: 'Software Engineering',
-      faculty: 'Dr. Vikram Gupta',
-      classroom: 'Room 301',
-      batch: 'CS-A',
-    },
-    {
-      day: 'tuesday',
-      time: '11:00-12:00',
-      subject: 'Machine Learning',
-      faculty: 'Dr. Anita Verma',
-      classroom: 'Lab 2',
-      batch: 'CS-A',
-    },
-    {
-      day: 'thursday',
-      time: '11:00-12:00',
-      subject: 'Web Development',
-      faculty: 'Prof. Suresh Reddy',
-      classroom: 'Lab 3',
-      batch: 'CS-A',
-    },
-    {
-      day: 'monday',
-      time: '14:00-15:00',
-      subject: 'Technical Writing',
-      faculty: 'Dr. Kavita Joshi',
-      classroom: 'Room 101',
-      batch: 'CS-A',
-    },
-    {
-      day: 'wednesday',
-      time: '14:00-15:00',
-      subject: 'Data Structures',
-      faculty: 'Dr. Rajesh Kumar',
-      classroom: 'Room 205',
-      batch: 'CS-A',
-    },
-    {
-      day: 'friday',
-      time: '14:00-15:00',
-      subject: 'Database Systems',
-      faculty: 'Prof. Meera Sharma',
-      classroom: 'Lab 1',
-      batch: 'CS-A',
-    },
-  ]
+  const [schedule, setSchedule] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [student, setStudent] = useState<any>(null)
+
+  useEffect(() => {
+    fetchSchedule()
+  }, [])
+
+  const fetchSchedule = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('http://localhost:8000/api/timetable/student/me/', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (data.success) {
+        setSchedule(data.slots)
+        setStudent(data.student)
+      }
+    } catch (error) {
+      console.error('Failed to fetch schedule:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout role="student">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="loading-spinner w-8 h-8 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading schedule...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
   return (
     <DashboardLayout role="student">

@@ -1,8 +1,48 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
 
 export default function FacultySchedule() {
+  const [schedule, setSchedule] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [faculty, setFaculty] = useState<any>(null)
+
+  useEffect(() => {
+    fetchSchedule()
+  }, [])
+
+  const fetchSchedule = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('http://localhost:8000/api/timetable/faculty/me/', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (data.success) {
+        setSchedule(data.slots)
+        setFaculty(data.faculty)
+      }
+    } catch (error) {
+      console.error('Failed to fetch schedule:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <DashboardLayout role="faculty">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="loading-spinner w-8 h-8 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading schedule...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
   return (
     <DashboardLayout role="faculty">
       <div className="space-responsive">
@@ -13,7 +53,9 @@ export default function FacultySchedule() {
               My Schedule
             </h1>
             <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
-              View your weekly teaching schedule
+              {faculty
+                ? `${faculty.faculty_name} • ${faculty.department}`
+                : 'View your weekly teaching schedule'}
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
@@ -33,15 +75,15 @@ export default function FacultySchedule() {
           <div className="card-compact">
             <div className="text-center">
               <div className="text-lg sm:text-xl font-semibold text-blue-600 dark:text-blue-400">
-                24
+                {schedule.length}
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Weekly Hours</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">Total Classes</div>
             </div>
           </div>
           <div className="card-compact">
             <div className="text-center">
               <div className="text-lg sm:text-xl font-semibold text-green-600 dark:text-green-400">
-                3
+                {new Set(schedule.map(s => s.subject_name)).size}
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-400">Subjects</div>
             </div>
@@ -49,7 +91,7 @@ export default function FacultySchedule() {
           <div className="card-compact">
             <div className="text-center">
               <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
-                5
+                {new Set(schedule.map(s => s.classroom_number)).size}
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-400">Classrooms</div>
             </div>
@@ -75,52 +117,40 @@ export default function FacultySchedule() {
           </div>
         </div>
 
-        {/* Today's Classes */}
+        {/* All Classes */}
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">Today's Classes</h3>
-            <p className="card-description">Monday, December 16, 2024</p>
+            <h3 className="card-title">My Classes</h3>
+            <p className="card-description">{schedule.length} classes assigned</p>
           </div>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-bold text-blue-800 dark:text-blue-300">9:00</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                  Mathematics 101
-                </h4>
-                <p className="text-xs text-gray-600 dark:text-gray-400">CS-A • Room 201</p>
-              </div>
-              <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">1h</div>
+          {schedule.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <p>No classes assigned yet</p>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-bold text-green-800 dark:text-green-300">11:00</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                  Physics 201
-                </h4>
-                <p className="text-xs text-gray-600 dark:text-gray-400">CS-C • Lab 1</p>
-              </div>
-              <div className="text-xs text-green-600 dark:text-green-400 font-medium">1h</div>
+          ) : (
+            <div className="space-y-3">
+              {schedule.map((slot, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg"
+                >
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold text-blue-800 dark:text-blue-300">
+                      {slot.start_time?.substring(0, 5)}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                      {slot.subject_name}
+                    </h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      {slot.day} • {slot.classroom_number}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center gap-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-              <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-bold text-purple-800 dark:text-purple-300">
-                  14:00
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                  Lab Session
-                </h4>
-                <p className="text-xs text-gray-600 dark:text-gray-400">CS-A • Lab 2</p>
-              </div>
-              <div className="text-xs text-purple-600 dark:text-purple-400 font-medium">1h</div>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Workload Summary */}
