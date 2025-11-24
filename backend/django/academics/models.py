@@ -63,8 +63,8 @@ class Organization(models.Model):
     website = models.CharField(max_length=255, null=True, blank=True)
 
     # Email domains
-    student_email_domain = models.CharField(max_length=100)
-    faculty_email_domain = models.CharField(max_length=100)
+    student_email_domain = models.CharField(max_length=100, default="student.edu")
+    faculty_email_domain = models.CharField(max_length=100, default="faculty.edu")
 
     # Academic configuration
     nep2020_enabled = models.BooleanField(default=True)
@@ -356,6 +356,12 @@ class Faculty(models.Model):
         ("guest_lecturer", "Guest Lecturer"),
     ]
 
+    GENDER_CHOICES = [
+        ("MALE", "Male"),
+        ("FEMALE", "Female"),
+        ("OTHER", "Other"),
+    ]
+
     faculty_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="faculty_members", db_column='org_id'
@@ -364,53 +370,96 @@ class Faculty(models.Model):
         Department, on_delete=models.CASCADE, related_name="faculty_members", db_column='dept_id'
     )
 
-    employee_id = models.CharField(max_length=30)  # Unique within organization
-    faculty_name = models.CharField(max_length=100)
-    designation = models.CharField(max_length=30, choices=DESIGNATION_CHOICES)
-
+    faculty_code = models.CharField(max_length=30)  # Unique within organization
+    username = models.CharField(max_length=50, null=True, blank=True)
     email = models.EmailField()
-    phone = models.CharField(max_length=20, null=True, blank=True)
-
+    first_name = models.CharField(max_length=100)
+    middle_name = models.CharField(max_length=100, null=True, blank=True)
+    last_name = models.CharField(max_length=100)
+    title = models.CharField(max_length=20, null=True, blank=True)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, null=True, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
+    alternate_phone = models.CharField(max_length=20, null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    city = models.CharField(max_length=100, null=True, blank=True)
+    state = models.CharField(max_length=100, null=True, blank=True)
+    pincode = models.CharField(max_length=10, null=True, blank=True)
+    designation = models.CharField(max_length=30, choices=DESIGNATION_CHOICES)
+    employment_type = models.CharField(max_length=50, null=True, blank=True)
+    highest_qualification = models.CharField(max_length=100, null=True, blank=True)
     specialization = models.CharField(max_length=200)
-    qualifications = models.TextField(null=True, blank=True)  # PhD, MTech, etc.
-
-    # Teaching Load
-    max_teaching_hours_per_week = models.IntegerField(default=18)
-    avg_leaves_per_month = models.DecimalField(
-        max_digits=3, decimal_places=1, default=1.5
-    )
-
-    # Availability
-    is_available = models.BooleanField(default=True)
     date_of_joining = models.DateField(null=True, blank=True)
     date_of_leaving = models.DateField(null=True, blank=True)
-
-    # User Account
-    user = models.OneToOneField(
-        "User",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="faculty_profile",
-    )
-
+    max_credits_per_semester = models.IntegerField(null=True, blank=True)
+    max_hours_per_week = models.IntegerField(default=18)
+    max_consecutive_hours = models.IntegerField(null=True, blank=True)
+    can_teach_cross_department = models.BooleanField(default=False)
+    preferred_time_slot = models.CharField(max_length=50, null=True, blank=True)
+    research_day = models.CharField(max_length=20, null=True, blank=True)
+    research_hours_per_week = models.IntegerField(null=True, blank=True)
+    is_hod = models.BooleanField(default=False)
+    is_dean = models.BooleanField(default=False)
+    is_proctor = models.BooleanField(default=False)
+    can_approve_timetable = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    last_login = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # User Account - removed as it doesn't exist in database
+    # user = models.OneToOneField(
+    #     "User",
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True,
+    #     related_name="faculty_profile",
+    # )
+
     class Meta:
         db_table = "faculty"
-        unique_together = [["organization", "employee_id"]]
+        unique_together = [["organization", "faculty_code"]]
         indexes = [
             models.Index(
-                fields=["organization", "department", "is_available"],
+                fields=["organization", "department", "is_active"],
                 name="fac_org_dept_avail_idx",
             ),
             models.Index(fields=["designation"], name="fac_desig_idx"),
-            models.Index(fields=["user"], name="fac_user_idx"),
+            # models.Index(fields=["user"], name="fac_user_idx"),
         ]
 
+    @property
+    def faculty_name(self):
+        """Computed property for backward compatibility"""
+        parts = [self.first_name]
+        if self.middle_name:
+            parts.append(self.middle_name)
+        if self.last_name:
+            parts.append(self.last_name)
+        return " ".join(parts)
+
+    @property
+    def phone(self):
+        """Alias for phone_number for backward compatibility"""
+        return self.phone_number
+
+    @property
+    def max_teaching_hours_per_week(self):
+        """Alias for max_hours_per_week for backward compatibility"""
+        return self.max_hours_per_week
+
+    @property
+    def qualifications(self):
+        """Alias for highest_qualification for backward compatibility"""
+        return self.highest_qualification
+
+    @property
+    def is_available(self):
+        """Alias for is_active for backward compatibility"""
+        return self.is_active
+
     def __str__(self):
-        return f"{self.faculty_name} ({self.employee_id})"
+        return f"{self.faculty_name} ({self.faculty_code})"
 
 
 # FacultySubject removed - not in database

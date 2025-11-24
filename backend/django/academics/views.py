@@ -144,15 +144,15 @@ class FacultyViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet)
     queryset = (
         Faculty.objects.select_related("department", "organization")
         .all()
-        .order_by("employee_id")
+        .order_by("faculty_code")
     )
     serializer_class = FacultySerializer
     filter_backends = [
         filters.SearchFilter,
         filters.OrderingFilter,
     ]
-    search_fields = ["faculty_name", "employee_id", "email", "specialization"]
-    ordering_fields = ["employee_id", "faculty_name"]
+    search_fields = ["faculty_name", "faculty_code", "email", "specialization"]
+    ordering_fields = ["faculty_code", "faculty_name"]
 
     @action(detail=True, methods=["get"])
     def timetable(self, request, pk=None):
