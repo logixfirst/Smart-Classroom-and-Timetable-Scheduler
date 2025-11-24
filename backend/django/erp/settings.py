@@ -70,6 +70,7 @@ APPEND_SLASH = False
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",  # WebSocket support - must be first
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -83,6 +84,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "corsheaders",
     "django_filters",
+    "channels",  # WebSocket support
     # Local apps
     "core",
     "academics",
@@ -311,8 +313,43 @@ CACHES = {
 CACHE_MIDDLEWARE_ALIAS = "default"
 CACHE_MIDDLEWARE_SECONDS = 300
 CACHE_MIDDLEWARE_KEY_PREFIX = f"sih28_{SENTRY_ENVIRONMENT}"
-#     }
-# }
+
+# Channels Configuration (WebSocket support)
+ASGI_APPLICATION = "erp.asgi.application"
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
+    },
+}
+
+# FastAPI AI Service URL
+FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8001")
+
+# Celery Configuration
+import ssl
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# SSL configuration for Upstash Redis (rediss://)
+if REDIS_USE_TLS:
+    CELERY_BROKER_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE,
+        'ssl_check_hostname': False
+    }
+    CELERY_REDIS_BACKEND_USE_SSL = {
+        'ssl_cert_reqs': ssl.CERT_NONE,
+        'ssl_check_hostname': False
+    }
 
 # Logging Configuration
 LOGGING = {

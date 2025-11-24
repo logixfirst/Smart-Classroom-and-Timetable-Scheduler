@@ -794,6 +794,9 @@ class GenerationJob(models.Model):
     """Timetable generation job tracking (legacy)"""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="generation_jobs", db_column='org_id'
+    )
     status = models.CharField(
         max_length=20,
         choices=[

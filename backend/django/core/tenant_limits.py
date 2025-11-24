@@ -130,12 +130,34 @@ class TenantLimits:
         cache_key = f"org_concurrent:{org_id}"
         current_concurrent = cache.get(cache_key, 0)
         
+        # Verify against actual running jobs in database
+        if current_concurrent >= limits['max_concurrent_generations']:
+            # Double-check with database to avoid stale cache
+            try:
+                from academics.models import GenerationJob
+                actual_running = GenerationJob.objects.filter(
+                    organization_id=org_id,
+                    status__in=['pending', 'running']
+                ).count()
+                
+                # If cache is stale, reset it
+                if actual_running == 0:
+                    cache.set(cache_key, 0, timeout=7200)
+                    current_concurrent = 0
+                    logger.info(f"Reset stale concurrent count for org {org_id}")
+                elif actual_running < current_concurrent:
+                    cache.set(cache_key, actual_running, timeout=7200)
+                    current_concurrent = actual_running
+                    logger.info(f"Corrected concurrent count for org {org_id} to {actual_running}")
+            except Exception as e:
+                logger.warning(f"Could not verify concurrent jobs: {e}")
+        
         if current_concurrent >= limits['max_concurrent_generations']:
             return False, f"Maximum concurrent generations ({limits['max_concurrent_generations']}) reached. Please wait for current jobs to complete."
         
-        # Check hardware resources
-        if not HardwareDetector.can_handle_load(required_memory_gb=1.5):
-            return False, "System resources exhausted. Please try again in a few minutes."
+        # Check hardware resources (allow if memory usage < 95%)
+        if not HardwareDetector.can_handle_load():
+            return False, "System resources exhausted (memory usage > 95%). Please try again in a few minutes."
         
         return True, None
     

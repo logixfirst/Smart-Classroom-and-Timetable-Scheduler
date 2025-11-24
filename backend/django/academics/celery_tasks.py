@@ -1,172 +1,141 @@
 """
-Celery Tasks for Timetable Generation
-Software-level parallelization ready for horizontal scaling
-Works on free tier (sequential) but scales automatically with better hardware
+Production-Grade Celery Tasks for Timetable Generation
+Enterprise Architecture: Async Task Queue with Progress Tracking
 """
 
-from celery import shared_task, group, chord
+from celery import shared_task
 from django.conf import settings
 import requests
 import logging
 from .models import GenerationJob
 from django.utils import timezone
+from core.tenant_limits import TenantLimits
 
 logger = logging.getLogger(__name__)
+
 
 @shared_task(bind=True, max_retries=3, soft_time_limit=1800)
 def generate_timetable_task(self, job_id, org_id, academic_year, semester):
     """
-    Celery task for timetable generation
-    Auto-adapts to available hardware:
-    - Free tier (512MB): Sequential processing
-    - Pro tier (4GB): 4 parallel workers
-    - Enterprise (16GB+): 40 parallel workers
+    Main timetable generation task
+    
+    Architecture:
+    1. Celery receives task from Django
+    2. Calls FastAPI /api/generate_variants (non-blocking)
+    3. FastAPI queues background task and returns immediately
+    4. FastAPI updates progress to Redis
+    5. Frontend polls Django which reads from Redis
+    6. FastAPI calls Django callback when complete
     """
+    job = None
     try:
-        # Check if system can handle load
+        job = GenerationJob.objects.get(id=job_id)
+        
+        # Check hardware resources
         from core.hardware_detector import HardwareDetector
-        if not HardwareDetector.can_handle_load(required_memory_gb=2.0):
-            logger.warning(f"Insufficient resources, retrying job {job_id} in 60s")
+        if not HardwareDetector.can_handle_load():
+            logger.warning(f"Insufficient resources, retrying job {job_id}")
             raise self.retry(countdown=60, max_retries=5)
         
-        job = GenerationJob.objects.get(job_id=job_id)
         job.status = 'running'
-        job.started_at = timezone.now()
         job.save()
         
-        # Call FastAPI optimization service
-        response = requests.post(
-            f"{settings.FASTAPI_URL}/api/v1/optimize",
-            json={
-                'job_id': job_id,
-                'org_id': org_id,
-                'academic_year': academic_year,
-                'semester': semester,
-                'generation_type': 'full',
-                'scope': 'university'
-            },
-            timeout=1800  # 30 minutes
-        )
+        # Call FastAPI (non-blocking - FastAPI returns immediately)
+        fastapi_url = getattr(settings, 'FASTAPI_URL', 'http://localhost:8001')
         
-        if response.status_code == 200:
-            logger.info(f"Job {job_id} queued successfully")
-            return {'status': 'queued', 'job_id': job_id}
-        else:
-            raise Exception(f"FastAPI error: {response.text}")
+        logger.info(f"Calling FastAPI for job {job_id}")
+        
+        try:
+            # Convert semester to int if possible, otherwise use 1
+            try:
+                semester_int = int(semester)
+            except (ValueError, TypeError):
+                # If semester is 'odd', 'even', or other string, map to number
+                semester_map = {'odd': 1, 'even': 2}
+                semester_int = semester_map.get(str(semester).lower(), 1)
+            
+            response = requests.post(
+                f"{fastapi_url}/api/generate_variants",
+                json={
+                    'job_id': str(job_id),
+                    'organization_id': org_id,
+                    'department_id': None,
+                    'batch_ids': [],
+                    'semester': semester_int,
+                    'academic_year': academic_year,
+                },
+                timeout=10  # FastAPI should respond in <1 second
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Job {job_id} queued in FastAPI")
+                # FastAPI will update progress to Redis
+                # FastAPI will call Django callback when complete
+                return {'status': 'queued', 'job_id': job_id}
+            else:
+                raise Exception(f"FastAPI returned {response.status_code}: {response.text}")
+                
+        except requests.exceptions.Timeout:
+            logger.error(f"FastAPI timeout for job {job_id}")
+            raise Exception("FastAPI service timeout")
+        except requests.exceptions.ConnectionError:
+            logger.error(f"Cannot connect to FastAPI for job {job_id}")
+            raise Exception("FastAPI service unavailable")
             
     except Exception as e:
         logger.error(f"Job {job_id} failed: {str(e)}")
-        job.status = 'failed'
-        job.error_message = str(e)
-        job.save()
+        if job:
+            job.status = 'failed'
+            job.error_message = str(e)
+            job.save()
+        
+        # Decrement concurrent counter
+        TenantLimits.decrement_concurrent(org_id)
         
         # Retry with exponential backoff
         raise self.retry(exc=e, countdown=60 * (2 ** self.request.retries))
 
 
 @shared_task
-def generate_department_timetable(job_id, dept_id, org_id, academic_year, semester):
+def fastapi_callback_task(job_id, status, variants=None, error=None):
     """
-    Generate timetable for single department
-    Used for parallel processing when multiple workers available
-    """
-    try:
-        response = requests.post(
-            f"{settings.FASTAPI_URL}/api/v1/optimize/department",
-            json={
-                'job_id': job_id,
-                'dept_id': dept_id,
-                'org_id': org_id,
-                'academic_year': academic_year,
-                'semester': semester
-            },
-            timeout=600  # 10 minutes per department
-        )
-        
-        return {
-            'dept_id': dept_id,
-            'status': 'completed' if response.status_code == 200 else 'failed',
-            'data': response.json() if response.status_code == 200 else None
-        }
-        
-    except Exception as e:
-        logger.error(f"Department {dept_id} failed: {str(e)}")
-        return {'dept_id': dept_id, 'status': 'failed', 'error': str(e)}
-
-
-@shared_task
-def generate_parallel_timetable(job_id, org_id, academic_year, semester, department_ids):
-    """
-    Parallel timetable generation using Celery groups
-    - Free tier: Processes sequentially (1 worker)
-    - Paid tier: Processes in parallel (10+ workers)
+    Callback task called by FastAPI when generation completes
     
-    Celery automatically handles worker availability
+    This is called by FastAPI via Celery queue (not direct HTTP)
     """
     try:
-        job = GenerationJob.objects.get(job_id=job_id)
-        job.status = 'running'
-        job.started_at = timezone.now()
-        job.save()
+        job = GenerationJob.objects.get(id=job_id)
         
-        # Create parallel tasks (Celery handles sequential/parallel automatically)
-        tasks = group(
-            generate_department_timetable.s(
-                job_id, dept_id, org_id, academic_year, semester
-            )
-            for dept_id in department_ids
-        )
-        
-        # Execute with callback
-        callback = merge_department_results.s(job_id)
-        chord(tasks)(callback)
-        
-        return {'status': 'queued', 'job_id': job_id, 'departments': len(department_ids)}
-        
-    except Exception as e:
-        logger.error(f"Parallel generation failed: {str(e)}")
-        job.status = 'failed'
-        job.error_message = str(e)
-        job.save()
-        raise
-
-
-@shared_task
-def merge_department_results(results, job_id):
-    """
-    Merge results from parallel department generation
-    Called automatically after all departments complete
-    """
-    try:
-        job = GenerationJob.objects.get(job_id=job_id)
-        
-        # Check if all departments succeeded
-        failed = [r for r in results if r['status'] == 'failed']
-        
-        if failed:
-            job.status = 'partial'
-            job.error_message = f"{len(failed)} departments failed"
-        else:
+        if status == 'completed':
             job.status = 'completed'
             job.progress = 100
+            job.completed_at = timezone.now()
+            
+            if variants:
+                job.timetable_data = {'variants': variants}
+            
+            logger.info(f"Job {job_id} completed successfully")
+            
+        elif status == 'failed':
+            job.status = 'failed'
+            job.error_message = error or 'Unknown error'
+            logger.error(f"Job {job_id} failed: {error}")
         
-        job.completed_at = timezone.now()
         job.save()
         
-        logger.info(f"Job {job_id} completed: {len(results)} departments")
-        return {'job_id': job_id, 'total': len(results), 'failed': len(failed)}
+        # Decrement concurrent counter
+        org_id = job.organization.org_code if job.organization else 'unknown'
+        TenantLimits.decrement_concurrent(org_id)
         
+    except GenerationJob.DoesNotExist:
+        logger.error(f"Job {job_id} not found in callback")
     except Exception as e:
-        logger.error(f"Merge failed: {str(e)}")
-        raise
+        logger.error(f"Callback failed for job {job_id}: {e}")
 
 
 @shared_task
 def cleanup_old_jobs():
-    """
-    Periodic task to cleanup old generation jobs
-    Run daily via Celery Beat
-    """
+    """Periodic task to cleanup old jobs"""
     from datetime import timedelta
     cutoff = timezone.now() - timedelta(days=30)
     
@@ -177,60 +146,3 @@ def cleanup_old_jobs():
     
     logger.info(f"Cleaned up {deleted[0]} old jobs")
     return deleted[0]
-
-
-@shared_task(bind=True, max_retries=3)
-def check_resource_availability(self):
-    """
-    Check if system has resources for new generation
-    Implements resource-aware queuing
-    """
-    import psutil
-    
-    # Get system resources
-    cpu_percent = psutil.cpu_percent(interval=1)
-    memory = psutil.virtual_memory()
-    
-    # Check if resources available
-    if cpu_percent > 90 or memory.percent > 85:
-        logger.warning(f"Resources exhausted: CPU {cpu_percent}%, RAM {memory.percent}%")
-        raise self.retry(countdown=60)  # Retry after 1 minute
-    
-    return {
-        'cpu_available': 100 - cpu_percent,
-        'memory_available': 100 - memory.percent,
-        'can_process': True
-    }
-
-
-@shared_task
-def priority_queue_task(job_id, priority='normal'):
-    """
-    Priority-based task execution
-    - 'high': Premium universities (priority=9)
-    - 'normal': Regular universities (priority=5)
-    - 'low': Free tier universities (priority=1)
-    """
-    job = GenerationJob.objects.get(job_id=job_id)
-    
-    # Set priority in job metadata
-    job.metadata = job.metadata or {}
-    job.metadata['priority'] = priority
-    job.save()
-    
-    # Queue with priority
-    if priority == 'high':
-        generate_timetable_task.apply_async(
-            args=[job_id, job.org_id, job.academic_year, job.semester],
-            priority=9
-        )
-    elif priority == 'low':
-        generate_timetable_task.apply_async(
-            args=[job_id, job.org_id, job.academic_year, job.semester],
-            priority=1
-        )
-    else:
-        generate_timetable_task.apply_async(
-            args=[job_id, job.org_id, job.academic_year, job.semester],
-            priority=5
-        )

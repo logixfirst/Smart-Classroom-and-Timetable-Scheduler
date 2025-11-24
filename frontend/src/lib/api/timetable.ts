@@ -59,19 +59,30 @@ export async function fetchTimetableWorkflows(filters?: {
   semester?: number
   academic_year?: string
 }): Promise<TimetableWorkflow[]> {
-  const params = new URLSearchParams()
-  if (filters?.organization_id) params.append('organization_id', filters.organization_id)
-  if (filters?.status) params.append('status', filters.status)
-  if (filters?.semester) params.append('semester', filters.semester.toString())
-  if (filters?.academic_year) params.append('academic_year', filters.academic_year)
+  try {
+    const params = new URLSearchParams()
+    if (filters?.status) params.append('status', filters.status)
+    if (filters?.semester) params.append('semester', filters.semester.toString())
+    if (filters?.academic_year) params.append('academic_year', filters.academic_year)
 
-  const response = await fetch(
-    `${DJANGO_API_BASE}/timetable-workflow/?${params.toString()}`,
-    getFetchOptions()
-  )
-  const data = await handleResponse<any>(response)
-  // Handle both paginated {results: [], count: X} and direct array responses
-  return Array.isArray(data) ? data : data.results || []
+    const response = await fetch(
+      `${DJANGO_API_BASE}/generation-jobs/?${params.toString()}`,
+      getFetchOptions()
+    )
+    
+    // If server error, return empty array instead of throwing
+    if (!response.ok) {
+      console.warn(`API returned ${response.status}, returning empty array`)
+      return []
+    }
+    
+    const data = await response.json()
+    // Handle both paginated {results: [], count: X} and direct array responses
+    return Array.isArray(data) ? data : data.results || []
+  } catch (error) {
+    console.error('Failed to fetch timetable workflows:', error)
+    return [] // Return empty array on any error
+  }
 }
 
 export async function fetchTimetableWorkflowById(id: string): Promise<TimetableWorkflow> {
@@ -211,13 +222,19 @@ export async function fetchFacultyAvailability(filters?: {
   const faculty = Array.isArray(data) ? data : data.results || []
 
   // Transform to FacultyAvailability format
-  return faculty.map((f: any) => ({
-    id: f.faculty_id || f.id,
-    name: f.faculty_name || f.name,
-    available: f.is_active !== false, // Assume active faculty are available
-    email: f.email,
-    department: f.department?.dept_name,
-  }))
+  return faculty.map((f: any) => {
+    // Construct full name from first_name, middle_name, last_name
+    const nameParts = [f.first_name, f.middle_name, f.last_name].filter(Boolean)
+    const fullName = nameParts.join(' ') || f.faculty_name || 'Unknown'
+    
+    return {
+      id: f.faculty_id || f.id,
+      name: fullName,
+      available: f.is_active !== false, // Assume active faculty are available
+      email: f.email,
+      department: f.department?.dept_name,
+    }
+  })
 }
 
 export async function updateFacultyAvailability(

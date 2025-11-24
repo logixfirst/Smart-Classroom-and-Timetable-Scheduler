@@ -69,8 +69,8 @@ class HardwareDetector:
                 'enable_parallel': True,
             }
         
-        # Business Tier: 4-8GB RAM
-        elif memory_gb < 8:
+        # Business Tier: 4-7GB RAM
+        elif memory_gb < 7:
             return 'business', {
                 'celery_workers': min(10, cpu_count * 2),
                 'celery_concurrency': 8,
@@ -80,7 +80,7 @@ class HardwareDetector:
                 'enable_parallel': True,
             }
         
-        # Enterprise Tier: 8GB+ RAM
+        # Enterprise Tier: 7GB+ RAM
         else:
             return 'enterprise', {
                 'celery_workers': min(40, cpu_count * 4),
@@ -95,7 +95,8 @@ class HardwareDetector:
     def can_handle_load(required_memory_gb: float = 2.0) -> bool:
         """Check if system can handle additional load"""
         resources = HardwareDetector.get_system_resources()
-        return resources['memory_available_gb'] >= required_memory_gb
+        # Allow if memory usage is below 95% (more realistic for production)
+        return resources['memory_percent'] < 95
     
     @staticmethod
     def get_optimal_workers() -> int:

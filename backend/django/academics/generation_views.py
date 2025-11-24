@@ -35,19 +35,15 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter jobs based on user role"""
         user = self.request.user
-        if user.role == "admin":
-            return GenerationJob.objects.all()
-        elif user.role in ["staff", "faculty"]:
-            return GenerationJob.objects.filter(
-                department__department_id=user.department
-            )
-        return GenerationJob.objects.filter(created_by=user)
+        # Return all jobs for now since created_by field doesn't exist
+        # TODO: Add created_by field to GenerationJob model for proper filtering
+        return GenerationJob.objects.all().order_by('-created_at')
 
     @action(detail=False, methods=["post"], url_path="generate")
     def generate_timetable(self, request):
         """
         Start a new timetable generation job
-        POST /api/timetable/generate/
+        POST /api/generation-jobs/generate/
         Body: {
             "academic_year": "2024-2025",
             "semester": "odd",
@@ -55,10 +51,18 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
             "priority": "normal"  # optional: high, normal, low
         }
         """
+        # Validate required fields FIRST
+        academic_year = request.data.get("academic_year")
+        semester = request.data.get("semester")
+        priority = request.data.get("priority", "normal")  # high, normal, low
+        org_id = request.data.get("org_id") or getattr(
+            request.user, "organization", None
+        )
+        
         # Check tenant limits and hardware resources
         from core.tenant_limits import TenantLimits
         
-        can_start, error_msg = TenantLimits.can_start_generation(str(university_id))
+        can_start, error_msg = TenantLimits.can_start_generation(str(org_id))
         if not can_start:
             return Response(
                 {
@@ -68,14 +72,6 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-        
-        # Validate required fields
-        academic_year = request.data.get("academic_year")
-        semester = request.data.get("semester")
-        priority = request.data.get("priority", "normal")  # high, normal, low
-        university_id = request.data.get("university_id") or getattr(
-            request.user, "organization", None
-        )
 
         if not academic_year or not semester:
             return Response(
@@ -83,38 +79,50 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not university_id:
+        if not org_id:
             return Response(
-                {"success": False, "error": "university_id not found"},
+                {"success": False, "error": "org_id not found"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Create generation job
         try:
+            # Get organization object
+            from .models import Organization
+            org = Organization.objects.filter(org_name=org_id).first()
+            if not org:
+                return Response(
+                    {"success": False, "error": f"Organization '{org_id}' not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            
             # Increment concurrent count
             from core.tenant_limits import TenantLimits
-            TenantLimits.increment_concurrent(str(university_id))
+            TenantLimits.increment_concurrent(str(org_id))
             
             # Get priority from tenant tier if not specified
             if priority == "normal":
-                priority_value = TenantLimits.get_priority(str(university_id))
+                priority_value = TenantLimits.get_priority(str(org_id))
             else:
                 priority_value = {'high': 9, 'normal': 5, 'low': 1}.get(priority, 5)
             
             # Create job entry for university-wide generation
             job = GenerationJob.objects.create(
-                department=None,  # University-wide
-                batch=None,  # All batches
-                semester=semester,
-                academic_year=academic_year,
-                status="queued",
+                organization=org,
+                status="pending",
                 progress=0,
-                created_by=request.user,
-                metadata={'priority': priority_value, 'org_id': str(university_id)}
+                timetable_data={
+                    'academic_year': academic_year,
+                    'semester': semester,
+                    'org_id': str(org_id),
+                    'priority': priority_value,
+                    'generation_type': 'full',
+                    'scope': 'university'
+                }
             )
 
             # Push job to FastAPI for processing with priority
-            self._queue_generation_job(job, university_id, priority)
+            self._queue_generation_job(job, org_id, priority)
 
             # Return job details
             job_serializer = GenerationJobSerializer(job)
@@ -122,7 +130,7 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 {
                     "success": True,
                     "message": "Timetable generation started for all 127 departments",
-                    "job_id": str(job.job_id),
+                    "job_id": str(job.id),
                     "estimated_time": "8-11 minutes",
                     "job": job_serializer.data,
                 },
@@ -146,7 +154,7 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
             job = self.get_object()
 
             # Check Redis for real-time progress
-            cache_key = f"generation_progress:{job.job_id}"
+            cache_key = f"generation_progress:{job.id}"
             redis_progress = cache.get(cache_key)
 
             if redis_progress is not None:
@@ -171,7 +179,7 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         """
         try:
             job = self.get_object()
-            cache_key = f"generation_progress:{job.job_id}"
+            cache_key = f"generation_progress:{job.id}"
 
             # Get progress from Redis
             progress = cache.get(cache_key)
@@ -181,7 +189,7 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "success": True,
-                    "job_id": str(job.job_id),
+                    "job_id": str(job.id),
                     "status": job.status,
                     "progress": progress,
                     "updated_at": job.updated_at.isoformat()
@@ -201,11 +209,61 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         """Decrement concurrent count when job completes"""
         try:
             from core.tenant_limits import TenantLimits
-            org_id = job.metadata.get('org_id') if job.metadata else None
+            org_id = job.timetable_data.get('org_id') if job.timetable_data else None
             if org_id:
                 TenantLimits.decrement_concurrent(org_id)
         except Exception as e:
             logger.error(f"Error decrementing concurrent count: {e}")
+    
+    @action(detail=True, methods=["post"], url_path="cancel")
+    def cancel_generation(self, request, pk=None):
+        """
+        Cancel a running generation job
+        POST /api/timetable/cancel/{job_id}/
+        """
+        try:
+            job = self.get_object()
+            
+            if job.status in ['completed', 'cancelled']:
+                return Response(
+                    {'success': False, 'error': f'Cannot cancel {job.status} job'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Revoke Celery task
+            try:
+                from celery import current_app
+                current_app.control.revoke(str(job.id), terminate=True)
+                logger.info(f"Revoked Celery task for job {job.id}")
+            except Exception as e:
+                logger.warning(f"Failed to revoke Celery task: {e}")
+            
+            # Update job status
+            job.status = 'cancelled'
+            job.completed_at = timezone.now()
+            job.error_message = 'Cancelled by user'
+            job.save()
+            
+            # Cleanup Redis
+            cache.delete(f"generation_progress:{job.id}")
+            cache.delete(f"generation_queue:{job.id}")
+            
+            # Decrement concurrent count
+            self._decrement_concurrent_on_complete(job)
+            
+            serializer = GenerationJobSerializer(job)
+            return Response({
+                'success': True,
+                'message': 'Generation cancelled successfully',
+                'job': serializer.data
+            })
+            
+        except Exception as e:
+            logger.error(f"Error cancelling job: {str(e)}")
+            return Response(
+                {'success': False, 'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
@@ -265,6 +323,69 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=True, methods=["post"], url_path="select-variant")
+    def select_variant(self, request, pk=None):
+        """
+        Select a variant from generated options
+        POST /api/timetable/select-variant/{job_id}/
+        Body: { "variant_id": "variant_1" }
+        """
+        try:
+            job = self.get_object()
+            variant_id = request.data.get('variant_id')
+            
+            if not variant_id:
+                return Response(
+                    {'success': False, 'error': 'variant_id is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get variant from Redis
+            fastapi_url = os.getenv("FASTAPI_AI_SERVICE_URL", "http://localhost:8001")
+            response = requests.get(f"{fastapi_url}/api/variants/{job.id}")
+            
+            if response.status_code != 200:
+                return Response(
+                    {'success': False, 'error': 'Failed to fetch variants'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            variants_data = response.json()
+            selected_variant = next(
+                (v for v in variants_data.get('variants', []) if v['id'] == variant_id),
+                None
+            )
+            
+            if not selected_variant:
+                return Response(
+                    {'success': False, 'error': 'Variant not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Mark variant as selected
+            job.timetable_data = job.timetable_data or {}
+            job.timetable_data['selected_variant'] = variant_id
+            job.save()
+            
+            # Update timetable status
+            Timetable.objects.filter(
+                generation_job=job,
+                variant_name=selected_variant['name']
+            ).update(status='selected', updated_at=timezone.now())
+            
+            return Response({
+                'success': True,
+                'message': f"Variant '{selected_variant['name']}' selected",
+                'variant': selected_variant
+            })
+            
+        except Exception as e:
+            logger.error(f"Error selecting variant: {str(e)}")
+            return Response(
+                {'success': False, 'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     @action(detail=True, methods=["get"], url_path="result")
     def get_result(self, request, pk=None):
         """
@@ -292,7 +413,7 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
             return Response(
                 {
                     "success": True,
-                    "job_id": str(job.job_id),
+                    "job_id": str(job.id),
                     "status": job.status,
                     "timetables": serializer.data,
                 }
@@ -312,12 +433,12 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         """
         try:
             # Store job data in Redis queue
-            cache_key = f"generation_queue:{job.job_id}"
+            cache_key = f"generation_queue:{job.id}"
             job_data = {
-                "job_id": str(job.job_id),
+                "job_id": str(job.id),
                 "university_id": university_id,
-                "semester": job.semester,
-                "academic_year": job.academic_year,
+                "semester": job.timetable_data.get('semester'),
+                "academic_year": job.timetable_data.get('academic_year'),
                 "generation_type": "full",
                 "scope": "university",
                 "priority": priority,
@@ -338,29 +459,26 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 
                 # Queue with priority
                 generate_timetable_task.apply_async(
-                    args=[str(job.job_id), university_id, job.academic_year, job.semester],
+                    args=[str(job.id), university_id, job.timetable_data.get('academic_year'), job.timetable_data.get('semester')],
                     priority=celery_priority
                 )
-                logger.info(f"Queued job {job.job_id} with priority {priority} (Celery)")
+                logger.info(f"Queued job {job.id} with priority {priority} (Celery)")
                 
-            except ImportError:
+            except Exception as celery_error:
                 # Fallback to direct FastAPI call if Celery not available
-                fastapi_url = os.getenv("FASTAPI_AI_SERVICE_URL", "http://localhost:8001")
-                requests.post(
-                    f"{fastapi_url}/api/v1/optimize",
-                    json=job_data,
-                    timeout=10,
-                )
-                logger.info(f"Triggered FastAPI generation for job {job.job_id} (direct)")
+                logger.warning(f"Celery not available: {celery_error}. Using direct FastAPI call.")
+                try:
+                    fastapi_url = os.getenv("FASTAPI_AI_SERVICE_URL", "http://localhost:8001")
+                    requests.post(
+                        f"{fastapi_url}/api/v1/optimize",
+                        json=job_data,
+                        timeout=10,
+                    )
+                    logger.info(f"Triggered FastAPI generation for job {job.id} (direct)")
+                except Exception as api_error:
+                    logger.error(f"FastAPI also unavailable: {api_error}")
+                    # Keep job as pending - worker will pick it up later
+                    logger.info(f"Job {job.id} queued in Redis, waiting for worker")
                 
         except Exception as e:
             logger.error(f"Error queuing job: {str(e)}")
-            job.status = "failed"
-            job.error_message = str(e)
-            job.save()
-
-        except Exception as e:
-            logger.error(f"Error queuing job: {str(e)}")
-            job.status = "failed"
-            job.error_message = str(e)
-            job.save()

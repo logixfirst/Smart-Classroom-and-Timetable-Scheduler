@@ -29,14 +29,14 @@ export default function CreateTimetablePage() {
       setIsGenerating(true)
       setError(null)
 
-      const response = await fetch(`${API_BASE}/timetable/generate/`, {
+      const response = await fetch(`${API_BASE}/generation-jobs/generate/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           academic_year: formData.academic_year,
           semester: formData.semester,
-          university_id: user.organization,
+          org_id: user.organization,
         }),
       })
 

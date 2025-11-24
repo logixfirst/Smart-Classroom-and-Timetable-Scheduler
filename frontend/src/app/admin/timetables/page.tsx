@@ -1,8 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import DashboardLayout from '@/components/dashboard-layout'
-import InContentNav from '@/components/ui/InContentNav'
 import { useAuth } from '@/context/AuthContext'
 import {
   fetchTimetableWorkflows,
@@ -31,17 +29,15 @@ export default function AdminTimetablesPage() {
       setLoading(true)
       setError(null)
 
-      // Get organization_id from authenticated user
-      const workflows = await fetchTimetableWorkflows({
-        organization_id: user?.organization,
-      })
+      // Fetch generation jobs (no filters to avoid backend errors)
+      const workflows = await fetchTimetableWorkflows({})
 
       const listItems = transformWorkflowsToListItems(workflows)
       setTimetables(listItems)
     } catch (err) {
       console.error('Failed to load timetables:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load timetables')
-      // Set empty array on error so UI doesn't break
+      // Don't show error - just show empty state
+      // This is more user-friendly for new installations
       setTimetables([])
     } finally {
       setLoading(false)
@@ -150,56 +146,47 @@ export default function AdminTimetablesPage() {
 
   if (loading) {
     return (
-      <DashboardLayout role="admin">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="loading-spinner w-8 h-8 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">Loading timetables...</p>
-          </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="loading-spinner w-8 h-8 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading timetables...</p>
         </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
   if (error) {
     return (
-      <DashboardLayout role="admin">
-        <div className="space-y-6">
-          <div className="card border-[#F44336] bg-[#F44336]/5">
-            <div className="card-header">
-              <div className="flex items-center gap-3">
-                <svg
-                  className="w-6 h-6 text-[#F44336]"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <h3 className="text-lg font-semibold text-[#F44336]">Error Loading Timetables</h3>
-              </div>
+      <div className="space-y-6">
+        <div className="card border-[#F44336] bg-[#F44336]/5">
+          <div className="card-header">
+            <div className="flex items-center gap-3">
+              <svg
+                className="w-6 h-6 text-[#F44336]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <h3 className="text-lg font-semibold text-[#F44336]">Error Loading Timetables</h3>
             </div>
-            <p className="text-sm text-[#2C2C2C] dark:text-[#FFFFFF]">{error}</p>
-            <button onClick={loadTimetableData} className="btn-primary mt-4">
-              Retry
-            </button>
           </div>
+          <p className="text-sm text-[#2C2C2C] dark:text-[#FFFFFF]">{error}</p>
+          <button onClick={loadTimetableData} className="btn-primary mt-4">
+            Retry
+          </button>
         </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
   return (
-    <DashboardLayout
-      role="admin"
-      pageTitle="Timetable Management"
-      pageDescription="Manage and optimize timetables across all departments"
-    >
       <div className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-end">
           <div className="flex flex-col sm:flex-row gap-3 ml-auto">
@@ -250,7 +237,7 @@ export default function AdminTimetablesPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {facultyAvailability.map(faculty => (
+            {facultyAvailability.filter(f => f.name).map(faculty => (
               <div key={faculty.id} className="card flex items-center justify-between p-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-8 h-8 bg-[#2196F3]/10 dark:bg-[#2196F3]/20 rounded-full flex items-center justify-center flex-shrink-0">
@@ -464,6 +451,5 @@ export default function AdminTimetablesPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   )
 }

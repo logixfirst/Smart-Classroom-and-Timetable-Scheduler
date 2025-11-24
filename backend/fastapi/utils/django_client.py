@@ -1,176 +1,263 @@
-"""Django Backend Integration - Fetch data from Django API"""
-import httpx
+"""Django Backend Integration - Fetch data from Django database directly"""
 import logging
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from typing import List, Dict, Optional
-from models.timetable_models import Course, Faculty, Room, TimeSlot, Student, Batch, GenerationRequest
-from config import settings
+from models.timetable_models import Course, Faculty, Room, TimeSlot, Student, Batch
 
 logger = logging.getLogger(__name__)
 
 
 class DjangoAPIClient:
-    """Client for communicating with Django backend"""
+    """Client for fetching data directly from Django database"""
 
-    def __init__(self, base_url: str = None):
-        self.base_url = base_url or settings.DJANGO_API_URL
-        self.client = httpx.AsyncClient(timeout=30.0)
+    def __init__(self):
+        self.db_conn = None
+        self._connect_db()
+    
+    def _connect_db(self):
+        """Connect to Django's PostgreSQL database"""
+        try:
+            db_url = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/sih28')
+            self.db_conn = psycopg2.connect(db_url, cursor_factory=RealDictCursor)
+            logger.info("Connected to Django database")
+        except Exception as e:
+            logger.error(f"Database connection failed: {e}")
+            raise
 
     async def close(self):
-        """Close HTTP client"""
-        await self.client.aclose()
+        """Close database connection"""
+        if self.db_conn:
+            self.db_conn.close()
 
     async def fetch_courses(
         self,
-        department_id: str,
-        batch_ids: List[str],
+        org_id: str,
         semester: int,
-        include_electives: bool = True
+        department_id: Optional[str] = None
     ) -> List[Course]:
-        """Fetch courses with NEP 2020 individual student enrollments"""
+        """Fetch courses from database"""
         try:
-            # Fetch courses with actual student enrollments (NEP 2020 critical)
-            response = await self.client.get(
-                f"{self.base_url}/students/enrollments/",
-                params={
-                    "department_id": department_id,
-                    "batch_ids": ",".join(batch_ids),
-                    "semester": semester,
-                    "include_electives": include_electives,
-                    "group_by_course": True  # NEP 2020: Group by course with student lists
-                }
-            )
-            response.raise_for_status()
-
-            data = response.json()
+            cursor = self.db_conn.cursor()
+            
+            query = """
+                SELECT course_id, course_code, course_name, dept_id,
+                       lecture_hours_per_week, room_type_required, 
+                       min_room_capacity, course_type
+                FROM courses 
+                WHERE org_id = %s AND is_active = true
+                AND (
+                    (offered_in_odd_semester = true AND %s = 1) OR
+                    (offered_in_even_semester = true AND %s = 2)
+                )
+            """
+            params = [org_id, semester, semester]
+            
+            if department_id:
+                query += " AND dept_id = %s"
+                params.append(department_id)
+            
+            query += " LIMIT 100"
+            
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            
             courses = []
-
-            for course_data in data["results"]:
-                # NEP 2020: Each course contains actual enrolled student IDs
+            for row in rows:
                 course = Course(
-                    course_id=course_data["course_id"],
-                    course_code=course_data["course_code"],
-                    course_name=course_data["course_name"],
-                    faculty_id=course_data["faculty_id"],
-                    credits=course_data["credits"],
-                    duration=course_data["duration"],
-                    subject_type=course_data["subject_type"],
-                    required_features=course_data.get("required_features", []),
-                    student_ids=course_data["enrolled_student_ids"],  # NEP 2020: Individual students
-                    batch_ids=course_data.get("batch_ids", [])  # For display grouping only
+                    course_id=str(row['course_id']),
+                    course_code=row['course_code'],
+                    course_name=row['course_name'],
+                    department_id=str(row['dept_id']),
+                    faculty_id="",  # Will be assigned
+                    credits=row.get('lecture_hours_per_week', 3),
+                    duration=1,
+                    subject_type=row.get('course_type', 'core'),
+                    required_features=[],
+                    student_ids=[],
+                    batch_ids=[]
                 )
                 courses.append(course)
-
-            logger.info(f"Fetched {len(courses)} courses with NEP 2020 student enrollments")
+            
+            cursor.close()
+            logger.info(f"Fetched {len(courses)} courses from database")
             return courses
 
         except Exception as e:
-            logger.error(f"Failed to fetch courses with enrollments: {e}")
-            raise
+            logger.error(f"Failed to fetch courses: {e}")
+            return []
 
-    async def fetch_faculty(self, department_id: str) -> Dict[str, Faculty]:
-        """Fetch faculty from Django API"""
+    async def fetch_faculty(self, org_id: str) -> Dict[str, Faculty]:
+        """Fetch faculty from database"""
         try:
-            response = await self.client.get(
-                f"{self.base_url}/academics/faculty/",
-                params={"department_id": department_id}
-            )
-            response.raise_for_status()
-
-            data = response.json()
-            faculty_dict = {
-                f["faculty_id"]: Faculty(**f)
-                for f in data["results"]
-            }
-
-            logger.info(f"Fetched {len(faculty_dict)} faculty from Django")
+            cursor = self.db_conn.cursor()
+            
+            cursor.execute("""
+                SELECT faculty_id, faculty_code, first_name, last_name, 
+                       dept_id, max_hours_per_week, specialization
+                FROM faculty 
+                WHERE org_id = %s AND is_active = true
+                LIMIT 50
+            """, (org_id,))
+            
+            rows = cursor.fetchall()
+            faculty_dict = {}
+            
+            for row in rows:
+                fac = Faculty(
+                    faculty_id=str(row['faculty_id']),
+                    faculty_code=row['faculty_code'],
+                    faculty_name=f"{row['first_name']} {row['last_name']}",
+                    department_id=str(row['dept_id']),
+                    max_hours_per_week=row.get('max_hours_per_week', 18),
+                    specialization=row.get('specialization', '')
+                )
+                faculty_dict[fac.faculty_id] = fac
+            
+            cursor.close()
+            logger.info(f"Fetched {len(faculty_dict)} faculty from database")
             return faculty_dict
 
         except Exception as e:
             logger.error(f"Failed to fetch faculty: {e}")
-            raise
+            return {}
 
-    async def fetch_rooms(self, campus_id: Optional[str] = None) -> List[Room]:
-        """Fetch rooms from Django API"""
+    async def fetch_rooms(self, org_id: str) -> List[Room]:
+        """Fetch rooms from database"""
         try:
-            params = {}
-            if campus_id:
-                params["campus_id"] = campus_id
-
-            response = await self.client.get(
-                f"{self.base_url}/academics/rooms/",
-                params=params
-            )
-            response.raise_for_status()
-
-            data = response.json()
-            rooms = [Room(**room_data) for room_data in data["results"]]
-
-            logger.info(f"Fetched {len(rooms)} rooms from Django")
+            cursor = self.db_conn.cursor()
+            
+            cursor.execute("""
+                SELECT room_id, room_code, room_number, room_type, 
+                       seating_capacity, building_id
+                FROM rooms 
+                WHERE org_id = %s AND is_active = true
+                LIMIT 60
+            """, (org_id,))
+            
+            rows = cursor.fetchall()
+            rooms = []
+            
+            for row in rows:
+                room = Room(
+                    room_id=str(row['room_id']),
+                    room_code=row['room_code'],
+                    room_name=row['room_number'],
+                    room_type=row.get('room_type', 'classroom'),
+                    capacity=row.get('seating_capacity', 60),
+                    features=[]
+                )
+                rooms.append(room)
+            
+            cursor.close()
+            logger.info(f"Fetched {len(rooms)} rooms from database")
             return rooms
 
         except Exception as e:
             logger.error(f"Failed to fetch rooms: {e}")
-            raise
+            return []
 
-    async def fetch_time_slots(self) -> List[TimeSlot]:
-        """Fetch time slots from Django API"""
+    async def fetch_time_slots(self, org_id: str) -> List[TimeSlot]:
+        """Generate standard time slots"""
         try:
-            response = await self.client.get(f"{self.base_url}/academics/time-slots/")
-            response.raise_for_status()
-
-            data = response.json()
-            time_slots = [TimeSlot(**ts_data) for ts_data in data["results"]]
-
-            logger.info(f"Fetched {len(time_slots)} time slots from Django")
+            # Generate standard time slots (9 AM - 5 PM, 6 days)
+            days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+            times = [
+                ('09:00', '10:00'), ('10:00', '11:00'), ('11:00', '12:00'),
+                ('12:00', '13:00'), ('14:00', '15:00'), ('15:00', '16:00'), ('16:00', '17:00')
+            ]
+            
+            time_slots = []
+            slot_id = 0
+            for day in days:
+                for start, end in times:
+                    slot = TimeSlot(
+                        slot_id=str(slot_id),
+                        day_of_week=day,
+                        start_time=start,
+                        end_time=end,
+                        slot_name=f"{day.capitalize()} {start}-{end}"
+                    )
+                    time_slots.append(slot)
+                    slot_id += 1
+            
+            logger.info(f"Generated {len(time_slots)} time slots")
             return time_slots
 
         except Exception as e:
-            logger.error(f"Failed to fetch time slots: {e}")
-            raise
+            logger.error(f"Failed to generate time slots: {e}")
+            return []
 
-    async def fetch_students(self, batch_ids: List[str]) -> Dict[str, Student]:
-        """Fetch students from Django API"""
+    async def fetch_students(self, org_id: str) -> Dict[str, Student]:
+        """Fetch students from database"""
         try:
-            response = await self.client.get(
-                f"{self.base_url}/academics/students/",
-                params={"batch_ids": ",".join(batch_ids)}
-            )
-            response.raise_for_status()
-
-            data = response.json()
-            students_dict = {
-                s["student_id"]: Student(**s)
-                for s in data["results"]
-            }
-
-            logger.info(f"Fetched {len(students_dict)} students from Django")
+            cursor = self.db_conn.cursor()
+            
+            cursor.execute("""
+                SELECT student_id, enrollment_number, first_name, last_name,
+                       dept_id, current_semester
+                FROM students 
+                WHERE org_id = %s AND is_active = true
+                LIMIT 200
+            """, (org_id,))
+            
+            rows = cursor.fetchall()
+            students_dict = {}
+            
+            for row in rows:
+                student = Student(
+                    student_id=str(row['student_id']),
+                    enrollment_number=row['enrollment_number'],
+                    student_name=f"{row['first_name']} {row['last_name']}",
+                    department_id=str(row['dept_id']),
+                    semester=row.get('current_semester', 1),
+                    batch_id=""
+                )
+                students_dict[student.student_id] = student
+            
+            cursor.close()
+            logger.info(f"Fetched {len(students_dict)} students from database")
             return students_dict
 
         except Exception as e:
             logger.error(f"Failed to fetch students: {e}")
-            raise
+            return {}
 
-    async def fetch_batches(self, batch_ids: List[str]) -> Dict[str, Batch]:
-        """Fetch batches from Django API"""
+    async def fetch_batches(self, org_id: str) -> Dict[str, Batch]:
+        """Fetch batches from database"""
         try:
-            response = await self.client.get(
-                f"{self.base_url}/academics/batches/",
-                params={"batch_ids": ",".join(batch_ids)}
-            )
-            response.raise_for_status()
-
-            data = response.json()
-            batches_dict = {
-                b["batch_id"]: Batch(**b)
-                for b in data["results"]
-            }
-
-            logger.info(f"Fetched {len(batches_dict)} batches from Django")
+            cursor = self.db_conn.cursor()
+            
+            cursor.execute("""
+                SELECT batch_id, batch_code, batch_name, dept_id,
+                       current_semester, total_students
+                FROM batches 
+                WHERE org_id = %s AND is_active = true
+                LIMIT 30
+            """, (org_id,))
+            
+            rows = cursor.fetchall()
+            batches_dict = {}
+            
+            for row in rows:
+                batch = Batch(
+                    batch_id=str(row['batch_id']),
+                    batch_code=row['batch_code'],
+                    batch_name=row['batch_name'],
+                    department_id=str(row['dept_id']),
+                    semester=row.get('current_semester', 1),
+                    total_students=row.get('total_students', 60)
+                )
+                batches_dict[batch.batch_id] = batch
+            
+            cursor.close()
+            logger.info(f"Fetched {len(batches_dict)} batches from database")
             return batches_dict
 
         except Exception as e:
             logger.error(f"Failed to fetch batches: {e}")
-            raise
+            return {}
 
     async def save_timetable(self, job_id: str, timetable_data: Dict):
         """Save generated timetable back to Django"""

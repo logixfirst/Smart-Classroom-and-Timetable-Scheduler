@@ -132,13 +132,9 @@ export default function TimetableReviewPage() {
       setLoading(true)
       setError(null)
 
-      const token = localStorage.getItem('access_token')
-
       // Fetch workflow details
       const workflowRes = await fetch(`${API_BASE}/timetable/workflows/${workflowId}/`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: 'include',
       })
 
       if (!workflowRes.ok) {
@@ -153,9 +149,7 @@ export default function TimetableReviewPage() {
         const variantsRes = await fetch(
           `${API_BASE}/timetable/variants/?job_id=${workflowData.job_id}`,
           {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            credentials: 'include',
           }
         )
 
@@ -185,14 +179,12 @@ export default function TimetableReviewPage() {
   const handleVariantSelect = async (variantId: string) => {
     try {
       setActionLoading(true)
-      const token = localStorage.getItem('access_token')
-
       const response = await fetch(`${API_BASE}/timetable/variants/${variantId}/select/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
+        credentials: 'include',
       })
 
       if (!response.ok) {
@@ -227,14 +219,12 @@ export default function TimetableReviewPage() {
 
     try {
       setActionLoading(true)
-      const token = localStorage.getItem('access_token')
-
       const response = await fetch(`${API_BASE}/timetable/workflows/${workflowId}/approve/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify({
           comments: approvalComments,
         }),
@@ -263,14 +253,12 @@ export default function TimetableReviewPage() {
 
     try {
       setActionLoading(true)
-      const token = localStorage.getItem('access_token')
-
       const response = await fetch(`${API_BASE}/timetable/workflows/${workflowId}/reject/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify({
           comments: rejectionReason,
         }),

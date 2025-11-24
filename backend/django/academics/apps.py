@@ -11,6 +11,7 @@ class AcademicsConfig(AppConfig):
         This ensures automatic cache updates when models change.
         """
         import academics.signals  # noqa: F401
+        import academics.celery_tasks  # noqa: F401 - Register Celery tasks
 
         # Register automatic cache invalidation for all models
         from core.cache_service import register_cache_invalidation

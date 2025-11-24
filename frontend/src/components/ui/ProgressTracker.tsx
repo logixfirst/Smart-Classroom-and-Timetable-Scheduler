@@ -1,50 +1,153 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface ProgressTrackerProps {
   jobId: string
   onComplete: (timetableId: string) => void
+  onCancel?: () => void
 }
 
-export default function TimetableProgressTracker({ jobId, onComplete }: ProgressTrackerProps) {
+export default function TimetableProgressTracker({ jobId, onComplete, onCancel }: ProgressTrackerProps) {
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('queued')
   const [phase, setPhase] = useState('Initializing...')
   const [eta, setEta] = useState<number | null>(null)
+  const [cancelling, setCancelling] = useState(false)
+  const wsRef = useRef<WebSocket | null>(null)
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000/api'
+  const WS_BASE = process.env.NEXT_PUBLIC_FASTAPI_WS_URL || 'ws://localhost:8001'
 
   useEffect(() => {
-    const pollProgress = async () => {
+    let isConnected = false
+
+    const connectWebSocket = () => {
       try {
-        const res = await fetch(`${API_BASE}/generation-jobs/${jobId}/status/`, {
-          credentials: 'include',
-        })
+        const ws = new WebSocket(`${WS_BASE}/ws/progress/${jobId}`)
+        wsRef.current = ws
 
-        if (res.ok) {
-          const data = await res.json()
-          setProgress(data.progress || 0)
-          setStatus(data.status)
-          setPhase(data.phase || data.message || 'Processing...')
-          setEta(data.eta_seconds)
+        ws.onopen = () => {
+          console.log('WebSocket connected')
+          isConnected = true
+        }
 
-          if (data.status === 'completed' && data.timetable_id) {
-            onComplete(data.timetable_id)
-          } else if (data.status === 'failed') {
-            alert(`Generation failed: ${data.error || 'Unknown error'}`)
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            setProgress(data.progress || 0)
+            setStatus(data.status || 'running')
+            setPhase(data.phase || data.message || 'Processing...')
+            setEta(data.eta_seconds)
+
+            if (data.status === 'completed' && data.timetable_id) {
+              onComplete(data.timetable_id)
+              ws.close()
+            } else if (data.status === 'failed') {
+              alert(`Generation failed: ${data.error || 'Unknown error'}`)
+              ws.close()
+            } else if (data.status === 'cancelled') {
+              ws.close()
+            }
+          } catch (err) {
+            console.error('Failed to parse WebSocket message:', err)
+          }
+        }
+
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error)
+        }
+
+        ws.onclose = () => {
+          console.log('WebSocket disconnected')
+          isConnected = false
+          
+          // Reconnect after 3 seconds if not completed/failed
+          if (status !== 'completed' && status !== 'failed' && status !== 'cancelled') {
+            reconnectTimeoutRef.current = setTimeout(() => {
+              console.log('Reconnecting WebSocket...')
+              connectWebSocket()
+            }, 3000)
           }
         }
       } catch (err) {
-        console.error('Failed to poll progress:', err)
+        console.error('Failed to connect WebSocket:', err)
+        // Fallback to polling if WebSocket fails
+        startPolling()
       }
     }
 
-    const interval = setInterval(pollProgress, 3000)
-    pollProgress()
+    const startPolling = () => {
+      const pollProgress = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/progress/${jobId}/`, {
+            credentials: 'include',
+          })
 
-    return () => clearInterval(interval)
-  }, [jobId, onComplete])
+          if (res.ok) {
+            const data = await res.json()
+            setProgress(data.progress || 0)
+            setStatus(data.status || 'running')
+            setPhase(data.stage || data.message || 'Processing...')
+
+            if (data.status === 'completed') {
+              onComplete(jobId)
+            } else if (data.status === 'failed') {
+              alert(`Generation failed: ${data.message || 'Unknown error'}`)
+            }
+          }
+        } catch (err) {
+          console.error('Failed to poll progress:', err)
+        }
+      }
+
+      const interval = setInterval(pollProgress, 2000)
+      pollProgress()
+
+      return () => clearInterval(interval)
+    }
+
+    // Try WebSocket first, fallback to polling
+    connectWebSocket()
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close()
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+      }
+    }
+  }, [jobId, onComplete, status])
+
+  const handleCancel = async () => {
+    if (!confirm('Are you sure you want to cancel this generation? This cannot be undone.')) {
+      return
+    }
+
+    setCancelling(true)
+    try {
+      const res = await fetch(`${API_BASE}/generation-jobs/${jobId}/cancel/`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+
+      if (res.ok) {
+        setStatus('cancelled')
+        setPhase('Generation cancelled by user')
+        if (onCancel) onCancel()
+      } else {
+        const data = await res.json()
+        alert(`Failed to cancel: ${data.error || 'Unknown error'}`)
+      }
+    } catch (err) {
+      console.error('Failed to cancel generation:', err)
+      alert('Failed to cancel generation')
+    } finally {
+      setCancelling(false)
+    }
+  }
 
   return (
     <div className="card max-w-2xl mx-auto">
@@ -73,8 +176,27 @@ export default function TimetableProgressTracker({ jobId, onComplete }: Progress
           </p>
         )}
 
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        </div>
+
+        <div className="flex justify-center gap-4">
+          <a
+            href="/admin/timetables"
+            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+          >
+            Back to Timetables
+          </a>
+          
+          {status !== 'completed' && status !== 'failed' && status !== 'cancelled' && (
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {cancelling ? 'Cancelling...' : 'Cancel Generation'}
+            </button>
+          )}
         </div>
       </div>
     </div>

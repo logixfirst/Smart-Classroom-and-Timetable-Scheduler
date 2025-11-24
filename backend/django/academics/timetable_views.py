@@ -214,6 +214,45 @@ def get_student_timetable(request):
         )
 
 
+@api_view(["GET"])
+def get_progress(request, job_id):
+    """
+    Get generation progress from Redis
+    GET /api/progress/{job_id}/
+    """
+    try:
+        from django.core.cache import cache
+        import json
+        
+        # Get progress from Redis
+        progress_key = f"progress:job:{job_id}"
+        progress_data = cache.get(progress_key)
+        
+        if not progress_data:
+            return Response(
+                {
+                    'job_id': job_id,
+                    'progress': 0,
+                    'status': 'not_found',
+                    'message': 'Job not found'
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Parse if string
+        if isinstance(progress_data, str):
+            progress_data = json.loads(progress_data)
+        
+        return Response(progress_data)
+        
+    except Exception as e:
+        logger.error(f"Error getting progress: {e}")
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @api_view(["POST"])
 def fastapi_callback(request):
     """

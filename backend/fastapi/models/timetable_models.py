@@ -26,6 +26,7 @@ class Course(BaseModel):
     credits: int = Field(..., ge=1, le=4, description="NEP 2020 credit structure")
     required_features: List[str] = Field(default_factory=list)
     department_id: str
+    subject_type: str = Field(default="core", description="core, elective, or open_elective")
 
 
 class Faculty(BaseModel):

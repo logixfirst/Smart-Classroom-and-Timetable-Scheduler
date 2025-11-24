@@ -7,7 +7,9 @@ from .timetable_views import (
     get_department_timetable,
     get_faculty_timetable,
     get_student_timetable,
+    get_progress,
 )
+from .workflow_views import TimetableWorkflowViewSet, TimetableVariantViewSet
 from .views import (
     BatchViewSet,
     BuildingViewSet,
@@ -46,6 +48,8 @@ router.register(r"schools", SchoolViewSet, basename="school")
 router.register(r"timetables", TimetableViewSet)
 router.register(r"timetable-slots", TimetableSlotViewSet)
 router.register(r"generation-jobs", GenerationJobViewSet, basename="generation-job")
+router.register(r"timetable/workflows", TimetableWorkflowViewSet, basename="workflow")
+router.register(r"timetable/variants", TimetableVariantViewSet, basename="variant")
 
 urlpatterns = [
     path("", include(router.urls)),
@@ -60,6 +64,7 @@ urlpatterns = [
     path("timetable/faculty/me/", get_faculty_timetable, name="faculty-timetable"),
     path("timetable/student/me/", get_student_timetable, name="student-timetable"),
     path("timetable/callback/", fastapi_callback, name="fastapi-callback"),
+    path("progress/<str:job_id>/", get_progress, name="get-progress"),
     # Auth endpoints - CSRF exempt via APICSRFExemptMiddleware
     path("auth/login/", login_view, name="login"),
     path("auth/login", login_view, name="login-no-slash"),

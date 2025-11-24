@@ -1,4 +1,4 @@
 """Engine package"""
-from .orchestrator import TimetableOrchestrator
+from .orchestrator import HierarchicalScheduler
 
-__all__ = ['TimetableOrchestrator']
+__all__ = ['HierarchicalScheduler']
