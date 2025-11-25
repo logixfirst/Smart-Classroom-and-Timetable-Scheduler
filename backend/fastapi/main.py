@@ -493,9 +493,9 @@ class TimetableGenerationSaga:
             num_islands = min(8, max(4, cpu_cores // 2))  # 4-8 islands
             
             # GA Optimizer with optimizations
-            # Use larger population if GPU available for batching benefit
+            # Use smaller population to prevent RAM exhaustion
             has_gpu = hardware_profile.has_nvidia_gpu if hardware_profile else False
-            pop_size = 30 if has_gpu else 15
+            pop_size = 10 if has_gpu else 5  # Drastically reduced for 5000+ assignments
             
             ga_optimizer = GeneticAlgorithmOptimizer(
                 courses=courses,
@@ -505,7 +505,7 @@ class TimetableGenerationSaga:
                 students={},
                 initial_solution=initial_schedule,
                 population_size=pop_size,
-                generations=20,
+                generations=10,  # Reduced from 20
                 mutation_rate=0.15,
                 crossover_rate=0.8,
                 elitism_rate=0.2,
