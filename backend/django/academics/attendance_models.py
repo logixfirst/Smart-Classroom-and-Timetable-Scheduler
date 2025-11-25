@@ -289,9 +289,19 @@ class AttendanceReport(models.Model):
     department = models.ForeignKey(
         Department, on_delete=models.SET_NULL, null=True, blank=True
     )
-    course = models.ForeignKey(Course, on_delete=models.SET_NULL, null=True, blank=True)
+    course = models.ForeignKey(
+        Course, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='attendance_reports_course'
+    )
     subject = models.ForeignKey(
-        Subject, on_delete=models.SET_NULL, null=True, blank=True
+        Subject, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='attendance_reports_subject'
     )
     start_date = models.DateField()
     end_date = models.DateField()

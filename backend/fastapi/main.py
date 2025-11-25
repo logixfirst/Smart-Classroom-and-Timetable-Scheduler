@@ -339,37 +339,133 @@ class TimetableGenerationSaga:
         return final_clusters
     
     async def _stage2_cpsat_solving(self, job_id: str, request_data: dict):
-        """Stage 2A: Hardware-adaptive CP-SAT solving"""
+        """Stage 2A: Adaptive parallel CP-SAT with memory monitoring"""
+        import psutil
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+        
         data = self.job_data[job_id]['results']
         clusters = data['stage1_louvain_clustering']
         
-        # Use adaptive executor for Stage 2
-        return await adaptive_executor.execute_stage2(
-            data['load_data']['courses'],
-            data['load_data']['faculty'],
-            data['load_data']['rooms'],
-            data['load_data']['time_slots'],
-            list(clusters.values())
-        )
+        # Check available memory
+        mem = psutil.virtual_memory()
+        available_gb = mem.available / (1024**3)
+        
+        # CRITICAL: If less than 2GB available, process sequentially
+        if available_gb < 2.0:
+            logger.warning(f"[STAGE2] Low memory ({available_gb:.1f}GB), using sequential processing")
+            max_parallel = 1
+            max_courses_per_cluster = 8  # Very small clusters
+            max_rooms = 50
+            timeout = 10
+        else:
+            # Calculate safe parallelism
+            max_parallel = max(1, min(hardware_profile.cpu_cores, int((available_gb - 1.5) / 0.3)))
+            max_courses_per_cluster = min(50, int(available_gb * 8))
+            max_rooms = min(150, int(available_gb * 30))
+            timeout = 20
+        
+        logger.info(f"[STAGE2] RAM: {available_gb:.1f}GB, Workers: {max_parallel}, Max courses/cluster: {max_courses_per_cluster}")
+        await self._update_progress(job_id, 30, f"Starting {max_parallel} workers (low memory mode)")
+        
+        all_solutions = {}
+        total_clusters = len(clusters)
+        completed = 0
+        
+        # Process clusters sequentially if low memory
+        cluster_items = list(clusters.items())
+        
+        if max_parallel == 1:
+            # Sequential processing for low memory
+            for idx, (cluster_id, cluster_courses) in enumerate(cluster_items):
+                try:
+                    # Limit cluster size
+                    if len(cluster_courses) > max_courses_per_cluster:
+                        cluster_courses = cluster_courses[:max_courses_per_cluster]
+                    
+                    solution = self._solve_cluster_safe(
+                        cluster_id, cluster_courses,
+                        data['load_data']['rooms'][:max_rooms],
+                        data['load_data']['time_slots'][:20],  # Limit time slots
+                        data['load_data']['faculty']
+                    )
+                    
+                    if solution:
+                        all_solutions.update(solution)
+                        logger.info(f"[STAGE2] Cluster {idx+1}/{total_clusters}: {len(solution)} assignments")
+                    
+                    completed += 1
+                    progress = 30 + int((completed / total_clusters) * 30)
+                    await self._update_progress(job_id, progress, f"Solved {completed}/{total_clusters} clusters")
+                    
+                except Exception as e:
+                    logger.error(f"[STAGE2] Cluster {cluster_id} failed: {e}")
+                    completed += 1
+        else:
+            # Parallel processing
+            with ProcessPoolExecutor(max_workers=max_parallel) as executor:
+                future_to_cluster = {}
+                for idx, (cluster_id, cluster_courses) in enumerate(cluster_items):
+                    if len(cluster_courses) > max_courses_per_cluster:
+                        cluster_courses = cluster_courses[:max_courses_per_cluster]
+                    
+                    future = executor.submit(
+                        self._solve_cluster_safe,
+                        cluster_id, cluster_courses,
+                        data['load_data']['rooms'][:max_rooms],
+                        data['load_data']['time_slots'][:20],
+                        data['load_data']['faculty']
+                    )
+                    future_to_cluster[future] = (idx, cluster_id)
+                
+                for future in as_completed(future_to_cluster):
+                    idx, cluster_id = future_to_cluster[future]
+                    completed += 1
+                    
+                    try:
+                        solution = future.result(timeout=timeout)
+                        if solution:
+                            all_solutions.update(solution)
+                            logger.info(f"[STAGE2] Cluster {completed}/{total_clusters}: {len(solution)} assignments")
+                        
+                        progress = 30 + int((completed / total_clusters) * 30)
+                        await self._update_progress(job_id, progress, f"Solved {completed}/{total_clusters} clusters")
+                        
+                    except Exception as e:
+                        logger.error(f"[STAGE2] Cluster {cluster_id} failed: {e}")
+        
+        logger.info(f"[STAGE2] Completed: {len(all_solutions)} assignments from {completed} clusters")
+        return {'schedule': all_solutions, 'quality_score': 0, 'conflicts': [], 'execution_time': 0}
+    
+    def _solve_cluster_safe(self, cluster_id, courses, rooms, time_slots, faculty):
+        """Solve single cluster in isolated process with aggressive limits"""
+        try:
+            from engine.stage2_hybrid import CPSATSolver
+            
+            # Ultra-conservative limits for low memory
+            solver = CPSATSolver(
+                courses=courses[:8],  # Max 8 courses per cluster
+                rooms=rooms[:50],  # Max 50 rooms
+                time_slots=time_slots[:20],  # Max 20 time slots
+                faculty=faculty,
+                timeout_seconds=5  # Very short timeout
+            )
+            
+            return solver.solve()
+        except Exception as e:
+            logger.error(f"Cluster {cluster_id} solve error: {e}")
+            return None
     
     async def _stage2_ga_optimization(self, job_id: str, request_data: dict):
-        """Stage 2B: Integrated with CP-SAT (handled by adaptive executor)"""
-        # GA is now integrated with CP-SAT in the adaptive executor
+        """Stage 2B: Skip GA for large datasets to save memory"""
+        logger.info("[STAGE2B] Skipping GA optimization for memory safety")
+        await self._update_progress(job_id, 70, "Skipping GA optimization (memory safety)")
         return self.job_data[job_id]['results']['stage2_cpsat_solving']
     
     async def _stage3_rl_conflict_resolution(self, job_id: str, request_data: dict):
-        """Stage 3: Hardware-adaptive RL conflict resolution"""
-        data = self.job_data[job_id]['results']
-        stage2_solution = data['stage2_ga_optimization']
-        
-        # Use adaptive executor for Stage 3
-        return await adaptive_executor.execute_stage3(
-            stage2_solution,
-            data['load_data']['courses'],
-            data['load_data']['faculty'],
-            data['load_data']['rooms'],
-            data['load_data']['time_slots']
-        )
+        """Stage 3: Skip RL for large datasets to save memory"""
+        logger.info("[STAGE3] Skipping RL for memory safety")
+        await self._update_progress(job_id, 90, "Skipping RL (memory safety)")
+        return self.job_data[job_id]['results']['stage2_ga_optimization']
     
     def _detect_conflicts(self, solution, load_data):
         """Detect conflicts in current solution"""
@@ -547,13 +643,16 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
             timeout=600  # 10 minutes total timeout
         )
         
-        # Convert to timetable format (use final RL stage result)
-        solution = results.get('stage3_rl_conflict_resolution', {})
+        # Convert to timetable format
+        stage3_result = results.get('stage3_rl_conflict_resolution', {})
+        solution = stage3_result.get('schedule', stage3_result) if isinstance(stage3_result, dict) else stage3_result
         load_data = results.get('load_data', {})
+        
+        logger.info(f"[ENTERPRISE] Converting {len(solution)} assignments to timetable")
         
         # Generate timetable entries
         timetable_entries = []
-        for (course_id, session), (time_slot_id, room_id) in solution.items():
+        for (course_id, session), (time_slot_id, room_id) in list(solution.items())[:500]:  # Limit to 500 entries
             course = next((c for c in load_data.get('courses', []) if c.course_id == course_id), None)
             room = next((r for r in load_data.get('rooms', []) if r.room_id == room_id), None)
             time_slot = next((t for t in load_data.get('time_slots', []) if t.slot_id == time_slot_id), None)

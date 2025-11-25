@@ -21,12 +21,15 @@ celery_app = Celery(
 )
 
 # Configure Celery
+import ssl
 celery_app.conf.update(
     task_serializer='pickle',
     accept_content=['pickle'],
     result_serializer='pickle',
     timezone='UTC',
     enable_utc=True,
+    broker_use_ssl={'ssl_cert_reqs': ssl.CERT_NONE},
+    redis_backend_use_ssl={'ssl_cert_reqs': ssl.CERT_NONE},
     task_routes={
         'engine.distributed_tasks.solve_cluster_task': {'queue': 'timetable_heavy'},
         'engine.distributed_tasks.resolve_conflicts_task': {'queue': 'timetable_light'},
