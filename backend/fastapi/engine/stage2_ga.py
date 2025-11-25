@@ -102,29 +102,28 @@ class GeneticAlgorithmOptimizer:
         
         # Hardware-adaptive configuration - ALWAYS use GPU if available
         if TORCH_AVAILABLE:
-            self.use_gpu = True
-            self.use_multicore = False
-            logger.info(f"🚀 GPU acceleration ENABLED (pop={population_size}, courses={len(courses)})")
             try:
                 self._init_gpu_tensors()
+                self.use_gpu = True
+                self.use_multicore = False
+                logger.info(f"🚀 GPU acceleration ENABLED (pop={self.population_size}, courses={len(courses)})")
             except Exception as e:
-                logger.warning(f"GPU init failed: {e}, falling back to CPU")
+                logger.error(f"GPU init failed: {e}, using single-core CPU")
                 self.use_gpu = False
-                self.use_multicore = len(courses) > 50
+                self.use_multicore = False  # FORCE single-core to save RAM
         else:
             self.use_gpu = False
-            self.use_multicore = len(courses) > 50
-            logger.info(f"GPU not available, using CPU (multicore={self.use_multicore})")
+            self.use_multicore = False  # FORCE single-core to save RAM
+            logger.info(f"GPU not available, using single-core CPU to save RAM")
         
         self.use_island_model = False  # Set externally
         
-        if self.use_multicore and not self.use_gpu:
-            import multiprocessing
-            self.num_workers = min(4, multiprocessing.cpu_count())
-            logger.info(f"🚀 GA using {self.num_workers} CPU cores")
-        
-        if not self.use_gpu and not self.use_multicore:
-            logger.info(f"GA using single-core CPU")
+        # NEVER use multicore - it exhausts RAM
+        self.num_workers = 1
+        if self.use_gpu:
+            logger.info(f"GA using GPU (single-core CPU fallback)")
+        else:
+            logger.info(f"GA using single-core CPU (RAM-safe mode)")
         
         # Build valid domains
         self._build_valid_domains()
@@ -362,12 +361,12 @@ class GeneticAlgorithmOptimizer:
         no_improvement_count = 0
         
         for generation in range(self.generations):
-            # Hardware-adaptive fitness evaluation
+            # Hardware-adaptive fitness evaluation - GPU ONLY or single-core CPU
             if self.use_gpu:
+                logger.info(f"Gen {generation}: Using GPU batch fitness")
                 fitness_scores = self._gpu_batch_fitness()
-            elif self.use_multicore:
-                fitness_scores = self._multicore_fitness()
             else:
+                # ALWAYS single-core to prevent RAM exhaustion
                 fitness_scores = [(sol, self.fitness(sol)) for sol in self.population]
             
             fitness_scores.sort(key=lambda x: x[1], reverse=True)
@@ -478,29 +477,38 @@ class GeneticAlgorithmOptimizer:
     def _init_gpu_tensors(self):
         """Initialize GPU tensors for accelerated computation"""
         if not TORCH_AVAILABLE:
-            return
+            raise RuntimeError("PyTorch not available")
         
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA not available")
+        
+        # Test GPU access
         try:
-            # Pre-compute faculty preference matrix
-            faculty_prefs = np.zeros((len(self.courses), len(self.time_slots)))
-            for i, course in enumerate(self.courses):
-                faculty = self.faculty.get(course.faculty_id)
-                if faculty:
-                    prefs = getattr(faculty, 'preferred_slots', {})
-                    for j, t_slot in enumerate(self.time_slots):
-                        faculty_prefs[i, j] = prefs.get(t_slot.slot_id, 0.5)
-            
-            self.faculty_prefs_tensor = torch.tensor(faculty_prefs, device=DEVICE, dtype=torch.float32)
-            logger.info(f"GPU tensors initialized: {self.faculty_prefs_tensor.shape}")
+            test_tensor = torch.zeros(10, device=DEVICE)
+            del test_tensor
+            torch.cuda.synchronize()
         except Exception as e:
-            logger.warning(f"GPU tensor initialization failed: {e}, falling back to CPU")
-            self.use_gpu = False
+            raise RuntimeError(f"GPU access failed: {e}")
+        
+        # Pre-compute faculty preference matrix
+        faculty_prefs = np.zeros((len(self.courses), len(self.time_slots)))
+        for i, course in enumerate(self.courses):
+            faculty = self.faculty.get(course.faculty_id)
+            if faculty:
+                prefs = getattr(faculty, 'preferred_slots', {})
+                for j, t_slot in enumerate(self.time_slots):
+                    faculty_prefs[i, j] = prefs.get(t_slot.slot_id, 0.5)
+        
+        self.faculty_prefs_tensor = torch.tensor(faculty_prefs, device=DEVICE, dtype=torch.float32)
+        logger.info(f"✅ GPU tensors initialized: {self.faculty_prefs_tensor.shape}")
     
     def _gpu_batch_fitness(self) -> List[Tuple[Dict, float]]:
         """GPU-accelerated BATCHED fitness evaluation for entire population"""
         try:
             import torch
             batch_size = len(self.population)
+            
+            logger.info(f"GPU batch fitness: {batch_size} solutions")
             
             # Convert entire population to GPU tensors (batched)
             feasibility = torch.tensor([1.0 if self._is_feasible(sol) else 0.0 for sol in self.population], device=DEVICE)
@@ -530,10 +538,11 @@ class GeneticAlgorithmOptimizer:
             
             # Move back to CPU
             fitness_values = fitness_tensor.cpu().numpy().tolist()
+            logger.info(f"✅ GPU batch fitness complete")
             return list(zip(self.population, fitness_values))
             
         except Exception as e:
-            logger.warning(f"GPU batch fitness failed: {e}, falling back to CPU")
+            logger.error(f"❌ GPU batch fitness failed: {e}, falling back to single-core CPU")
             self.use_gpu = False
             return [(sol, self.fitness(sol)) for sol in self.population]
     
