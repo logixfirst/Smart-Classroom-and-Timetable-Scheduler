@@ -236,31 +236,30 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Revoke Celery task
+            # Set cancellation flag in Redis for FastAPI to detect
+            cache.set(f"cancel:job:{job.id}", "1", timeout=3600)
+            logger.info(f"Set cancellation flag for job {job.id}")
+            
+            # Also call FastAPI cancel endpoint
             try:
-                from celery import current_app
-                current_app.control.revoke(str(job.id), terminate=True)
-                logger.info(f"Revoked Celery task for job {job.id}")
+                fastapi_url = os.getenv("FASTAPI_AI_SERVICE_URL", "http://localhost:8001")
+                response = requests.post(
+                    f"{fastapi_url}/api/cancel/{job.id}",
+                    timeout=5
+                )
+                if response.status_code == 200:
+                    logger.info(f"FastAPI acknowledged cancellation for job {job.id}")
             except Exception as e:
-                logger.warning(f"Failed to revoke Celery task: {e}")
+                logger.warning(f"Failed to notify FastAPI: {e} (flag set in Redis)")
             
-            # Update job status
-            job.status = 'cancelled'
-            job.completed_at = timezone.now()
-            job.error_message = 'Cancelled by user'
+            # Update job status immediately
+            job.status = 'cancelling'
             job.save()
-            
-            # Cleanup Redis
-            cache.delete(f"generation_progress:{job.id}")
-            cache.delete(f"generation_queue:{job.id}")
-            
-            # Decrement concurrent count
-            self._decrement_concurrent_on_complete(job)
             
             serializer = GenerationJobSerializer(job)
             return Response({
                 'success': True,
-                'message': 'Generation cancelled successfully',
+                'message': 'Cancellation requested - job will stop shortly',
                 'job': serializer.data
             })
             

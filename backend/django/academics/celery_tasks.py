@@ -138,7 +138,27 @@ def fastapi_callback_task(job_id, status, variants=None, error=None):
     try:
         job = GenerationJob.objects.get(id=job_id)
         
-        if status == 'completed':
+        if status == 'cancelled':
+            job.status = 'cancelled'
+            job.error_message = 'Cancelled by user'
+            job.completed_at = timezone.now()
+            logger.info(f"[CALLBACK] Job {job_id} cancelled")
+            
+            # Update Redis
+            from django.core.cache import cache
+            cache.set(
+                f"progress:job:{job_id}",
+                {
+                    'job_id': str(job_id),
+                    'status': 'cancelled',
+                    'progress': 0,
+                    'stage': 'cancelled',
+                    'message': 'Generation cancelled by user',
+                },
+                timeout=7200
+            )
+        
+        elif status == 'completed':
             job.status = 'completed'
             job.progress = 100
             job.completed_at = timezone.now()
@@ -185,10 +205,10 @@ def fastapi_callback_task(job_id, status, variants=None, error=None):
         
         job.save()
         
-        # Cleanup temporary Redis keys (keep progress for frontend)
+        # Cleanup temporary Redis keys
         from django.core.cache import cache
         cache.delete(f"generation_queue:{job_id}")
-        # Keep timetable:variants for retrieval
+        cache.delete(f"cancel:job:{job_id}")  # Cleanup cancel flag
         
         # Decrement concurrent counter
         org_id = job.organization.org_code if job.organization else 'unknown'

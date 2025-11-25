@@ -27,24 +27,27 @@ except ImportError:
 # GPU Detection and Initialization (Non-blocking)
 try:
     import torch
-    TORCH_AVAILABLE = torch.cuda.is_available()
-    if TORCH_AVAILABLE:
-        # Check if GPU is busy (non-blocking)
+    if torch.cuda.is_available():
         try:
-            torch.cuda.synchronize()  # Quick sync check
+            # Test GPU access
+            test = torch.zeros(1).cuda()
+            del test
+            torch.cuda.synchronize()
+            TORCH_AVAILABLE = True
             DEVICE = torch.device('cuda')
-            logger.info(f"✅ GPU detected: {torch.cuda.get_device_name(0)} - GA will use GPU acceleration")
-        except RuntimeError:
+            logger.info(f"✅ GPU READY: {torch.cuda.get_device_name(0)} - GA will use GPU acceleration")
+        except Exception as e:
             TORCH_AVAILABLE = False
             DEVICE = torch.device('cpu')
-            logger.warning("⚠️ GPU busy - GA will use CPU")
+            logger.error(f"❌ GPU test failed: {e} - GA will use CPU")
     else:
+        TORCH_AVAILABLE = False
         DEVICE = torch.device('cpu')
-        logger.info("⚠️ GPU not available - GA will use CPU")
+        logger.warning("⚠️ CUDA not available - GA will use CPU")
 except ImportError:
     TORCH_AVAILABLE = False
     DEVICE = None
-    logger.info("⚠️ PyTorch not installed - GA will use CPU-only mode")
+    logger.warning("⚠️ PyTorch not installed - GA will use CPU-only mode")
 
 
 class GeneticAlgorithmOptimizer:
@@ -100,21 +103,25 @@ class GeneticAlgorithmOptimizer:
         self.fitness_cache = {}  # Fitness caching
         self.max_cache_size = 500  # Limit cache to prevent memory explosion
         
-        # Hardware-adaptive configuration - ALWAYS use GPU if available
-        if TORCH_AVAILABLE:
+        # Hardware-adaptive configuration - FORCE GPU if available
+        if TORCH_AVAILABLE and DEVICE is not None:
             try:
+                logger.info(f"Initializing GPU tensors for {len(courses)} courses...")
                 self._init_gpu_tensors()
                 self.use_gpu = True
                 self.use_multicore = False
-                logger.info(f"🚀 GPU acceleration ENABLED (pop={self.population_size}, courses={len(courses)})")
+                logger.info(f"✅ GPU ENABLED: pop={self.population_size}, courses={len(courses)}")
             except Exception as e:
-                logger.error(f"GPU init failed: {e}, using single-core CPU")
+                logger.error(f"❌ GPU init failed: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
                 self.use_gpu = False
-                self.use_multicore = False  # FORCE single-core to save RAM
+                self.use_multicore = False
+                logger.warning(f"Falling back to single-core CPU")
         else:
             self.use_gpu = False
-            self.use_multicore = False  # FORCE single-core to save RAM
-            logger.info(f"GPU not available, using single-core CPU to save RAM")
+            self.use_multicore = False
+            logger.warning(f"GPU not available (TORCH_AVAILABLE={TORCH_AVAILABLE}, DEVICE={DEVICE})")
         
         self.use_island_model = False  # Set externally
         
@@ -352,21 +359,30 @@ class GeneticAlgorithmOptimizer:
         tournament = random.sample(fitness_scores, min(k, len(fitness_scores)))
         return max(tournament, key=lambda x: x[1])[0]
     
-    def evolve(self) -> Dict:
+    def evolve(self, job_id: str = None) -> Dict:
         """Run GA evolution with early stopping and caching"""
         self.initialize_population()
+        self.job_id = job_id
         
         best_solution = self.initial_solution
         best_fitness = self.fitness(best_solution)
         no_improvement_count = 0
         
         for generation in range(self.generations):
+            # Check cancellation
+            if job_id and self._check_cancellation():
+                logger.info(f"GA cancelled at generation {generation}")
+                return best_solution
             # Hardware-adaptive fitness evaluation - GPU ONLY or single-core CPU
             if self.use_gpu:
-                logger.info(f"Gen {generation}: Using GPU batch fitness")
-                fitness_scores = self._gpu_batch_fitness()
+                try:
+                    fitness_scores = self._gpu_batch_fitness()
+                except Exception as e:
+                    logger.error(f"GPU fitness failed: {e}, falling back to CPU")
+                    self.use_gpu = False
+                    fitness_scores = [(sol, self.fitness(sol)) for sol in self.population]
             else:
-                # ALWAYS single-core to prevent RAM exhaustion
+                # Single-core CPU to prevent RAM exhaustion
                 fitness_scores = [(sol, self.fitness(sol)) for sol in self.population]
             
             fitness_scores.sort(key=lambda x: x[1], reverse=True)
@@ -416,6 +432,10 @@ class GeneticAlgorithmOptimizer:
                 mode = "GPU" if self.use_gpu else ("Multi-core" if self.use_multicore else "CPU")
                 cache_size = len(self.fitness_cache)
                 logger.info(f"GA Gen {generation} ({mode}): Best={best_fitness:.4f}, Cache={cache_size}")
+                # Check cancellation every 5 generations
+                if job_id and self._check_cancellation():
+                    logger.info(f"GA cancelled at generation {generation}")
+                    break
         
         # Final cleanup
         self.population.clear()
@@ -425,6 +445,18 @@ class GeneticAlgorithmOptimizer:
         
         logger.info(f"GA complete: Final fitness={best_fitness:.4f}")
         return best_solution
+    
+    def _check_cancellation(self) -> bool:
+        """Check if job has been cancelled via Redis"""
+        try:
+            import redis
+            import os
+            redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1")
+            r = redis.from_url(redis_url, decode_responses=True)
+            cancel_flag = r.get(f"cancel:job:{self.job_id}")
+            return cancel_flag is not None
+        except:
+            return False
     
     def evolve_island_model(self, num_islands: int = 8, migration_interval: int = 10) -> Dict:
         """Island Model GA - 5x speedup via parallel evolution"""
@@ -580,11 +612,14 @@ class GeneticAlgorithmOptimizer:
             scores = []
             for (course_id, session), (time_slot, room_id) in solution.items():
                 course_idx = next((i for i, c in enumerate(self.courses) if c.course_id == course_id), None)
-                time_idx = next((i for i, t in enumerate(self.time_slots) if t.slot_id == time_slot), None)
+                # Convert time_slot to int if it's a string
+                time_slot_id = int(time_slot) if isinstance(time_slot, str) else time_slot
+                time_idx = next((i for i, t in enumerate(self.time_slots) if t.slot_id == time_slot_id), None)
                 if course_idx is not None and time_idx is not None:
                     scores.append(self.faculty_prefs_tensor[course_idx, time_idx])
             return torch.mean(torch.stack(scores)) if scores else torch.tensor(0.0, device=DEVICE)
-        except:
+        except Exception as e:
+            logger.error(f"GPU faculty preference failed: {e}")
             return torch.tensor(self._faculty_preference_satisfaction(solution), device=DEVICE)
     
     def _multicore_fitness(self) -> List[Tuple[Dict, float]]:

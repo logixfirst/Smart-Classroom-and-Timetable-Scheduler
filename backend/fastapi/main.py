@@ -131,6 +131,11 @@ class TimetableGenerationSaga:
         
         try:
             for step_name, execute_func, compensate_func in self.steps:
+                # Check cancellation before each step
+                if await self._check_cancellation(job_id):
+                    logger.info(f"[SAGA] Job {job_id} cancelled at {step_name}")
+                    raise asyncio.CancelledError(f"Job cancelled by user")
+                
                 logger.info(f"[SAGA] Job {job_id}: Executing {step_name}")
                 
                 # Execute step with timeout
@@ -147,6 +152,12 @@ class TimetableGenerationSaga:
             
             self.job_data[job_id]['status'] = 'completed'
             return self.job_data[job_id]['results']
+        
+        except asyncio.CancelledError as e:
+            logger.warning(f"[SAGA] Job {job_id} cancelled: {e}")
+            await self._compensate(job_id)
+            self.job_data[job_id]['status'] = 'cancelled'
+            raise
             
         except Exception as e:
             logger.error(f"[SAGA] Job {job_id} failed at {step_name}: {e}")
@@ -514,17 +525,17 @@ class TimetableGenerationSaga:
             
             logger.info(f"[STAGE2B] GA config: pop={pop_size}, gen=20, GPU={has_gpu}")
             
-            # Use Island Model if enough cores, else standard GA
-            if num_islands >= 4:
-                optimized_schedule = await asyncio.to_thread(
-                    ga_optimizer.evolve_island_model,
-                    num_islands,
-                    10  # migration_interval
-                )
+            # Use GPU-accelerated GA if available, otherwise single-process CPU GA
+            # Island Model disabled - exhausts RAM with multiprocessing
+            if has_gpu:
+                logger.info(f"[STAGE2B] Using GPU-accelerated GA")
             else:
-                optimized_schedule = await asyncio.to_thread(
-                    ga_optimizer.evolve
-                )
+                logger.info(f"[STAGE2B] Using single-core CPU GA (RAM-safe)")
+            
+            optimized_schedule = await asyncio.to_thread(
+                ga_optimizer.evolve,
+                job_id
+            )
             
             final_fitness = ga_optimizer.fitness(optimized_schedule)
             
@@ -679,10 +690,26 @@ class TimetableGenerationSaga:
         """Cleanup RL resources"""
         pass  # RL cleanup if needed
     
+    async def _check_cancellation(self, job_id: str) -> bool:
+        """Check if job has been cancelled"""
+        global redis_client_global
+        try:
+            if redis_client_global:
+                cancel_flag = redis_client_global.get(f"cancel:job:{job_id}")
+                return cancel_flag is not None and cancel_flag
+        except Exception as e:
+            logger.error(f"[CANCEL] Error checking cancellation: {e}")
+        return False
+    
     async def _update_progress(self, job_id: str, progress: int, message: str, total_items: int = None, completed_items: int = None):
         """Enterprise progress tracking with accurate ETA based on actual work completed"""
         global redis_client_global
         from datetime import timedelta
+        
+        # Check for cancellation
+        if await self._check_cancellation(job_id):
+            raise asyncio.CancelledError(f"Job {job_id} cancelled by user")
+        
         try:
             if redis_client_global:
                 start_time_key = f"start_time:job:{job_id}"
@@ -825,6 +852,7 @@ app.add_middleware(
 # Enterprise background task
 async def run_enterprise_generation(job_id: str, request: GenerationRequest):
     """Enterprise generation using saga pattern"""
+    global redis_client_global
     import gc
     try:
         logger.info(f"[ENTERPRISE] Starting generation for job {job_id}")
@@ -838,6 +866,27 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
             saga.execute(job_id, request.dict()),
             timeout=600  # 10 minutes total timeout
         )
+    
+    except asyncio.CancelledError:
+        logger.warning(f"[ENTERPRISE] Job {job_id} was cancelled")
+        
+        # Update cancellation status
+        if redis_client_global:
+            cancel_data = {
+                'job_id': job_id,
+                'progress': 0,
+                'status': 'cancelled',
+                'stage': 'Cancelled',
+                'message': 'Generation cancelled by user',
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            }
+            redis_client_global.setex(f"progress:job:{job_id}", 3600, json.dumps(cancel_data))
+            redis_client_global.delete(f"cancel:job:{job_id}")  # Cleanup flag
+        
+        await call_django_callback(job_id, 'cancelled', error='Cancelled by user')
+        return
+    
+    try:
         
         # Convert to timetable format
         stage3_result = results.get('stage3_rl_conflict_resolution', {})
@@ -887,7 +936,6 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
         }
         
         # Update final progress
-        global redis_client_global
         if redis_client_global:
             progress_data = {
                 'job_id': job_id,
@@ -921,7 +969,7 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
             redis_client_global.setex(f"progress:job:{job_id}", 3600, json.dumps(timeout_data))
         
         await call_django_callback(job_id, 'failed', error='Generation timed out')
-        
+    
     except Exception as e:
         logger.error(f"[ENTERPRISE] Job {job_id} failed: {e}")
         import traceback
@@ -940,6 +988,14 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
             redis_client_global.setex(f"progress:job:{job_id}", 3600, json.dumps(error_data))
         
         await call_django_callback(job_id, 'failed', error=str(e))
+    
+    finally:
+        # Always cleanup cancellation flag
+        if redis_client_global:
+            try:
+                redis_client_global.delete(f"cancel:job:{job_id}")
+            except:
+                pass
 
 async def call_django_callback(job_id: str, status: str, variants: list = None, error: str = None):
     """Enterprise callback with retry logic"""
@@ -1163,6 +1219,27 @@ async def refresh_hardware_detection():
     except Exception as e:
         logger.error(f"[HARDWARE] Error refreshing hardware: {e}")
         return {"error": str(e)}
+
+@app.post("/api/cancel/{job_id}")
+async def cancel_generation(job_id: str):
+    """Cancel a running generation job"""
+    global redis_client_global
+    try:
+        if not redis_client_global:
+            raise HTTPException(status_code=503, detail="Redis not available")
+        
+        # Set cancellation flag
+        redis_client_global.setex(f"cancel:job:{job_id}", 3600, "1")
+        logger.info(f"[CANCEL] Cancellation flag set for job {job_id}")
+        
+        return {
+            "success": True,
+            "message": f"Cancellation requested for job {job_id}",
+            "job_id": job_id
+        }
+    except Exception as e:
+        logger.error(f"[CANCEL] Error setting cancellation flag: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 def _estimate_processing_time(profile: HardwareProfile) -> dict:
     """Estimate processing time based on hardware profile"""
