@@ -63,7 +63,7 @@ pulp>=2.7.0  # Linear programming
 
 # Time series
 pandas>=2.1.0  # Use prebuilt wheel
-pytz==2023.3
+pytz>=2023.0
 
 # Shared Dependencies
 redis==5.2.0
@@ -74,8 +74,8 @@ sentry-sdk[fastapi]==2.19.2
 python-jose[cryptography]==3.3.0
 setuptools>=65.0.0
 psutil==6.1.0  # System resource monitoring for adaptive parallelism
-gevent==23.9.1  # Async worker pool for Celery (optional)
-eventlet==0.33.3  # Alternative async pool for Celery (optional)
+# gevent==23.9.1  # SKIP: Requires C++ compiler (optional)
+# eventlet==0.33.3  # SKIP: Requires C++ compiler (optional)
 cryptography>=41.0.0  # Security
 bcrypt>=4.0.0  # Password hashing
 
@@ -109,7 +109,7 @@ mypy==1.7.1  # Type checking
 # Performance profiling (Development)
 py-spy==0.3.14
 memory-profiler==0.61.0
-line-profiler==4.1.1
+# line-profiler==4.1.1  # SKIP: Requires C++ compiler (optional)
 
 # Documentation (Development)
 mkdocs==1.5.3
