@@ -158,9 +158,9 @@ class TimetableGenerationSaga:
         """Stage 0: Load and validate data with hardware detection"""
         from utils.django_client import DjangoAPIClient
         
-        # ALWAYS detect hardware fresh (no caching)
+        # Detect hardware fresh for each generation (RAM availability changes)
         global hardware_profile, adaptive_executor
-        logger.info("[HARDWARE] Detecting system capabilities (fresh detection)...")
+        logger.info("[HARDWARE] Detecting current system state...")
         hardware_profile = get_hardware_profile(force_refresh=True)
         adaptive_executor = await get_adaptive_executor()
         logger.info(f"[HARDWARE] Available RAM: {hardware_profile.available_ram_gb:.1f}GB")
@@ -269,10 +269,10 @@ class TimetableGenerationSaga:
             timeout = 5  # 5s per cluster (fast)
             logger.info(f"[STAGE2] Low memory mode: sequential")
         
-        await self._update_progress(job_id, 5, f"Starting CP-SAT solver ({total_clusters} clusters)")
-        
         all_solutions = {}
         total_clusters = len(clusters)
+        
+        await self._update_progress(job_id, 5, f"Starting CP-SAT solver ({total_clusters} clusters)")
         completed = 0
         
         if max_parallel == 1:
@@ -463,10 +463,10 @@ class TimetableGenerationSaga:
         return mock_schedule
     
     async def _stage2_ga_optimization(self, job_id: str, request_data: dict):
-        """Stage 2B: GA optimization with hardware orchestration"""
+        """Stage 2B: GA optimization with Island Model parallelization"""
         from engine.stage2_ga import GeneticAlgorithmOptimizer
-        from engine.orchestrator import get_orchestrator
         import gc
+        import multiprocessing
         
         data = self.job_data[job_id]['results']
         cpsat_result = data['stage2_cpsat_solving']
@@ -477,8 +477,8 @@ class TimetableGenerationSaga:
             await self._update_progress(job_id, 70, "Skipping GA (no initial solution)")
             return cpsat_result
         
-        logger.info(f"[STAGE2B] Starting GA optimization with {len(initial_schedule)} initial assignments")
-        await self._update_progress(job_id, 65, "Optimizing with Genetic Algorithm")
+        logger.info(f"[STAGE2B] Starting Island Model GA with {len(initial_schedule)} initial assignments")
+        await self._update_progress(job_id, 65, "Optimizing with Island Model GA")
         
         try:
             # Prepare data
@@ -487,7 +487,15 @@ class TimetableGenerationSaga:
             time_slots = data['load_data']['time_slots']
             faculty = data['load_data']['faculty']
             
-            # GA Optimizer
+            # Determine number of islands based on CPU cores
+            cpu_cores = multiprocessing.cpu_count()
+            num_islands = min(8, max(4, cpu_cores // 2))  # 4-8 islands
+            
+            # GA Optimizer with optimizations
+            # Use larger population if GPU available for batching benefit
+            has_gpu = hardware_profile.has_nvidia_gpu if hardware_profile else False
+            pop_size = 30 if has_gpu else 15
+            
             ga_optimizer = GeneticAlgorithmOptimizer(
                 courses=courses,
                 rooms=rooms,
@@ -495,24 +503,32 @@ class TimetableGenerationSaga:
                 faculty=faculty,
                 students={},
                 initial_solution=initial_schedule,
-                population_size=30,
-                generations=50,
-                mutation_rate=0.1,
+                population_size=pop_size,
+                generations=20,
+                mutation_rate=0.15,
                 crossover_rate=0.8,
-                elitism_rate=0.1,
-                context_engine=None
+                elitism_rate=0.2,
+                early_stop_patience=5
             )
             
-            # Use orchestrator for optimal hardware utilization (GPU + CPU)
-            orchestrator = get_orchestrator()
-            optimized_schedule = await asyncio.to_thread(
-                orchestrator.execute_stage2_ga,
-                ga_optimizer
-            )
+            logger.info(f"[STAGE2B] GA config: pop={pop_size}, gen=20, GPU={has_gpu}")
+            
+            # Use Island Model if enough cores, else standard GA
+            if num_islands >= 4:
+                optimized_schedule = await asyncio.to_thread(
+                    ga_optimizer.evolve_island_model,
+                    num_islands,
+                    10  # migration_interval
+                )
+            else:
+                optimized_schedule = await asyncio.to_thread(
+                    ga_optimizer.evolve
+                )
+            
             final_fitness = ga_optimizer.fitness(optimized_schedule)
             
-            logger.info(f"[STAGE2B] GA complete: fitness={final_fitness:.4f}")
-            await self._update_progress(job_id, 80, f"GA complete (fitness: {final_fitness:.2f})")
+            logger.info(f"[STAGE2B] Island Model GA complete: fitness={final_fitness:.4f}")
+            await self._update_progress(job_id, 80, f"Island Model GA complete (fitness: {final_fitness:.2f})")
             
             gc.collect()
             
@@ -524,8 +540,8 @@ class TimetableGenerationSaga:
             }
             
         except Exception as e:
-            logger.error(f"[STAGE2B] GA optimization failed: {e}")
-            await self._update_progress(job_id, 70, "GA optimization failed, using CP-SAT result")
+            logger.error(f"[STAGE2B] Island Model GA optimization failed: {e}")
+            await self._update_progress(job_id, 70, "Island Model GA failed, using CP-SAT result")
             gc.collect()
             return cpsat_result
     
@@ -548,18 +564,20 @@ class TimetableGenerationSaga:
         await self._update_progress(job_id, 85, "Resolving conflicts with RL")
         
         try:
-            # Detect conflicts first
+            # Quick conflict detection
             load_data = data['load_data']
             conflicts = self._detect_conflicts(schedule, load_data)
             
-            if not conflicts:
-                logger.info("[STAGE3] No conflicts detected, skipping RL")
-                await self._update_progress(job_id, 90, "No conflicts detected")
+            # OPTIMIZATION: Skip RL if very few conflicts
+            if len(conflicts) < 10:
+                logger.info(f"[STAGE3] Only {len(conflicts)} conflicts, skipping RL")
+                await self._update_progress(job_id, 90, f"Minimal conflicts ({len(conflicts)}), skipping RL")
                 return ga_result
             
             logger.info(f"[STAGE3] Detected {len(conflicts)} conflicts, resolving with RL")
             
-            # RL Conflict Resolver
+            # RL Conflict Resolver with GPU support
+            has_gpu = hardware_profile.has_nvidia_gpu if hardware_profile else False
             resolver = RLConflictResolver(
                 courses=load_data['courses'],
                 faculty=load_data['faculty'],
@@ -568,8 +586,11 @@ class TimetableGenerationSaga:
                 learning_rate=0.15,
                 discount_factor=0.85,
                 epsilon=0.10,
-                max_iterations=100
+                max_iterations=100,
+                use_gpu=has_gpu  # Force GPU if available
             )
+            
+            logger.info(f"[STAGE3] RL config: GPU={has_gpu}, conflicts={len(conflicts)}")
             
             # Use orchestrator for optimal hardware utilization (GPU if available)
             orchestrator = get_orchestrator()

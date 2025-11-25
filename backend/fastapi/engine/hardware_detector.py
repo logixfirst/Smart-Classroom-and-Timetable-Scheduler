@@ -527,17 +527,58 @@ def get_hardware_profile(force_refresh: bool = False) -> HardwareProfile:
 def get_optimal_config(profile: HardwareProfile) -> Dict:
     """Get optimal configuration based on hardware profile"""
     
+    # Adaptive parallelization based on CPU cores and RAM
+    cpu_cores = profile.cpu_cores
+    available_ram = profile.available_ram_gb
+    
+    # Stage 1: Graph construction workers
+    graph_workers = min(cpu_cores, 8)
+    
+    # Stage 2A: Cluster parallelization
+    if available_ram > 6.0:
+        cluster_workers = min(cpu_cores - 2, 12)  # Leave 2 cores free
+        cpsat_workers = 4
+    elif available_ram > 4.0:
+        cluster_workers = min(cpu_cores // 2, 6)
+        cpsat_workers = 2
+    else:
+        cluster_workers = 1
+        cpsat_workers = 1
+    
+    # Stage 2B: Island Model GA
+    island_workers = min(8, max(4, cpu_cores // 2))
+    
+    # Stage 3: Conflict detection workers
+    conflict_workers = min(8, cpu_cores)
+    
     config = {
-        # Base configuration
-        'cpsat_timeout': 30,
-        'cpsat_workers': 1,
-        'ga_population': 15,
-        'ga_generations': 25,
-        'rl_iterations': 250,
-        'parallel_processes': 1,
-        'use_gpu': False,
-        'use_distributed': False,
-        'memory_limit_gb': 4.0
+        # Stage 1: Louvain Clustering
+        'graph_construction_workers': graph_workers,
+        'louvain_runs': 3 if cpu_cores < 8 else 5,
+        
+        # Stage 2A: CP-SAT
+        'cpsat_timeout': 5,  # Fast mode
+        'cpsat_workers': cpsat_workers,
+        'cluster_parallel_workers': cluster_workers,
+        
+        # Stage 2B: GA
+        'ga_island_workers': island_workers,
+        'ga_population_per_island': 50,
+        'ga_generations': 50,
+        'ga_migration_interval': 10,
+        
+        # Stage 3: RL
+        'rl_iterations': 100,
+        'conflict_detection_workers': conflict_workers,
+        
+        # GPU
+        'use_gpu': profile.has_nvidia_gpu and profile.gpu_memory_gb >= 4,
+        'gpu_fitness_threshold': 200,  # Use GPU if population >= 200
+        
+        # Memory
+        'memory_limit_gb': min(available_ram * 0.8, 16.0),
+        'parallel_processes': cluster_workers,
+        'use_distributed': False
     }
     
     # Adjust based on strategy

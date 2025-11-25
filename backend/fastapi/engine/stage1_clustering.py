@@ -5,7 +5,7 @@ Graph-based clustering with weighted constraint graph
 import logging
 import networkx as nx
 import random
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from models.timetable_models import Course
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,7 @@ class LouvainClusterer:
     
     def __init__(self, target_cluster_size: int = 10):
         self.target_cluster_size = target_cluster_size
+        self.EDGE_THRESHOLD = 0.5  # SPARSE: Only significant edges (was 1.0)
     
     def cluster_courses(self, courses: List[Course]) -> Dict[int, List[Course]]:
         """
@@ -38,42 +39,60 @@ class LouvainClusterer:
         return final_clusters
     
     def _build_constraint_graph(self, courses: List[Course]) -> nx.Graph:
-        """Build weighted constraint graph (sequential for stability)"""
+        """Build weighted constraint graph with parallel edge computation"""
+        import multiprocessing
+        from concurrent.futures import ProcessPoolExecutor
+        
         G = nx.Graph()
         
         # Add nodes
         for course in courses:
             G.add_node(course.course_id)
         
-        # SEQUENTIAL: Edge computation (batch process for memory efficiency)
-        logger.info(f"Building constraint graph for {len(courses)} courses...")
-        edges_added = 0
+        # Parallel edge computation
+        num_workers = min(multiprocessing.cpu_count(), 8)
+        logger.info(f"Building constraint graph for {len(courses)} courses with {num_workers} workers...")
         
-        # Process in batches to show progress
-        batch_size = 100
-        for i in range(0, len(courses), batch_size):
-            batch_end = min(i + batch_size, len(courses))
-            for idx in range(i, batch_end):
-                course_i = courses[idx]
-                for course_j in courses[idx+1:]:
-                    weight = self._compute_constraint_weight(course_i, course_j)
-                    if weight > 0.1:
-                        G.add_edge(course_i.course_id, course_j.course_id, weight=weight)
-                        edges_added += 1
+        # Split courses into chunks for parallel processing
+        chunk_size = max(1, len(courses) // num_workers)
+        chunks = [(i, min(i + chunk_size, len(courses))) for i in range(0, len(courses), chunk_size)]
+        
+        # Parallel edge computation
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            futures = [
+                executor.submit(self._compute_edges_for_chunk, courses, start, end)
+                for start, end in chunks
+            ]
             
-            if (i // batch_size) % 5 == 0:
-                logger.info(f"Processed {batch_end}/{len(courses)} courses, {edges_added} edges")
+            edges_added = 0
+            for future in futures:
+                edges = future.result()
+                G.add_weighted_edges_from(edges)
+                edges_added += len(edges)
         
-        logger.info(f"Built graph: {len(G.nodes)} nodes, {len(G.edges)} edges")
+        logger.info(f"Built graph: {len(G.nodes)} nodes, {edges_added} edges")
         return G
     
+    def _compute_edges_for_chunk(self, courses: List[Course], start: int, end: int) -> List[Tuple]:
+        """Compute edges for a chunk of courses (runs in separate process)"""
+        edges = []
+        for i in range(start, end):
+            course_i = courses[i]
+            for j in range(i + 1, len(courses)):
+                course_j = courses[j]
+                weight = self._compute_constraint_weight(course_i, course_j)
+                # SPARSE: Only add significant edges
+                if weight > self.EDGE_THRESHOLD:
+                    edges.append((course_i.course_id, course_j.course_id, weight))
+        return edges
+    
     def _compute_constraint_weight(self, course_i: Course, course_j: Course) -> float:
-        """Compute weighted edge between courses"""
+        """Compute weighted edge between courses with early termination"""
         weight = 0.0
         
-        # Faculty sharing (high weight)
+        # Faculty sharing (high weight) - EARLY RETURN for strong edges
         if getattr(course_i, 'faculty_id', None) == getattr(course_j, 'faculty_id', None):
-            weight += 10.0
+            return 10.0  # Early termination on strong edge
         
         # Student overlap (NEP 2020 critical)
         students_i = set(getattr(course_i, 'student_ids', []))

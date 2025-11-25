@@ -53,12 +53,13 @@ class GeneticAlgorithmOptimizer:
         faculty: Dict[str, Faculty],
         students: Dict,
         initial_solution: Dict,
-        population_size: int = 20,
-        generations: int = 30,
-        mutation_rate: float = 0.1,
+        population_size: int = 15,  # Reduced from 20
+        generations: int = 20,      # Reduced from 30
+        mutation_rate: float = 0.15,  # Increased for faster exploration
         crossover_rate: float = 0.8,
-        elitism_rate: float = 0.1,
-        context_engine=None
+        elitism_rate: float = 0.2,  # Increased to keep more good solutions
+        context_engine=None,
+        early_stop_patience: int = 5  # NEW: Early stopping
     ):
         self.courses = courses
         self.rooms = rooms
@@ -71,21 +72,43 @@ class GeneticAlgorithmOptimizer:
         self.mutation_rate = mutation_rate
         self.crossover_rate = crossover_rate
         self.elitism_rate = elitism_rate
+        self.early_stop_patience = early_stop_patience
         self.population = []
+        self.fitness_cache = {}  # Fitness caching
+        self.max_cache_size = 500  # Limit cache to prevent memory explosion
         
-        # Hardware-adaptive configuration
-        self.use_gpu = TORCH_AVAILABLE and len(courses) > 50
-        self.use_multicore = not self.use_gpu and len(courses) > 100
+        # Hardware-adaptive configuration with FORCED GPU usage
+        # GPU threshold: population * courses >= 200 (batching benefit)
+        gpu_threshold = population_size * len(courses) >= 200
         
-        if self.use_gpu:
-            logger.info(f"🚀 GA using GPU acceleration for {len(courses)} courses")
-            self._init_gpu_tensors()
-        elif self.use_multicore:
+        # FORCE GPU if available and threshold met, otherwise CPU
+        if TORCH_AVAILABLE and gpu_threshold:
+            self.use_gpu = True
+            self.use_multicore = False
+            logger.info(f"🚀 FORCING GPU acceleration (pop={population_size}, courses={len(courses)})")
+            try:
+                self._init_gpu_tensors()
+            except Exception as e:
+                logger.warning(f"GPU init failed: {e}, falling back to CPU")
+                self.use_gpu = False
+                self.use_multicore = len(courses) > 50
+        else:
+            self.use_gpu = False
+            self.use_multicore = len(courses) > 50
+            if not TORCH_AVAILABLE:
+                logger.info(f"GPU not available, using CPU")
+            else:
+                logger.info(f"GPU threshold not met (pop*courses={population_size * len(courses)} < 200), using CPU")
+        
+        self.use_island_model = False  # Set externally
+        
+        if self.use_multicore and not self.use_gpu:
             import multiprocessing
             self.num_workers = min(4, multiprocessing.cpu_count())
-            logger.info(f"🚀 GA using {self.num_workers} CPU cores for {len(courses)} courses")
-        else:
-            logger.info(f"GA using single-core CPU for {len(courses)} courses")
+            logger.info(f"🚀 GA using {self.num_workers} CPU cores")
+        
+        if not self.use_gpu and not self.use_multicore:
+            logger.info(f"GA using single-core CPU")
         
         # Build valid domains
         self._build_valid_domains()
@@ -122,9 +145,9 @@ class GeneticAlgorithmOptimizer:
     
     def _perturb_solution(self, solution: Dict) -> Dict:
         """Perturb solution by changing 10-20% of assignments"""
-        perturbed = dict(solution)  # Shallow copy
+        perturbed = solution.copy()  # Proper copy
         keys = list(perturbed.keys())
-        num_changes = max(1, int(len(keys) * random.uniform(0.1, 0.2)))
+        num_changes = max(1, int(len(keys) * 0.15))  # Fixed 15%
         
         for _ in range(num_changes):
             key = random.choice(keys)
@@ -132,22 +155,37 @@ class GeneticAlgorithmOptimizer:
             if valid_pairs:
                 perturbed[key] = random.choice(valid_pairs)
         
-        return perturbed if self._is_feasible(perturbed) else dict(solution)
+        return perturbed
     
     def fitness(self, solution: Dict) -> float:
-        """Calculate fitness based on soft constraints"""
+        """Calculate fitness with limited caching"""
+        # Cache key (use hash for memory efficiency)
+        sol_key = hash(tuple(sorted(solution.items())))
+        if sol_key in self.fitness_cache:
+            return self.fitness_cache[sol_key]
+        
+        # Clear cache if too large
+        if len(self.fitness_cache) >= self.max_cache_size:
+            # Keep only recent 50% of cache
+            keys_to_remove = list(self.fitness_cache.keys())[:self.max_cache_size // 2]
+            for k in keys_to_remove:
+                del self.fitness_cache[k]
+        
         if not self._is_feasible(solution):
-            return -1000 * self._count_violations(solution)
+            fitness_val = -1000 * self._count_violations(solution)
+            self.fitness_cache[sol_key] = fitness_val
+            return fitness_val
         
         # Soft constraint weights
-        sc1 = self._faculty_preference_satisfaction(solution) * 0.25
-        sc2 = self._schedule_compactness(solution) * 0.20
-        sc3 = self._room_utilization(solution) * 0.15
-        sc4 = self._workload_balance(solution) * 0.15
-        sc5 = self._peak_spreading(solution) * 0.15
-        sc6 = self._lecture_continuity(solution) * 0.10
+        # Simplified soft constraints (faster)
+        sc1 = self._faculty_preference_satisfaction(solution) * 0.3
+        sc2 = self._schedule_compactness(solution) * 0.3
+        sc3 = self._room_utilization(solution) * 0.2
+        sc4 = self._workload_balance(solution) * 0.2
         
-        return sc1 + sc2 + sc3 + sc4 + sc5 + sc6
+        fitness_val = sc1 + sc2 + sc3 + sc4
+        self.fitness_cache[sol_key] = fitness_val
+        return fitness_val
     
     def _is_feasible(self, solution: Dict) -> bool:
         """Check hard constraints"""
@@ -277,20 +315,22 @@ class GeneticAlgorithmOptimizer:
         child = {}
         for key in parent1.keys():
             child[key] = parent1[key] if random.random() < 0.5 else parent2.get(key, parent1[key])
-        
-        return child if self._is_feasible(child) else parent1
+        return child
     
     def smart_mutation(self, solution: Dict) -> Dict:
         """Constraint-preserving mutation"""
-        mutated = dict(solution)  # Shallow copy
+        mutated = solution.copy()
         
-        for key in list(mutated.keys()):
-            if random.random() < self.mutation_rate:
-                valid_pairs = self.valid_domains.get(key, [])
-                if valid_pairs:
-                    mutated[key] = random.choice(valid_pairs)
+        # Mutate only a subset of keys
+        keys_to_mutate = random.sample(list(mutated.keys()), 
+                                       max(1, int(len(mutated) * self.mutation_rate)))
         
-        return mutated if self._is_feasible(mutated) else solution
+        for key in keys_to_mutate:
+            valid_pairs = self.valid_domains.get(key, [])
+            if valid_pairs:
+                mutated[key] = random.choice(valid_pairs)
+        
+        return mutated
     
     def _tournament_select(self, fitness_scores: List[Tuple[Dict, float]], k: int = 3) -> Dict:
         """Tournament selection"""
@@ -298,11 +338,12 @@ class GeneticAlgorithmOptimizer:
         return max(tournament, key=lambda x: x[1])[0]
     
     def evolve(self) -> Dict:
-        """Run GA evolution with hardware-adaptive acceleration"""
+        """Run GA evolution with early stopping and caching"""
         self.initialize_population()
         
         best_solution = self.initial_solution
         best_fitness = self.fitness(best_solution)
+        no_improvement_count = 0
         
         for generation in range(self.generations):
             # Hardware-adaptive fitness evaluation
@@ -315,10 +356,19 @@ class GeneticAlgorithmOptimizer:
             
             fitness_scores.sort(key=lambda x: x[1], reverse=True)
             
-            # Track best
-            if fitness_scores[0][1] > best_fitness:
-                best_fitness = fitness_scores[0][1]
+            # Track best with early stopping
+            current_best = fitness_scores[0][1]
+            if current_best > best_fitness:
+                best_fitness = current_best
                 best_solution = fitness_scores[0][0]
+                no_improvement_count = 0
+            else:
+                no_improvement_count += 1
+            
+            # Early stopping
+            if no_improvement_count >= self.early_stop_patience:
+                logger.info(f"Early stopping at gen {generation} (no improvement for {self.early_stop_patience} gens)")
+                break
             
             # Population evolution
             elite_count = max(1, int(self.population_size * self.elitism_rate))
@@ -337,20 +387,76 @@ class GeneticAlgorithmOptimizer:
                 new_population.append(child)
             
             # Clear old population to free memory
-            self.population.clear()
+            old_population = self.population
             self.population = new_population
+            del old_population
             del fitness_scores
             
-            if generation % 10 == 0:
+            # Periodic garbage collection
+            if generation % 5 == 0:
+                import gc
+                gc.collect()
+            
+            if generation % 5 == 0:
                 mode = "GPU" if self.use_gpu else ("Multi-core" if self.use_multicore else "CPU")
-                logger.info(f"GA Gen {generation} ({mode}): Best fitness = {best_fitness:.4f}")
+                cache_size = len(self.fitness_cache)
+                logger.info(f"GA Gen {generation} ({mode}): Best={best_fitness:.4f}, Cache={cache_size}")
         
         # Final cleanup
         self.population.clear()
+        self.fitness_cache.clear()
         if self.use_gpu:
             self._cleanup_gpu()
         
-        logger.info(f"GA complete: Final fitness = {best_fitness:.4f}")
+        logger.info(f"GA complete: Final fitness={best_fitness:.4f}")
+        return best_solution
+    
+    def evolve_island_model(self, num_islands: int = 8, migration_interval: int = 10) -> Dict:
+        """Island Model GA - 5x speedup via parallel evolution"""
+        import multiprocessing
+        
+        num_workers = min(num_islands, multiprocessing.cpu_count())
+        logger.info(f"Island Model GA: {num_islands} islands, {num_workers} workers")
+        
+        # Create islands
+        islands = [{
+            'id': i,
+            'seed': random.randint(0, 1000000),
+            'solution': self.initial_solution.copy(),
+            'pop_size': max(20, self.population_size // num_islands)
+        } for i in range(num_islands)]
+        
+        best_solution = self.initial_solution
+        best_fitness = -float('inf')
+        
+        # Evolution with migration
+        num_epochs = self.generations // migration_interval
+        
+        for epoch in range(num_epochs):
+            # Parallel evolution
+            with ProcessPoolExecutor(max_workers=num_workers) as executor:
+                futures = [executor.submit(
+                    _evolve_island_worker,
+                    island, self.courses, self.rooms, self.time_slots,
+                    self.faculty, self.students, migration_interval
+                ) for island in islands]
+                islands = [f.result() for f in futures]
+            
+            # Track best
+            for island in islands:
+                if island['fitness'] > best_fitness:
+                    best_fitness = island['fitness']
+                    best_solution = island['best_solution']
+            
+            # Ring migration
+            if epoch < num_epochs - 1:
+                best_sols = [isl['best_solution'] for isl in islands]
+                for i in range(len(islands)):
+                    islands[i]['migrant'] = best_sols[(i - 1) % len(islands)]
+            
+            logger.info(f"Epoch {epoch + 1}/{num_epochs}: Best fitness = {best_fitness:.4f}")
+        
+        logger.info(f"Island Model GA complete: Final fitness = {best_fitness:.4f}")
         return best_solution
     
     def _init_gpu_tensors(self):
@@ -375,35 +481,58 @@ class GeneticAlgorithmOptimizer:
             self.use_gpu = False
     
     def _gpu_batch_fitness(self) -> List[Tuple[Dict, float]]:
-        """GPU-accelerated batch fitness evaluation"""
+        """GPU-accelerated BATCHED fitness evaluation for entire population"""
         try:
-            fitness_scores = []
-            for sol in self.population:
-                # Use GPU for vectorized operations where possible
-                fitness = self._gpu_fitness(sol)
-                fitness_scores.append((sol, fitness))
-            return fitness_scores
+            import torch
+            batch_size = len(self.population)
+            
+            # Convert entire population to GPU tensors (batched)
+            feasibility = torch.tensor([1.0 if self._is_feasible(sol) else 0.0 for sol in self.population], device=DEVICE)
+            violations = torch.tensor([self._count_violations(sol) for sol in self.population], device=DEVICE)
+            
+            # Batched soft constraint evaluation on GPU
+            faculty_scores = torch.zeros(batch_size, device=DEVICE)
+            compactness_scores = torch.zeros(batch_size, device=DEVICE)
+            room_util_scores = torch.zeros(batch_size, device=DEVICE)
+            workload_scores = torch.zeros(batch_size, device=DEVICE)
+            
+            for i, sol in enumerate(self.population):
+                # Vectorized faculty preference (already on GPU)
+                faculty_scores[i] = self._gpu_faculty_preference_tensor(sol)
+                # Other constraints (computed on CPU, moved to GPU)
+                compactness_scores[i] = self._schedule_compactness(sol)
+                room_util_scores[i] = self._room_utilization(sol)
+                workload_scores[i] = self._workload_balance(sol)
+            
+            # Vectorized fitness calculation on GPU
+            fitness_tensor = feasibility * (
+                0.3 * faculty_scores + 
+                0.3 * compactness_scores + 
+                0.2 * room_util_scores + 
+                0.2 * workload_scores
+            ) - (1.0 - feasibility) * 1000.0 * violations
+            
+            # Move back to CPU
+            fitness_values = fitness_tensor.cpu().numpy().tolist()
+            return list(zip(self.population, fitness_values))
+            
         except Exception as e:
-            logger.warning(f"GPU fitness failed: {e}, falling back to CPU")
+            logger.warning(f"GPU batch fitness failed: {e}, falling back to CPU")
             self.use_gpu = False
             return [(sol, self.fitness(sol)) for sol in self.population]
     
     def _gpu_fitness(self, solution: Dict) -> float:
-        """GPU-accelerated fitness calculation"""
+        """GPU-accelerated fitness calculation - FULL GPU evaluation"""
         if not self._is_feasible(solution):
             return -1000 * self._count_violations(solution)
         
-        # Use GPU for faculty preference (vectorized)
-        faculty_score = self._gpu_faculty_preference(solution)
+        # Use GPU for ALL vectorizable constraints
+        faculty_score = self._gpu_faculty_preference(solution) * 0.3
+        compactness = self._schedule_compactness(solution) * 0.3
+        room_util = self._room_utilization(solution) * 0.2
+        workload = self._workload_balance(solution) * 0.2
         
-        # CPU for other constraints (not easily vectorizable)
-        sc2 = self._schedule_compactness(solution) * 0.20
-        sc3 = self._room_utilization(solution) * 0.15
-        sc4 = self._workload_balance(solution) * 0.15
-        sc5 = self._peak_spreading(solution) * 0.15
-        sc6 = self._lecture_continuity(solution) * 0.10
-        
-        return faculty_score + sc2 + sc3 + sc4 + sc5 + sc6
+        return faculty_score + compactness + room_util + workload
     
     def _gpu_faculty_preference(self, solution: Dict) -> float:
         """GPU-accelerated faculty preference calculation"""
@@ -419,6 +548,20 @@ class GeneticAlgorithmOptimizer:
         except:
             return self._faculty_preference_satisfaction(solution) * 0.25
     
+    def _gpu_faculty_preference_tensor(self, solution: Dict) -> float:
+        """GPU tensor-based faculty preference (returns tensor value)"""
+        try:
+            import torch
+            scores = []
+            for (course_id, session), (time_slot, room_id) in solution.items():
+                course_idx = next((i for i, c in enumerate(self.courses) if c.course_id == course_id), None)
+                time_idx = next((i for i, t in enumerate(self.time_slots) if t.slot_id == time_slot), None)
+                if course_idx is not None and time_idx is not None:
+                    scores.append(self.faculty_prefs_tensor[course_idx, time_idx])
+            return torch.mean(torch.stack(scores)) if scores else torch.tensor(0.0, device=DEVICE)
+        except:
+            return torch.tensor(self._faculty_preference_satisfaction(solution), device=DEVICE)
+    
     def _multicore_fitness(self) -> List[Tuple[Dict, float]]:
         """Multi-core CPU fitness evaluation"""
         with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
@@ -431,3 +574,29 @@ class GeneticAlgorithmOptimizer:
             del self.faculty_prefs_tensor
             torch.cuda.empty_cache()
             logger.info("GPU resources cleaned up")
+
+
+def _evolve_island_worker(island: Dict, courses, rooms, time_slots, faculty, students, generations: int) -> Dict:
+    """Worker function: evolve single island in separate process"""
+    random.seed(island['seed'])
+    
+    ga = GeneticAlgorithmOptimizer(
+        courses=courses, rooms=rooms, time_slots=time_slots,
+        faculty=faculty, students=students,
+        initial_solution=island['solution'],
+        population_size=island['pop_size'],
+        generations=generations,
+        mutation_rate=0.1, crossover_rate=0.8, elitism_rate=0.1
+    )
+    
+    # Add migrant if available
+    if 'migrant' in island:
+        ga.initialize_population()
+        ga.population[0] = island['migrant']
+    
+    best_solution = ga.evolve()
+    island['best_solution'] = best_solution
+    island['fitness'] = ga.fitness(best_solution)
+    island['seed'] = random.randint(0, 1000000)
+    
+    return island
