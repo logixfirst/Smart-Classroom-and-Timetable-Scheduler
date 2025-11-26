@@ -115,12 +115,11 @@ class SmartGreedyScheduler:
             logger.error("[GREEDY] NO TIME SLOTS AVAILABLE - Cannot schedule anything!")
             return {}
         
-        # DEBUG: Check department distribution
-        course_depts = set(getattr(c, 'department_id', None) for c in cluster)
-        room_depts = set(getattr(r, 'dept_id', None) or getattr(r, 'department_id', None) for r in self.rooms)
-        logger.info(f"[GREEDY] Course departments: {course_depts}")
-        logger.info(f"[GREEDY] Room departments: {room_depts}")
-        logger.info(f"[GREEDY] Matching departments: {course_depts & room_depts}")
+        # DEBUG: Check capacity distribution
+        course_sizes = [len(c.student_ids) for c in cluster]
+        room_capacities = [r.capacity for r in self.rooms]
+        logger.info(f"[GREEDY] Course sizes: min={min(course_sizes, default=0)}, max={max(course_sizes, default=0)}, avg={sum(course_sizes)/max(len(course_sizes),1):.1f}")
+        logger.info(f"[GREEDY] Room capacities: min={min(room_capacities, default=0)}, max={max(room_capacities, default=0)}, avg={sum(room_capacities)/max(len(room_capacities),1):.1f}")
         
         # Pre-compute room features for faster lookup
         room_features = {r.room_id: set(getattr(r, 'features', [])) for r in self.rooms}
@@ -142,12 +141,7 @@ class SmartGreedyScheduler:
                         continue
                     
                     for room in self.rooms:
-                        # CRITICAL: Department matching constraint
-                        course_dept = getattr(course, 'department_id', None)
-                        room_dept = getattr(room, 'dept_id', None) or getattr(room, 'department_id', None)
-                        if course_dept and room_dept and course_dept != room_dept:
-                            continue
-                        
+                        # NEP 2020: Cross-department scheduling allowed (HC5: Capacity only)
                         # Capacity check
                         if student_count > room.capacity:
                             continue
@@ -162,9 +156,8 @@ class SmartGreedyScheduler:
                 
                 # DEBUG: Log courses with no valid pairs
                 if len(valid_pairs) == 0:
-                    course_dept = getattr(course, 'department_id', None)
-                    matching_rooms = sum(1 for r in self.rooms if (getattr(r, 'dept_id', None) or getattr(r, 'department_id', None)) == course_dept)
-                    logger.warning(f"[GREEDY] Course {course.course_code} session {session}: NO VALID PAIRS (dept={course_dept}, students={student_count}, matching_rooms={matching_rooms}/{len(self.rooms)})")
+                    suitable_rooms = sum(1 for r in self.rooms if student_count <= r.capacity)
+                    logger.warning(f"[GREEDY] Course {course.course_code} session {session}: NO VALID PAIRS (students={student_count}, suitable_rooms={suitable_rooms}/{len(self.rooms)})")
         
         # Clear temporary data
         del room_features
@@ -174,7 +167,7 @@ class SmartGreedyScheduler:
         logger.info(f"[GREEDY] Computed {total_pairs} valid pairs for {len(cluster)} courses ({total_pairs/max(len(cluster),1):.1f} avg per course)")
         
         if total_pairs == 0:
-            logger.error(f"[GREEDY] ZERO valid pairs! Department mismatch: courses need rooms from {course_depts} but rooms are from {room_depts}")
+            logger.error(f"[GREEDY] ZERO valid pairs! Possible causes: insufficient room capacity, faculty unavailability, or missing required features")
         
         return valid_domains
     

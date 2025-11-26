@@ -1915,7 +1915,9 @@ async def generate_variants_enterprise(request: GenerationRequest):
 @app.get("/api/progress/{job_id}/")
 @app.get("/api/progress/{job_id}")
 async def get_progress_enterprise(job_id: str):
-    """Get enterprise generation progress - NO AUTH REQUIRED"""
+    """Get enterprise generation progress - NO AUTH REQUIRED (PUBLIC ENDPOINT)"""
+    # CRITICAL: This endpoint must be public for real-time progress updates
+    # No authentication required - progress is not sensitive data
     try:
         # Check if redis_client exists in app.state
         if not hasattr(app.state, 'redis_client') or not app.state.redis_client:

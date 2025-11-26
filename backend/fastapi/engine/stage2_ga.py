@@ -225,7 +225,7 @@ class GeneticAlgorithmOptimizer:
         return perturbed
     
     def fitness(self, solution: Dict) -> float:
-        """Calculate fitness with thread-safe GPU-accelerated caching"""
+        """Calculate fitness with thread-safe GPU-accelerated caching + ALL soft constraints"""
         # Cache key (use hash for memory efficiency)
         sol_key = hash(tuple(sorted(solution.items())))
         
@@ -245,17 +245,22 @@ class GeneticAlgorithmOptimizer:
         else:
             # FAST fitness: skip expensive compactness for large schedules
             if len(solution) > 1500:
-                sc1 = self._faculty_preference_satisfaction(solution) * 0.4
-                sc3 = self._room_utilization(solution) * 0.3
-                sc4 = self._workload_balance(solution) * 0.3
-                fitness_val = sc1 + sc3 + sc4
+                sc1 = self._faculty_preference_satisfaction(solution) * 0.25
+                sc3 = self._room_utilization(solution) * 0.20
+                sc4 = self._workload_balance(solution) * 0.20
+                sc5 = self._peak_spreading(solution) * 0.15
+                sc_dept = self._department_matching(solution) * 0.20
+                fitness_val = sc1 + sc3 + sc4 + sc5 + sc_dept
             else:
-                # Full fitness for smaller schedules
-                sc1 = self._faculty_preference_satisfaction(solution) * 0.3
-                sc2 = self._schedule_compactness(solution) * 0.3
-                sc3 = self._room_utilization(solution) * 0.2
-                sc4 = self._workload_balance(solution) * 0.2
-                fitness_val = sc1 + sc2 + sc3 + sc4
+                # Full fitness for smaller schedules (all 6 soft constraints)
+                sc1 = self._faculty_preference_satisfaction(solution) * 0.20
+                sc2 = self._schedule_compactness(solution) * 0.20
+                sc3 = self._room_utilization(solution) * 0.15
+                sc4 = self._workload_balance(solution) * 0.15
+                sc5 = self._peak_spreading(solution) * 0.10
+                sc6 = self._lecture_continuity(solution) * 0.05
+                sc_dept = self._department_matching(solution) * 0.15
+                fitness_val = sc1 + sc2 + sc3 + sc4 + sc5 + sc6 + sc_dept
         
         # Thread-safe cache write
         self._cache_fitness(sol_key, fitness_val)
@@ -461,7 +466,7 @@ class GeneticAlgorithmOptimizer:
         return max(0, 1 - std_load / mean_load) if mean_load > 0 else 1.0
     
     def _peak_spreading(self, solution: Dict) -> float:
-        """Spread courses across time slots"""
+        """SC5: Spread courses across time slots to avoid peak congestion"""
         slot_loads = defaultdict(int)
         for _, (time_slot, _) in solution.items():
             slot_loads[time_slot] += 1
@@ -472,8 +477,73 @@ class GeneticAlgorithmOptimizer:
         return max(0, 1 - max_load / total_courses) if total_courses > 0 else 1.0
     
     def _lecture_continuity(self, solution: Dict) -> float:
-        """Prefer MWF or TTh patterns"""
-        return 1.0  # Simplified
+        """SC6: Prefer MWF or TTh patterns for multi-session courses"""
+        try:
+            # Group sessions by course
+            course_slots = defaultdict(list)
+            for (course_id, session), (time_slot, _) in solution.items():
+                try:
+                    slot_int = int(time_slot) if isinstance(time_slot, str) else time_slot
+                    course_slots[course_id].append(slot_int)
+                except (ValueError, TypeError):
+                    continue
+            
+            # Check for good patterns (MWF = 0,2,4 or TTh = 1,3)
+            good_patterns = 0
+            total_multi_session = 0
+            
+            for course_id, slots in course_slots.items():
+                if len(slots) < 2:
+                    continue
+                total_multi_session += 1
+                slots.sort()
+                
+                # Check if slots follow MWF (even days) or TTh (odd days) pattern
+                all_even = all(s % 2 == 0 for s in slots)
+                all_odd = all(s % 2 == 1 for s in slots)
+                if all_even or all_odd:
+                    good_patterns += 1
+            
+            return good_patterns / total_multi_session if total_multi_session > 0 else 1.0
+        except Exception as e:
+            logger.debug(f"Lecture continuity calculation failed: {e}")
+            return 0.5
+    
+    def _department_matching(self, solution: Dict) -> float:
+        """Soft constraint: Prefer course.dept_id == faculty.dept_id == room.dept_id"""
+        try:
+            matches = 0
+            total = 0
+            
+            for (course_id, session), (time_slot, room_id) in solution.items():
+                course = next((c for c in self.courses if c.course_id == course_id), None)
+                if not course:
+                    continue
+                
+                course_dept = getattr(course, 'department_id', None)
+                if not course_dept:
+                    continue
+                
+                total += 1
+                
+                # Check faculty department match
+                faculty_obj = self.faculty.get(course.faculty_id)
+                faculty_dept = getattr(faculty_obj, 'department_id', None) if faculty_obj else None
+                
+                # Check room department match
+                room = next((r for r in self.rooms if r.room_id == room_id), None)
+                room_dept = getattr(room, 'dept_id', None) or getattr(room, 'department_id', None) if room else None
+                
+                # Award points for matches
+                if faculty_dept and faculty_dept == course_dept:
+                    matches += 0.5
+                if room_dept and room_dept == course_dept:
+                    matches += 0.5
+            
+            return matches / total if total > 0 else 1.0
+        except Exception as e:
+            logger.debug(f"Department matching calculation failed: {e}")
+            return 0.5
     
     def smart_crossover(self, parent1: Dict, parent2: Dict) -> Dict:
         """Constraint-preserving crossover"""

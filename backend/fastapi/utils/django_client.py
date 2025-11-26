@@ -64,11 +64,12 @@ class DjangoAPIClient:
             logger.info(f"Found organization: {org_row['org_name']} (ID: {org_id})")
             
             # CRITICAL: Use subquery to avoid ARRAY_AGG duplicates from join multiplication
+            # Also fetch co_faculty_ids to split large courses into sections
             query = """
                 SELECT c.course_id, c.course_code, c.course_name, c.dept_id,
                        c.lecture_hours_per_week, c.room_type_required, 
                        c.min_room_capacity, c.course_type,
-                       co.offering_id, co.primary_faculty_id,
+                       co.offering_id, co.primary_faculty_id, co.co_faculty_ids,
                        (
                            SELECT ARRAY_AGG(DISTINCT student_id)
                            FROM course_enrollments
@@ -115,31 +116,74 @@ class DjangoAPIClient:
                     
                     # PostgreSQL returns array as string like "{uuid1,uuid2}", parse it
                     if student_ids_raw and isinstance(student_ids_raw, str):
-                        # Remove curly braces and split by comma
                         student_ids_raw = student_ids_raw.strip('{}').split(',') if student_ids_raw != '{}' else []
                     elif not student_ids_raw:
                         student_ids_raw = []
                     
                     student_ids = [str(sid).strip() for sid in student_ids_raw if sid and str(sid).strip()]
                     enrollment_counts.append(len(student_ids))
-                    unique_students.update(student_ids)  # Add to unique set
+                    unique_students.update(student_ids)
                     
-                    # Use offering_id as unique course_id to handle multi-faculty courses
-                    course = Course(
-                        course_id=f"{row['course_id']}_off_{row['offering_id']}",
-                        course_code=f"{row['course_code']}",
-                        course_name=row['course_name'],
-                        department_id=str(row['dept_id']),
-                        faculty_id=str(row['primary_faculty_id']),
-                        credits=row.get('lecture_hours_per_week', 3) or 3,
-                        duration=row.get('lecture_hours_per_week', 3) or 3,
-                        type=row.get('course_type', 'core'),
-                        subject_type=row.get('course_type', 'core'),
-                        required_features=[],
-                        student_ids=student_ids,
-                        batch_ids=[]
-                    )
-                    courses.append(course)
+                    # Parse co_faculty_ids (JSON array)
+                    co_faculty_ids = row.get('co_faculty_ids') or []
+                    if isinstance(co_faculty_ids, str):
+                        import json
+                        try:
+                            co_faculty_ids = json.loads(co_faculty_ids)
+                        except:
+                            co_faculty_ids = []
+                    
+                    # Split course into sections if co-faculty exists and enrollment > 60
+                    faculty_list = [str(row['primary_faculty_id'])]
+                    if co_faculty_ids:
+                        faculty_list.extend([str(fid) for fid in co_faculty_ids if fid])
+                    
+                    num_sections = len(faculty_list)
+                    
+                    if num_sections > 1 and len(student_ids) > 60:
+                        # Split students across sections
+                        students_per_section = len(student_ids) // num_sections
+                        remainder = len(student_ids) % num_sections
+                        
+                        start_idx = 0
+                        for section_idx, faculty_id in enumerate(faculty_list):
+                            # Distribute remainder students to first sections
+                            section_size = students_per_section + (1 if section_idx < remainder else 0)
+                            section_students = student_ids[start_idx:start_idx + section_size]
+                            start_idx += section_size
+                            
+                            course = Course(
+                                course_id=f"{row['course_id']}_off_{row['offering_id']}_sec{section_idx}",
+                                course_code=f"{row['course_code']}",
+                                course_name=f"{row['course_name']} (Section {section_idx+1})",
+                                department_id=str(row['dept_id']),
+                                faculty_id=faculty_id,
+                                credits=row.get('lecture_hours_per_week', 3) or 3,
+                                duration=row.get('lecture_hours_per_week', 3) or 3,
+                                type=row.get('course_type', 'core'),
+                                subject_type=row.get('course_type', 'core'),
+                                required_features=[],
+                                student_ids=section_students,
+                                batch_ids=[]
+                            )
+                            courses.append(course)
+                    else:
+                        # Single section course
+                        course = Course(
+                            course_id=f"{row['course_id']}_off_{row['offering_id']}",
+                            course_code=f"{row['course_code']}",
+                            course_name=row['course_name'],
+                            department_id=str(row['dept_id']),
+                            faculty_id=str(row['primary_faculty_id']),
+                            credits=row.get('lecture_hours_per_week', 3) or 3,
+                            duration=row.get('lecture_hours_per_week', 3) or 3,
+                            type=row.get('course_type', 'core'),
+                            subject_type=row.get('course_type', 'core'),
+                            required_features=[],
+                            student_ids=student_ids,
+                            batch_ids=[]
+                        )
+                        courses.append(course)
                 except Exception as e:
                     logger.warning(f"Skipping course {row.get('course_code')}: {e}")
                     continue

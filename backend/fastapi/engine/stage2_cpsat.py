@@ -127,6 +127,7 @@ class AdaptiveCPSATSolver:
             
             for t_slot in self.time_slots[:10]:
                 for room in self.rooms[:10]:
+                    # Only check room capacity (HC5)
                     if students <= room.capacity:
                         available += 1
                         if available >= duration:
@@ -187,21 +188,21 @@ class AdaptiveCPSATSolver:
         return True
     
     def _count_valid_slots(self, course: Course) -> int:
-        """Count valid (time, room) pairs for a course"""
+        """Count valid (time, room) pairs for a course (NEP 2020 constraints only)"""
         count = 0
         
         for t_slot in self.time_slots:
             for room in self.rooms:
-                # Capacity check
+                # HC5: Room capacity check
                 if len(course.student_ids) > room.capacity:
                     continue
                 
-                # Feature compatibility
+                # HC6: Feature compatibility
                 if hasattr(course, 'required_features') and course.required_features:
                     if not all(feat in getattr(room, 'features', []) for feat in course.required_features):
                         continue
                 
-                # Faculty availability
+                # HC7: Faculty availability
                 if course.faculty_id in self.faculty:
                     faculty_avail = getattr(self.faculty[course.faculty_id], 'available_slots', None)
                     if faculty_avail and t_slot.slot_id not in faculty_avail:
@@ -296,6 +297,9 @@ class AdaptiveCPSATSolver:
             self._add_hierarchical_student_constraints(
                 model, variables, cluster, strategy['student_priority']
             )
+        
+        # HC8: Faculty workload limits
+        self._add_workload_constraints(model, variables, cluster)
         
         # Solve with cancellation callback
         logger.info(f"[CP-SAT SOLVE] Starting solver with {len(variables)} variables, timeout={strategy['timeout']}s")
@@ -451,6 +455,34 @@ class AdaptiveCPSATSolver:
                 ]
                 if room_vars:
                     model.Add(sum(room_vars) <= 1)
+    
+    def _add_workload_constraints(self, model, variables, cluster):
+        """HC8: Faculty workload limits - ensure teaching load doesn't exceed max_load"""
+        for faculty_id in set(c.faculty_id for c in cluster):
+            if faculty_id not in self.faculty:
+                continue
+            
+            faculty_obj = self.faculty[faculty_id]
+            max_load = getattr(faculty_obj, 'max_load', len(self.time_slots))
+            
+            # Count total assigned sessions for this faculty
+            faculty_courses = [c for c in cluster if c.faculty_id == faculty_id]
+            total_sessions = sum(c.duration for c in faculty_courses)
+            
+            # Only add constraint if workload would exceed limit
+            if total_sessions > max_load:
+                logger.info(f"[HC8] Faculty {faculty_id}: {total_sessions} sessions > {max_load} limit")
+                # This cluster violates workload - constraint will make it infeasible
+                # Add constraint that sum of all assigned sessions <= max_load
+                faculty_vars = [
+                    variables[(c.course_id, s, t, r)]
+                    for c in faculty_courses
+                    for s in range(c.duration)
+                    for t, r in [(t_slot.slot_id, room.room_id) for t_slot in self.time_slots for room in self.rooms]
+                    if (c.course_id, s, t, r) in variables
+                ]
+                if faculty_vars:
+                    model.Add(sum(faculty_vars) <= max_load)
     
     def _add_hierarchical_student_constraints(self, model, variables, cluster, priority: str):
         """

@@ -10,7 +10,7 @@ from django.core.cache import cache
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
 from .models import Batch, Department, GenerationJob, Timetable
@@ -31,6 +31,12 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
     queryset = GenerationJob.objects.all()
     serializer_class = GenerationJobSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        """Allow public access to list endpoint for status checking"""
+        if self.action == 'list':
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get_queryset(self):
         """Filter jobs based on user role and status"""
