@@ -52,17 +52,18 @@ class EnterpriseProgressTracker:
         logger.info(f"[PROGRESS] Time-based virtual progress tracker initialized for {job_id}")
     
     def set_stage(self, stage_name: str, total_items: int = 0):
-        """Set current stage with optional work tracking"""
+        """Set current stage with optional work tracking - NO JUMP"""
         if stage_name in self.stage_config:
-            # Calculate cumulative progress up to this stage
+            # Calculate expected stage start progress
             stage_order = ['load_data', 'clustering', 'cpsat', 'ga', 'rl', 'finalize']
             if stage_name in stage_order:
                 idx = stage_order.index(stage_name)
-                self.stage_start_progress = sum(self.stage_config[s]['weight'] for s in stage_order[:idx])
+                expected_start = sum(self.stage_config[s]['weight'] for s in stage_order[:idx])
+            else:
+                expected_start = 0
             
-            # CRITICAL: Ensure last_progress never goes backward when switching stages
-            if self.stage_start_progress < self.last_progress:
-                self.stage_start_progress = self.last_progress
+            # CRITICAL: Use current progress as start if it's higher (no backward jump)
+            self.stage_start_progress = max(expected_start, self.last_progress)
             
             self.current_stage = stage_name
             self.stage_start_time = time.time()
@@ -72,32 +73,29 @@ class EnterpriseProgressTracker:
             self.stage_items_done = 0
             
             if total_items > 0:
-                logger.info(f"[PROGRESS] Stage: {stage_name} (base: {self.stage_start_progress}%, items: {total_items})")
+                logger.info(f"[PROGRESS] Stage: {stage_name} (start: {self.stage_start_progress:.1f}%, items: {total_items})")
             else:
-                logger.info(f"[PROGRESS] Stage: {stage_name} (base: {self.stage_start_progress}%, time-based)")
+                logger.info(f"[PROGRESS] Stage: {stage_name} (start: {self.stage_start_progress:.1f}%, time-based)")
     
     def update_work_progress(self, items_done: int):
         """Update work-based progress (for CP-SAT clusters, GA generations, RL episodes)"""
         self.stage_items_done = items_done
     
     def mark_stage_complete(self):
-        """Mark current stage as completed"""
-        stage_order = ['load_data', 'clustering', 'cpsat', 'ga', 'rl', 'finalize']
-        if self.current_stage in stage_order:
-            idx = stage_order.index(self.current_stage)
-            stage_end_progress = sum(self.stage_config[s]['weight'] for s in stage_order[:idx+1])
-            if self.last_progress < stage_end_progress:
-                self.last_progress = stage_end_progress
-                logger.info(f"[PROGRESS] Stage {self.current_stage} completed, jumped to {self.last_progress}%")
-            else:
-                logger.info(f"[PROGRESS] Stage {self.current_stage} completed at {self.last_progress}%")
+        """Mark current stage as completed - NO JUMP, just log"""
+        # Don't force jump - let work-based or time-based progress naturally reach end
+        logger.info(f"[PROGRESS] Stage {self.current_stage} completed at {self.last_progress:.1f}%")
+        
+        # Reset work tracking for next stage
+        self.stage_items_total = 0
+        self.stage_items_done = 0
     
     def calculate_smooth_progress(self) -> float:
         """
-        HYBRID Progress Tracking (Linus Torvalds approach)
-        - Use ACTUAL work completion when available (CP-SAT clusters, GA generations)
-        - Fall back to time-based smoothing when blocked
-        - GUARANTEED forward-only movement (monotonic)
+        HYBRID Progress Tracking - FIXED sticking and jumping
+        - Use ACTUAL work completion when available
+        - Fall back to time-based smoothing
+        - ALWAYS increment (never stick)
         """
         stage_config = self.stage_config.get(self.current_stage, {'weight': 0, 'expected_time': 1})
         stage_weight = stage_config['weight']
@@ -105,7 +103,7 @@ class EnterpriseProgressTracker:
         # HYBRID: Use actual work if available, otherwise use time
         if self.stage_items_total > 0:
             # Work-based progress (CP-SAT clusters, GA generations, RL episodes)
-            work_completion = self.stage_items_done / self.stage_items_total
+            work_completion = min(1.0, self.stage_items_done / self.stage_items_total)
             stage_progress = work_completion * stage_weight
         else:
             # Time-based progress (for stages without measurable work)
@@ -115,9 +113,11 @@ class EnterpriseProgressTracker:
             
             raw_progress = stage_elapsed / stage_expected_time
             
+            # Smooth asymptotic approach
             if raw_progress < 1.0:
                 smooth_progress = raw_progress
             else:
+                # Slow down but keep moving
                 overtime = raw_progress - 1.0
                 smooth_progress = 0.99 - 0.99 * (0.5 ** overtime)
             
@@ -126,8 +126,20 @@ class EnterpriseProgressTracker:
         # Map to overall progress
         current_progress = self.stage_start_progress + stage_progress
         
-        # CRITICAL: Strict monotonic guarantee - never go backwards
-        current_progress = max(current_progress, self.last_progress + 0.01)
+        # CRITICAL FIX: ALWAYS increment, never stick
+        now = time.time()
+        time_since_last_update = now - getattr(self, '_last_update_time', now)
+        self._last_update_time = now
+        
+        # Minimum increment based on time (0.05% per 100ms = smooth)
+        min_increment = 0.05 * (time_since_last_update / 0.1)
+        
+        if current_progress <= self.last_progress:
+            # Force increment if stuck
+            current_progress = self.last_progress + min_increment
+        elif current_progress - self.last_progress < min_increment:
+            # Ensure minimum increment
+            current_progress = self.last_progress + min_increment
         
         # Cap at 98% until explicitly completed
         current_progress = min(98.0, current_progress)
@@ -271,16 +283,22 @@ class ProgressUpdateTask:
         try:
             update_count = 0
             while self.running:
-                # Build message
+                # Build message with work progress if available
                 stage_name = self.tracker.current_stage.replace('_', ' ').title()
-                message = f"Processing: {stage_name}"
+                
+                if self.tracker.stage_items_total > 0:
+                    # Show work progress
+                    message = f"{stage_name}: {self.tracker.stage_items_done}/{self.tracker.stage_items_total}"
+                else:
+                    # Generic message
+                    message = f"Processing: {stage_name}"
                 
                 await self.tracker.update(message)
                 update_count += 1
                 
                 # Log every 10 updates (every 1 second) for debugging
                 if update_count % 10 == 0:
-                    logger.debug(f"[PROGRESS] Background task running: {self.tracker.last_progress:.1f}% - {message}")
+                    logger.debug(f"[PROGRESS] {self.tracker.last_progress:.1f}% - {message}")
                 
                 await asyncio.sleep(0.1)  # Update every 100ms for ultra-smooth progress
         except asyncio.CancelledError:

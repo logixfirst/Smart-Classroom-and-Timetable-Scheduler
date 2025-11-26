@@ -1,47 +1,45 @@
 """
-Multi-GPU Support for GA Islands
+GPU Detection and Management for Tensor GA
 """
 import torch
 import logging
-from typing import List
 
 logger = logging.getLogger(__name__)
 
-class MultiGPUManager:
-    """Manage multiple GPUs for parallel island evolution"""
+class GPUManager:
+    """Detect and manage GPU for tensor operations"""
     
     def __init__(self):
-        self.num_gpus = 0
-        self.devices = []
-        self._detect_gpus()
+        self.has_gpu = False
+        self.device = torch.device('cpu')
+        self.gpu_name = None
+        self.gpu_memory_gb = 0
+        self._detect_gpu()
     
-    def _detect_gpus(self):
-        """Detect available GPUs"""
+    def _detect_gpu(self):
+        """Detect GPU and capabilities"""
         if not torch.cuda.is_available():
-            logger.info("No GPUs available")
+            logger.info("⚠️ No GPU available - using CPU")
             return
         
-        self.num_gpus = torch.cuda.device_count()
-        self.devices = [torch.device(f'cuda:{i}') for i in range(self.num_gpus)]
-        
-        for i, device in enumerate(self.devices):
-            props = torch.cuda.get_device_properties(device)
-            logger.info(f"GPU {i}: {props.name} ({props.total_memory / 1024**3:.1f}GB)")
+        try:
+            self.device = torch.device('cuda:0')
+            props = torch.cuda.get_device_properties(0)
+            self.gpu_name = props.name
+            self.gpu_memory_gb = props.total_memory / (1024**3)
+            self.has_gpu = True
+            
+            logger.info(f"✅ GPU: {self.gpu_name} ({self.gpu_memory_gb:.1f}GB VRAM)")
+        except Exception as e:
+            logger.error(f"❌ GPU detection failed: {e}")
+            self.device = torch.device('cpu')
     
-    def distribute_islands(self, num_islands: int) -> List[int]:
-        """Distribute islands across GPUs"""
-        if self.num_gpus == 0:
-            return [0] * num_islands  # CPU fallback
+    def get_optimal_population_size(self) -> int:
+        """Calculate optimal population size based on VRAM"""
+        if not self.has_gpu:
+            return 100  # CPU fallback
         
-        # Round-robin distribution
-        gpu_assignments = [i % self.num_gpus for i in range(num_islands)]
-        logger.info(f"Distributed {num_islands} islands across {self.num_gpus} GPUs")
-        return gpu_assignments
-    
-    def get_device(self, gpu_id: int):
-        """Get device for GPU ID"""
-        if gpu_id >= len(self.devices):
-            return torch.device('cpu')
-        return self.devices[gpu_id]
+        # Scale population with VRAM: 1GB = 1000 individuals
+        return min(20000, int(self.gpu_memory_gb * 1000))
 
-multi_gpu_manager = MultiGPUManager()
+gpu_manager = GPUManager()

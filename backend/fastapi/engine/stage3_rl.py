@@ -598,9 +598,8 @@ class RLConflictResolver:
     
     def resolve_conflicts(self, schedule: Dict, job_id: str = None) -> Dict:
         """Resolve conflicts in schedule using RL with Transfer Learning"""
-        self.job_id = job_id  # Store for progress updates
+        self.job_id = job_id
         logger.info(f"Starting RL conflict resolution with {len(schedule)} assignments")
-        logger.info(f"Expected quality: {self.rl_agent.expected_quality*100:.0f}% (Transfer Learning: {'✅ Enabled' if len(self.rl_agent.q_table) > 0 else '❌ Disabled'})")
         
         # Prepare timetable data
         timetable_data = {
@@ -615,27 +614,25 @@ class RLConflictResolver:
         conflicts = self._detect_conflicts(schedule)
         
         if not conflicts:
-            logger.info("No conflicts detected")
-            # Save learned Q-table for future transfer learning
-            if self.org_id:
-                self._save_learned_knowledge()
+            logger.info("✅ No conflicts detected")
             return schedule
         
-        logger.info(f"Detected {len(conflicts)} conflicts, resolving...")
+        logger.info(f"⚠️ Detected {len(conflicts)} conflicts, resolving...")
         
-        # Use DQN for high conflict scenarios
-        if len(conflicts) > self.use_dqn_threshold and self.use_gpu:
-            logger.info(f"🧠 High conflicts ({len(conflicts)}), using DQN instead of Q-learning")
-            resolved = self._resolve_with_dqn(conflicts, timetable_data)
-        else:
-            # Standard Q-learning for normal conflicts
-            resolved = resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, self.rl_agent, self.progress_tracker)
+        # ALWAYS use enhanced RL (no DQN - it's not resolving conflicts properly)
+        resolved = resolve_conflicts_with_enhanced_rl(
+            conflicts, 
+            timetable_data, 
+            self.rl_agent, 
+            self.progress_tracker
+        )
         
-        logger.info(f"RL resolved {len(resolved)} conflicts")
+        # Verify resolution
+        remaining_conflicts = self._detect_conflicts(timetable_data['current_solution'])
+        logger.info(f"✅ RL resolved {len(conflicts) - len(remaining_conflicts)}/{len(conflicts)} conflicts")
         
-        # Save learned Q-table for future transfer learning
-        if self.org_id:
-            self._save_learned_knowledge()
+        if remaining_conflicts:
+            logger.warning(f"⚠️ {len(remaining_conflicts)} conflicts remain unresolved")
         
         return timetable_data['current_solution']
     
@@ -829,16 +826,17 @@ def _update_rl_progress(progress_tracker, current_episode: int, total_episodes: 
         logger.debug(f"Failed to update RL progress: {e}")
 
 def resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, rl_agent=None, progress_tracker=None):
-    """RAM-safe parallel batch RL conflict resolution"""
+    """RAM-safe parallel batch RL conflict resolution - ACTUALLY RESOLVES CONFLICTS"""
     
     if rl_agent is None:
         rl_agent = ContextAwareRLAgent()
     
     resolved = []
     initial_conflicts = len(conflicts)
+    remaining_conflicts = conflicts.copy()
     
-    # RL episodes for conflict resolution
-    max_episodes = min(100, len(conflicts) * 2)
+    # RL episodes for conflict resolution - MORE AGGRESSIVE
+    max_episodes = min(200, len(conflicts) * 3)  # More episodes for better resolution
     
     # Adaptive batch size based on RAM
     import psutil
@@ -850,12 +848,13 @@ def resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, rl_agent=None,
     from concurrent.futures import ThreadPoolExecutor, as_completed
     
     for episode in range(0, max_episodes, batch_size):
-        if not conflicts:
+        if not remaining_conflicts:
+            logger.info(f"✅ All conflicts resolved at episode {episode}")
             break
         
-        # Process batch of conflicts
+        # Process batch of remaining conflicts
         batch_end = min(episode + batch_size, max_episodes)
-        batch_conflicts = [conflicts[i % len(conflicts)] for i in range(episode, batch_end)]
+        batch_conflicts = remaining_conflicts[:batch_size]  # Take first N conflicts
         
         # Parallel conflict resolution (threads share memory)
         with ThreadPoolExecutor(max_workers=min(batch_size, 8)) as executor:
@@ -886,9 +885,10 @@ def resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, rl_agent=None,
                         resolved.append(swap_result)
                         rl_agent.conflicts_resolved += 1
                         
-                        # Remove resolved conflict
-                        conflicts = [c for c in conflicts if c['course_id'] != conflict['course_id'] or 
-                                    c.get('student_id') != conflict.get('student_id')]
+                        # Remove resolved conflict from remaining list
+                        remaining_conflicts = [c for c in remaining_conflicts 
+                                             if not (c['course_id'] == conflict['course_id'] and 
+                                                    c.get('student_id') == conflict.get('student_id'))]
                 except Exception as e:
                     logger.debug(f"Conflict resolution failed: {e}")
         

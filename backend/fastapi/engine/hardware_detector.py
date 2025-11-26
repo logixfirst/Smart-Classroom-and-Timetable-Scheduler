@@ -7,6 +7,7 @@ import psutil
 import platform
 import subprocess
 import json
+import os
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
@@ -525,97 +526,102 @@ def get_hardware_profile(force_refresh: bool = False) -> HardwareProfile:
     return hardware_detector.detect_hardware(force_refresh)
 
 def get_optimal_config(profile: HardwareProfile) -> Dict:
-    """Get optimal configuration based on hardware profile"""
+    """Get hardware-adaptive optimal configuration"""
     
-    # Adaptive parallelization based on CPU cores and RAM
     cpu_cores = profile.cpu_cores
+    total_ram = profile.total_ram_gb
     available_ram = profile.available_ram_gb
+    has_gpu = profile.has_nvidia_gpu
+    gpu_vram = profile.gpu_memory_gb
     
-    # Stage 1: Graph construction workers
-    graph_workers = min(cpu_cores, 8)
-    
-    # Stage 2A: Cluster parallelization
-    if available_ram > 6.0:
-        cluster_workers = min(cpu_cores - 2, 12)  # Leave 2 cores free
-        cpsat_workers = 4
-    elif available_ram > 4.0:
-        cluster_workers = min(cpu_cores // 2, 6)
-        cpsat_workers = 2
+    # Determine hardware tier
+    if total_ram >= 24 and cpu_cores >= 12:
+        tier = "workstation"
+    elif total_ram >= 12 and cpu_cores >= 6:
+        tier = "laptop"
     else:
-        cluster_workers = 1
-        cpsat_workers = 1
+        tier = "potato"
     
-    # Stage 2B: Island Model GA
-    island_workers = min(8, max(4, cpu_cores // 2))
+    # Stage 1: Louvain
+    if tier == "workstation":
+        louvain_workers = min(cpu_cores - 2, 12)
+    elif tier == "laptop":
+        louvain_workers = min(cpu_cores // 2, 4)
+    else:
+        louvain_workers = 1
     
-    # Stage 3: Conflict detection workers
-    conflict_workers = min(8, cpu_cores)
+    # Stage 2A: CP-SAT
+    if tier == "workstation":
+        cpsat_timeout = 2
+        cpsat_parallel = min(cpu_cores - 2, 12)
+        student_limit = 100
+    elif tier == "laptop":
+        cpsat_timeout = 1
+        cpsat_parallel = min(cpu_cores // 2, 4)
+        student_limit = 50
+    else:
+        cpsat_timeout = 0.5
+        cpsat_parallel = 1
+        student_limit = 10
     
-    config = {
-        # Stage 1: Louvain Clustering
-        'graph_construction_workers': graph_workers,
-        'louvain_runs': 3 if cpu_cores < 8 else 5,
-        
-        # Stage 2A: CP-SAT
-        'cpsat_timeout': 5,  # Fast mode
-        'cpsat_workers': cpsat_workers,
-        'cluster_parallel_workers': cluster_workers,
-        
-        # Stage 2B: GA
-        'ga_island_workers': island_workers,
-        'ga_population_per_island': 50,
-        'ga_generations': 50,
-        'ga_migration_interval': 10,
-        
-        # Stage 3: RL
-        'rl_iterations': 100,
-        'conflict_detection_workers': conflict_workers,
-        
-        # GPU
-        'use_gpu': profile.has_nvidia_gpu and profile.gpu_memory_gb >= 4,
-        'gpu_fitness_threshold': 200,  # Use GPU if population >= 200
-        
-        # Memory
-        'memory_limit_gb': min(available_ram * 0.8, 16.0),
-        'parallel_processes': cluster_workers,
-        'use_distributed': False
+    # Stage 2B: GA - CRITICAL DECISION
+    # NEVER use GPU for GA if VRAM < 8GB (causes OOM)
+    use_gpu_ga = has_gpu and gpu_vram >= 8 and total_ram >= 24
+    
+    if tier == "workstation" and total_ram >= 24:
+        ga_population = 30
+        ga_generations = 30
+        ga_islands = 4 if use_gpu_ga else 1
+    elif tier == "laptop":
+        ga_population = 12
+        ga_generations = 18
+        ga_islands = 1  # NO island model for 16GB RAM
+    else:
+        ga_population = 5
+        ga_generations = 10
+        ga_islands = 1
+    
+    # Stage 3: RL
+    if tier == "workstation":
+        rl_iterations = 200
+        rl_similar_unis = 10
+    elif tier == "laptop":
+        rl_iterations = 100
+        rl_similar_unis = 3
+    else:
+        rl_iterations = 50
+        rl_similar_unis = 1
+    
+    return {
+        'tier': tier,
+        'stage1_louvain': {
+            'workers': louvain_workers,
+            'edge_threshold': 0.5,
+            'parallel_mode': 'batched' if tier != 'potato' else 'sequential'
+        },
+        'stage2a_cpsat': {
+            'timeout': cpsat_timeout,
+            'parallel_clusters': cpsat_parallel,
+            'student_limit': student_limit,
+            'quick_feasibility': True
+        },
+        'stage2b_ga': {
+            'population': ga_population,
+            'generations': ga_generations,
+            'islands': ga_islands,
+            'parallel_fitness': True,
+            'fitness_workers': min(cpu_cores // 2, 4),
+            'fitness_mode': 'full',
+            'sample_students': None,
+            'early_stopping': True,
+            'early_stop_patience': 3,
+            'use_gpu': use_gpu_ga
+        },
+        'stage3_qlearning': {
+            'max_iterations': rl_iterations,
+            'transfer_learning': True,
+            'similar_universities': rl_similar_unis,
+            'bootstrap_weight': 0.3,
+            'use_gpu': False
+        }
     }
-    
-    # Adjust based on strategy
-    if profile.optimal_strategy == ExecutionStrategy.GPU_CUDA:
-        config.update({
-            'use_gpu': True,
-            'gpu_memory_gb': profile.gpu_memory_gb,
-            'ga_population': int(15 * profile.gpu_multiplier),
-            'ga_generations': int(25 * 1.5),  # GPU can handle more generations
-            'cpsat_timeout': int(30 * 1.5)
-        })
-    
-    elif profile.optimal_strategy == ExecutionStrategy.CPU_MULTI:
-        config.update({
-            'cpsat_workers': min(profile.cpu_cores, 8),
-            'parallel_processes': min(profile.cpu_cores // 2, 4),
-            'ga_population': int(15 * profile.cpu_multiplier),
-            'memory_limit_gb': min(profile.available_ram_gb * 0.8, 16.0)
-        })
-    
-    elif profile.optimal_strategy == ExecutionStrategy.CLOUD_DISTRIBUTED:
-        config.update({
-            'use_distributed': True,
-            'distributed_nodes': len(profile.distributed_nodes),
-            'cpsat_workers': min(profile.cpu_cores * 2, 16),
-            'ga_population': int(15 * profile.cpu_multiplier * 2),
-            'memory_limit_gb': min(profile.available_ram_gb * 0.9, 32.0)
-        })
-    
-    elif profile.optimal_strategy == ExecutionStrategy.HYBRID:
-        config.update({
-            'use_gpu': True,
-            'gpu_memory_gb': profile.gpu_memory_gb,
-            'cpsat_workers': min(profile.cpu_cores, 8),
-            'parallel_processes': min(profile.cpu_cores // 2, 4),
-            'ga_population': int(15 * max(profile.cpu_multiplier, profile.gpu_multiplier)),
-            'memory_limit_gb': min(profile.available_ram_gb * 0.8, 24.0)
-        })
-    
-    return config

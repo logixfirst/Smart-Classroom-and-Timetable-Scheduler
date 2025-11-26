@@ -29,7 +29,7 @@ from functools import wraps
 import os
 
 # Hardware-Adaptive System
-from engine.hardware_detector import get_hardware_profile, HardwareProfile
+from engine.hardware_detector import get_hardware_profile, HardwareProfile, get_optimal_config
 from engine.adaptive_executor import get_adaptive_executor, AdaptiveExecutor
 from engine.distributed_tasks import discover_workers, select_optimal_workers
 
@@ -288,15 +288,15 @@ class TimetableGenerationSaga:
         # Set stage for progress tracking
         self.progress_tracker.set_stage('load_data')
         
-        # Detect hardware fresh for each generation (RAM availability changes)
+        # Detect hardware and get optimal config
         global hardware_profile, adaptive_executor
-        logger.info("[HARDWARE] Detecting current system state...")
+        logger.info("[HARDWARE] Detecting system...")
         hardware_profile = get_hardware_profile(force_refresh=True)
-        logger.info(f"[HARDWARE] Available RAM: {hardware_profile.available_ram_gb:.1f}GB")
+        optimal_config = get_optimal_config(hardware_profile)
+        
+        logger.info(f"[HARDWARE] Tier: {optimal_config['tier']} | RAM: {hardware_profile.total_ram_gb:.1f}GB | CPU: {hardware_profile.cpu_cores} cores")
         if hardware_profile.has_nvidia_gpu:
-            logger.info(f"[HARDWARE] ✅ GPU: {hardware_profile.gpu_memory_gb:.1f}GB VRAM")
-        else:
-            logger.warning("[HARDWARE] ⚠️ No GPU detected")
+            logger.info(f"[HARDWARE] GPU: {hardware_profile.gpu_memory_gb:.1f}GB VRAM")
         
         # Hardware info logged (background task handles progress)
         
@@ -339,9 +339,15 @@ class TimetableGenerationSaga:
             await client.close()
     
     async def _stage1_louvain_clustering(self, job_id: str, request_data: dict):
-        """Stage 1: Louvain clustering with hardware orchestration"""
+        """Stage 1: Louvain clustering with memory management"""
         from engine.stage1_clustering import LouvainClusterer
         from engine.orchestrator import get_orchestrator
+        from utils.memory_cleanup import get_memory_usage, aggressive_cleanup
+        import gc
+        
+        # Check memory before clustering
+        mem_before = get_memory_usage()
+        logger.info(f"[STAGE1] Memory before clustering: {mem_before['rss_mb']:.1f}MB ({mem_before['percent']:.1f}%)")
         
         data = self.job_data[job_id]['results']['load_data']
         courses = data['courses']
@@ -359,6 +365,11 @@ class TimetableGenerationSaga:
             clusterer
         )
         
+        # Cleanup after clustering
+        del clusterer
+        gc.collect()
+        logger.info(f"[STAGE1] Clustering complete: {len(clusters)} clusters")
+        
         return clusters
     
 
@@ -368,13 +379,25 @@ class TimetableGenerationSaga:
         import psutil
         import gc
         from concurrent.futures import ThreadPoolExecutor, as_completed
+        from utils.memory_cleanup import get_memory_usage, aggressive_cleanup
         
         data = self.job_data[job_id]['results']
         clusters = data['stage1_louvain_clustering']
         
-        # Check available memory
+        # Check available memory with monitoring
         mem = psutil.virtual_memory()
         available_gb = mem.available / (1024**3)
+        mem_usage = get_memory_usage()
+        logger.info(f"[STAGE2] Memory before CP-SAT: {mem_usage['rss_mb']:.1f}MB ({mem_usage['percent']:.1f}%)")
+        
+        # Emergency cleanup if memory > 75%
+        if mem_usage['percent'] > 75:
+            logger.warning(f"[STAGE2] ⚠️ High memory ({mem_usage['percent']:.1f}%), forcing cleanup")
+            aggressive_cleanup()
+            mem = psutil.virtual_memory()
+            available_gb = mem.available / (1024**3)
+            mem_usage = get_memory_usage()
+            logger.info(f"[STAGE2] After cleanup: {mem_usage['rss_mb']:.1f}MB ({mem_usage['percent']:.1f}%)")
         
         # Use ThreadPoolExecutor (not ProcessPoolExecutor) to avoid pickle errors
         # Threads share memory, so no duplication like processes
@@ -462,10 +485,12 @@ class TimetableGenerationSaga:
                 
                 gc.collect()
         
-        # Mark stage as complete (jump to stage end)
+        # Mark stage as complete and cleanup
         self.progress_tracker.mark_stage_complete()
         
-        logger.info(f"[STAGE2] Completed: {len(all_solutions)} assignments from {len(clusters)} clusters")
+        # Aggressive cleanup after CP-SAT
+        cleanup_stats = aggressive_cleanup()
+        logger.info(f"[STAGE2] Completed: {len(all_solutions)} assignments, freed {cleanup_stats['freed_mb']:.1f}MB")
         
         # FALLBACK: If no solutions found, generate mock timetable
         if len(all_solutions) == 0:
@@ -673,207 +698,153 @@ class TimetableGenerationSaga:
         return mock_schedule
     
     async def _stage2_ga_optimization(self, job_id: str, request_data: dict):
-        """Stage 2B: GA optimization with Island Model parallelization"""
-        from engine.stage2_ga import GeneticAlgorithmOptimizer
+        """Stage 2B: GPU Tensor GA - 90%+ GPU utilization with memory management"""
         import gc
-        import multiprocessing
+        import torch
+        from utils.memory_cleanup import get_memory_usage, aggressive_cleanup
+        
+        # Check memory before GA
+        mem_before = get_memory_usage()
+        logger.info(f"[STAGE2B] Memory before GA: {mem_before['rss_mb']:.1f}MB ({mem_before['percent']:.1f}%)")
         
         data = self.job_data[job_id]['results']
         cpsat_result = data['stage2_cpsat_solving']
         initial_schedule = cpsat_result.get('schedule', {})
         
         if not initial_schedule:
-            logger.warning("[STAGE2B] No initial schedule from CP-SAT, skipping GA")
+            logger.warning("[STAGE2B] No initial schedule, skipping GA")
             return cpsat_result
         
-        logger.info(f"[STAGE2B] Starting Island Model GA with {len(initial_schedule)} initial assignments")
+        logger.info(f"[STAGE2B] GPU Tensor GA: {len(initial_schedule)} assignments")
         self.progress_tracker.set_stage('ga')
         
-        # Time-based progress will handle smooth updates during GA
-        
         try:
-            # Prepare data
             courses = data['load_data']['courses']
             rooms = data['load_data']['rooms']
             time_slots = data['load_data']['time_slots']
             faculty = data['load_data']['faculty']
             
-            # Determine number of islands based on CPU cores
-            cpu_cores = multiprocessing.cpu_count()
-            num_islands = min(8, max(4, cpu_cores // 2))  # 4-8 islands
+            has_gpu = torch.cuda.is_available()
             
-            # GA Optimizer with adaptive sizing based on schedule size
-            has_gpu = hardware_profile.has_nvidia_gpu if hardware_profile else False
+            # Use hardware-optimal config
+            global hardware_profile
+            optimal_config = get_optimal_config(hardware_profile) if hardware_profile else {'stage2b_ga': {'population': 12, 'generations': 18, 'islands': 1, 'use_gpu': False, 'fitness_mode': 'full'}}
+            ga_config = optimal_config['stage2b_ga']
             
-            # Use strategy config if available
-            if hasattr(self, 'strategy') and self.strategy:
-                pop_size = self.strategy.ga_population
-                generations = self.strategy.ga_generations
-                num_islands = self.strategy.ga_islands if has_gpu else 1
-                use_sample_fitness = self.strategy.use_sample_fitness
-                sample_size = self.strategy.sample_size
-                logger.info(f"[STAGE2B] Strategy: pop={pop_size}, gen={generations}, islands={num_islands}, sample={use_sample_fitness}")
+            if has_gpu and ga_config['use_gpu']:
+                # GPU Tensor GA
+                from engine.gpu_tensor_ga import GPUTensorGA
+                
+                pop_size = min(ga_config['population'] * 40, 2000)
+                generations = ga_config['generations']
+                logger.info(f"[STAGE2B] GPU Tensor GA: pop={pop_size}, gen={generations}")
+                
+                logger.info(f"[STAGE2B] ✅ GPU Tensor GA: pop={pop_size}, gen={generations}")
+                
+                gpu_ga = GPUTensorGA(
+                    courses=courses,
+                    rooms=rooms,
+                    time_slots=time_slots,
+                    faculty=faculty,
+                    initial_solution=initial_schedule,
+                    population_size=pop_size,
+                    generations=generations,
+                    mutation_rate=0.15,
+                    device='cuda'
+                )
+                
+                optimized_schedule = await asyncio.to_thread(gpu_ga.evolve)
+                
+                # Calculate fitness using old GA for compatibility
+                from engine.stage2_ga import GeneticAlgorithmOptimizer
+                temp_ga = GeneticAlgorithmOptimizer(
+                    courses=courses, rooms=rooms, time_slots=time_slots,
+                    faculty=faculty, students={},
+                    initial_solution=optimized_schedule,
+                    population_size=1, generations=1
+                )
+                final_fitness = temp_ga.fitness(optimized_schedule)
+                del temp_ga
+                
+                logger.info(f"[STAGE2B] ✅ GPU GA complete: fitness={final_fitness:.4f}")
+                
+                # CRITICAL: Force GPU cleanup after GA
+                del gpu_ga
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+                gc.collect()
+                logger.info("[STAGE2B] ✅ GPU memory released")
             else:
-                # Adaptive scaling based on available RAM
-                import psutil
-                mem = psutil.virtual_memory()
-                available_gb = mem.available / (1024**3)
+                # CPU GA with hardware-optimal config
+                logger.info(f"[STAGE2B] CPU GA: pop={ga_config['population']}, gen={ga_config['generations']}, islands={ga_config['islands']}")
+                from engine.stage2_ga import GeneticAlgorithmOptimizer
                 
-                # Scale based on RAM and dataset size
-                if available_gb > 8.0:  # High RAM (>8GB available)
-                    if len(initial_schedule) > 2000:
-                        pop_size = 6
-                        generations = 6
-                        num_islands = 3 if has_gpu else 1
-                    else:
-                        pop_size = 10
-                        generations = 10
-                        num_islands = 4 if has_gpu else 1
-                elif available_gb > 5.0:  # Medium RAM (5-8GB available)
-                    if len(initial_schedule) > 1500:
-                        pop_size = 4
-                        generations = 5
-                        num_islands = 2 if has_gpu else 1
-                    else:
-                        pop_size = 8
-                        generations = 8
-                        num_islands = 3 if has_gpu else 1
-                else:  # Low RAM (<5GB available)
-                    pop_size = 3
-                    generations = 3
-                    num_islands = 1
+                ga_optimizer = GeneticAlgorithmOptimizer(
+                    courses=courses, rooms=rooms, time_slots=time_slots,
+                    faculty=faculty, students={},
+                    initial_solution=initial_schedule,
+                    population_size=ga_config['population'],
+                    generations=ga_config['generations'],
+                    use_sample_fitness=ga_config['fitness_mode'] == 'sample_based',
+                    sample_size=ga_config.get('sample_students', 100)
+                )
+                ga_optimizer.progress_tracker = self.progress_tracker
+                ga_optimizer.job_id = job_id
                 
-                use_sample_fitness = False
-                sample_size = 0
-                logger.info(f"[STAGE2B] Adaptive config: RAM={available_gb:.1f}GB, pop={pop_size}, gen={generations}, islands={num_islands}")
-            
-            # Pass redis client to GA for progress updates
-            ga_optimizer = GeneticAlgorithmOptimizer(
-                courses=courses,
-                rooms=rooms,
-                time_slots=time_slots,
-                faculty=faculty,
-                students={},
-                initial_solution=initial_schedule,
-                population_size=pop_size,
-                generations=generations,
-                mutation_rate=0.15,
-                crossover_rate=0.8,
-                elitism_rate=0.2,
-                early_stop_patience=3,
-                use_sample_fitness=use_sample_fitness if hasattr(self, 'strategy') and self.strategy else False,
-                sample_size=sample_size if hasattr(self, 'strategy') and self.strategy else 200
-            )
-            
-            # Pass progress tracker to GA for unified progress updates
-            ga_optimizer.progress_tracker = self.progress_tracker
-            ga_optimizer.job_id = job_id
-            
-            logger.info(f"[STAGE2B] GA config: pop={pop_size}, gen={generations}, GPU={has_gpu}, assignments={len(initial_schedule)}")
-            
-            # Feature 10: Check if Celery distributed mode is enabled
-            use_celery = os.getenv('USE_CELERY_DISTRIBUTED', 'false').lower() == 'true' and CELERY_AVAILABLE
-            
-            # Use island model if GPU available and multiple islands configured
-            if has_gpu and num_islands > 1:
-                if use_celery:
-                    logger.info(f"[STAGE2B] ✅ Using Distributed Celery Island Model ({num_islands} workers)")
-                else:
-                    logger.info(f"[STAGE2B] Using GPU Island Model ({num_islands} islands)")
-                use_island_model = True
-            else:
-                logger.info(f"[STAGE2B] Using single-thread GA")
-                use_island_model = False
-                use_celery = False
-            
-            # Run GA with timeout - progress updates happen inside GA (65-80%)
-            # Adaptive timeout based on schedule size (more time for larger schedules)
-            timeout_seconds = min(900, max(180, len(initial_schedule) // 5))  # 3-15 minutes
-            logger.info(f"[STAGE2B] GA timeout set to {timeout_seconds}s for {len(initial_schedule)} assignments")
-            
-            try:
-                if use_island_model:
-                    # Feature 10: Distributed Celery OR GPU Island Model
-                    if use_celery:
-                        logger.info(f"[STAGE2B] ✅ Starting distributed Celery island evolution")
-                        optimized_schedule = await asyncio.wait_for(
-                            asyncio.to_thread(ga_optimizer.evolve_island_model, num_islands, 5, job_id, use_celery=True),
-                            timeout=timeout_seconds
-                        )
-                    else:
-                        # GPU Island Model - 4 islands, 5 gen migration
-                        optimized_schedule = await asyncio.wait_for(
-                            asyncio.to_thread(ga_optimizer.evolve_island_model, 4, 5, job_id, use_celery=False),
-                            timeout=timeout_seconds
-                        )
-                else:
-                    # Standard single-core GA
-                    optimized_schedule = await asyncio.wait_for(
-                        asyncio.to_thread(ga_optimizer.evolve, job_id),
-                        timeout=timeout_seconds
-                    )
-                
-                # CRITICAL: Stop GA immediately after completion
-                ga_optimizer.stop()
-                
-                # Mark stage as complete
-                self.progress_tracker.mark_stage_complete()
-                
+                optimized_schedule = await asyncio.to_thread(ga_optimizer.evolve, job_id)
                 final_fitness = ga_optimizer.fitness(optimized_schedule)
                 
-                logger.info(f"[STAGE2B] GA complete: fitness={final_fitness:.4f}")
-                
-                # Cleanup GA optimizer
                 del ga_optimizer
-                gc.collect()
-                
-                return {
-                    'schedule': optimized_schedule,
-                    'quality_score': final_fitness,
-                    'conflicts': [],
-                    'execution_time': 0
-                }
-            except asyncio.TimeoutError:
-                logger.warning(f"[STAGE2B] GA timed out after {timeout_seconds}s, using CP-SAT result")
-                # CRITICAL: Stop GA immediately to prevent zombie threads
-                if 'ga_optimizer' in locals():
-                    try:
-                        ga_optimizer.stop()
-                        logger.info("[STAGE2B] GA stopped successfully")
-                    except Exception as e:
-                        logger.error(f"[STAGE2B] Error stopping GA: {e}")
-                    try:
-                        del ga_optimizer
-                    except:
-                        pass
-                gc.collect()
-                gc.collect()  # Double collect
-                return cpsat_result
+            
+            # Mark stage complete and AGGRESSIVE cleanup
+            self.progress_tracker.mark_stage_complete()
+            
+            # CRITICAL: Aggressive cleanup before RL stage
+            if has_gpu:
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+            
+            cleanup_stats = aggressive_cleanup()
+            logger.info(f"[STAGE2B] ✅ Freed {cleanup_stats['freed_mb']:.1f}MB before RL stage")
+            
+            return {
+                'schedule': optimized_schedule,
+                'quality_score': final_fitness,
+                'conflicts': [],
+                'execution_time': 0
+            }
             
         except Exception as e:
-            logger.error(f"[STAGE2B] GA optimization failed: {e}")
+            logger.error(f"[STAGE2B] GA failed: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            # CRITICAL: Stop GA immediately on error
-            if 'ga_optimizer' in locals():
-                try:
-                    ga_optimizer.stop()
-                    logger.info("[STAGE2B] GA stopped after error")
-                except Exception as stop_err:
-                    logger.error(f"[STAGE2B] Error stopping GA: {stop_err}")
-                try:
-                    del ga_optimizer
-                except:
-                    pass
-            gc.collect()
-            gc.collect()  # Double collect
+            
+            # Cleanup on error
+            if 'gpu_ga' in locals():
+                del gpu_ga
+            if has_gpu:
+                torch.cuda.empty_cache()
+            aggressive_cleanup()
+            
             return cpsat_result
     
     async def _stage3_rl_conflict_resolution(self, job_id: str, request_data: dict):
-        """Stage 3: RL conflict resolution with hardware orchestration"""
+        """Stage 3: RL conflict resolution with memory management"""
         from engine.stage3_rl import RLConflictResolver
         from engine.orchestrator import get_orchestrator
+        from utils.memory_cleanup import get_memory_usage, aggressive_cleanup
         import gc
+        
+        # Check memory before RL
+        mem_before = get_memory_usage()
+        logger.info(f"[STAGE3] Memory before RL: {mem_before['rss_mb']:.1f}MB ({mem_before['percent']:.1f}%)")
+        
+        # Emergency cleanup if memory > 80%
+        if mem_before['percent'] > 80:
+            logger.warning(f"[STAGE3] ⚠️ High memory ({mem_before['percent']:.1f}%), forcing cleanup")
+            aggressive_cleanup()
+            mem_before = get_memory_usage()
+            logger.info(f"[STAGE3] After cleanup: {mem_before['rss_mb']:.1f}MB ({mem_before['percent']:.1f}%)")
         
         data = self.job_data[job_id]['results']
         ga_result = data['stage2_ga_optimization']
@@ -893,10 +864,14 @@ class TimetableGenerationSaga:
             load_data = data['load_data']
             conflicts = self._detect_conflicts(schedule, load_data)
             
-            # OPTIMIZATION: Skip RL if very few conflicts
+            # OPTIMIZATION: Skip RL if very few conflicts OR too many (memory exhaustion)
             if len(conflicts) < 10:
                 logger.info(f"[STAGE3] Only {len(conflicts)} conflicts, skipping RL")
                 return ga_result
+            
+            if len(conflicts) > 1000:
+                logger.warning(f"[STAGE3] Too many conflicts ({len(conflicts)}), limiting to 1000 for memory safety")
+                conflicts = conflicts[:1000]
             
             logger.info(f"[STAGE3] Detected {len(conflicts)} conflicts, resolving with RL")
             
@@ -922,12 +897,11 @@ class TimetableGenerationSaga:
             # Use orchestrator for optimal hardware utilization (GPU if available)
             orchestrator = get_orchestrator()
             
-            # RL training
+            # RL training - FIXED: orchestrator.execute_stage3_rl takes 2 args, not 3
             resolved_schedule = await asyncio.to_thread(
                 orchestrator.execute_stage3_rl,
                 resolver,
-                schedule,
-                job_id
+                schedule
             )
             
             # Verify resolution
@@ -938,7 +912,9 @@ class TimetableGenerationSaga:
             
             logger.info(f"[STAGE3] RL complete: {len(conflicts)} → {len(remaining_conflicts)} conflicts")
             
-            gc.collect()
+            # Aggressive cleanup after RL
+            cleanup_stats = aggressive_cleanup()
+            logger.info(f"[STAGE3] ✅ Freed {cleanup_stats['freed_mb']:.1f}MB after RL")
             
             return {
                 'schedule': resolved_schedule,
@@ -949,7 +925,12 @@ class TimetableGenerationSaga:
             
         except Exception as e:
             logger.error(f"[STAGE3] RL conflict resolution failed: {e}")
-            gc.collect()
+            
+            # Cleanup on error
+            if 'resolver' in locals():
+                del resolver
+            aggressive_cleanup()
+            
             return ga_result
     
     def _detect_conflicts(self, solution, load_data):
