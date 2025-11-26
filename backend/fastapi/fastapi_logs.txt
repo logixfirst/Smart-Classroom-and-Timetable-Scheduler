@@ -2,3 +2,12 @@
 2025-11-27 04:34:10,341 - __main__ - INFO - Logs saved to: D:\GitHub\SIH28\backend\fastapi\fastapi_logs.txt
 2025-11-27 04:34:10,465 - __main__ - INFO - Starting Enterprise FastAPI Timetable Service...
 2025-11-27 04:34:11,074 - __main__ - INFO - Memory cleanup completed
+2025-11-27 04:39:23,914 - __main__ - INFO - [ENTERPRISE] Starting generation for job 7feb758a-434f-488c-9c89-95d75da183d5
+2025-11-27 04:39:24,041 - utils.progress_tracker - INFO - [PROGRESS] Time-based virtual progress tracker initialized for 7feb758a-434f-488c-9c89-95d75da183d5
+2025-11-27 04:39:24,041 - utils.progress_tracker - INFO - [PROGRESS] Started background updates for 7feb758a-434f-488c-9c89-95d75da183d5
+2025-11-27 04:39:24,041 - engine.resource_monitor - INFO - [MONITOR] Progressive thresholds set: [70, 80, 90, 95]%
+2025-11-27 04:39:24,063 - __main__ - INFO - [SAGA] Job 7feb758a-434f-488c-9c89-95d75da183d5: Executing load_data
+2025-11-27 04:39:24,063 - utils.progress_tracker - INFO - [PROGRESS] Stage: load_data (start: 0.0%, items: 0)
+2025-11-27 04:39:24,063 - __main__ - INFO - [HARDWARE] Detecting system...
+2025-11-27 04:39:24,064 - engine.hardware_detector - INFO - Detecting hardware (no cache)...
+2025-11-27 04:39:24,064 - engine.hardware_detector - INFO - Memory detected: 15.35GB total, 5.3GB available
