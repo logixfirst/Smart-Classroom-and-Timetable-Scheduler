@@ -311,9 +311,10 @@ class TimetableGenerationSaga:
                 faculty_task = client.fetch_faculty(org_id)
                 rooms_task = client.fetch_rooms(org_id)
                 time_slots_task = client.fetch_time_slots(org_id)
+                students_task = client.fetch_students(org_id)
                 
-                courses, faculty, rooms, time_slots = await asyncio.gather(
-                    courses_task, faculty_task, rooms_task, time_slots_task
+                courses, faculty, rooms, time_slots, students = await asyncio.gather(
+                    courses_task, faculty_task, rooms_task, time_slots_task, students_task
                 )
             else:
                 # Sequential loading for low-end hardware
@@ -321,18 +322,20 @@ class TimetableGenerationSaga:
                 faculty = await client.fetch_faculty(org_id)
                 rooms = await client.fetch_rooms(org_id)
                 time_slots = await client.fetch_time_slots(org_id)
+                students = await client.fetch_students(org_id)
             
             # Validate data
             if not courses or len(courses) < 5:
                 raise ValueError(f"Insufficient courses: {len(courses)}")
             
-            logger.info(f"[DATA] Loaded {len(courses)} courses, {len(faculty)} faculty, {len(rooms)} rooms")
+            logger.info(f"[DATA] Loaded {len(courses)} courses, {len(faculty)} faculty, {len(rooms)} rooms, {len(students)} students")
             
             return {
                 'courses': courses,
                 'faculty': faculty,
                 'rooms': rooms,
-                'time_slots': time_slots
+                'time_slots': time_slots,
+                'students': students
             }
             
         finally:
@@ -727,11 +730,11 @@ class TimetableGenerationSaga:
             
             # Use hardware-optimal config
             global hardware_profile
-            optimal_config = get_optimal_config(hardware_profile) if hardware_profile else {'stage2b_ga': {'population': 12, 'generations': 18, 'islands': 1, 'use_gpu': False, 'fitness_mode': 'full'}}
-            ga_config = optimal_config['stage2b_ga']
+            optimal_config = get_optimal_config(hardware_profile) if hardware_profile else {}
+            ga_config = optimal_config.get('stage2b_ga', {'population': 12, 'generations': 18, 'islands': 1, 'use_gpu': False, 'fitness_mode': 'full'})
             
             # CRITICAL: Only use GPU if config explicitly allows it (checks VRAM >= 8GB)
-            if ga_config['use_gpu']:
+            if ga_config.get('use_gpu', False):
                 # GPU Tensor GA
                 from engine.gpu_tensor_ga import GPUTensorGA
                 
@@ -776,16 +779,19 @@ class TimetableGenerationSaga:
                 logger.info("[STAGE2B] ✅ GPU memory released")
             else:
                 # CPU GA with hardware-optimal config
-                logger.info(f"[STAGE2B] CPU GA: pop={ga_config['population']}, gen={ga_config['generations']}, islands={ga_config['islands']}")
+                pop = ga_config.get('population', 12)
+                gen = ga_config.get('generations', 18)
+                islands = ga_config.get('islands', 1)
+                logger.info(f"[STAGE2B] CPU GA: pop={pop}, gen={gen}, islands={islands}")
                 from engine.stage2_ga import GeneticAlgorithmOptimizer
                 
                 ga_optimizer = GeneticAlgorithmOptimizer(
                     courses=courses, rooms=rooms, time_slots=time_slots,
                     faculty=faculty, students={},
                     initial_solution=initial_schedule,
-                    population_size=ga_config['population'],
-                    generations=ga_config['generations'],
-                    use_sample_fitness=ga_config['fitness_mode'] == 'sample_based',
+                    population_size=pop,
+                    generations=gen,
+                    use_sample_fitness=ga_config.get('fitness_mode', 'full') == 'sample_based',
                     sample_size=ga_config.get('sample_students', 100)
                 )
                 ga_optimizer.progress_tracker = self.progress_tracker
@@ -877,8 +883,12 @@ class TimetableGenerationSaga:
             
             # Get hardware-adaptive config
             global hardware_profile
-            optimal_config = get_optimal_config(hardware_profile) if hardware_profile else None
-            stage3_config = optimal_config['stage3_qlearning'] if optimal_config else {'max_iterations': 100, 'transfer_learning': True, 'similar_universities': 3}
+            optimal_config = get_optimal_config(hardware_profile) if hardware_profile else {}
+            stage3_config = optimal_config.get('stage3_qlearning', {'max_iterations': 100, 'algorithm': 'q_learning', 'use_gpu': False})
+            
+            max_iter = stage3_config.get('max_iterations', 100)
+            use_gpu_rl = stage3_config.get('use_gpu', False)
+            algorithm = stage3_config.get('algorithm', 'q_learning')
             
             resolver = RLConflictResolver(
                 courses=load_data['courses'],
@@ -888,13 +898,13 @@ class TimetableGenerationSaga:
                 learning_rate=0.15,
                 discount_factor=0.85,
                 epsilon=0.10,
-                max_iterations=stage3_config['max_iterations'],
-                use_gpu=stage3_config.get('use_gpu', False),
+                max_iterations=max_iter,
+                use_gpu=use_gpu_rl,
                 org_id=request_data.get('organization_id'),
                 progress_tracker=self.progress_tracker
             )
             
-            logger.info(f"[STAGE3] Config: algorithm={stage3_config['algorithm']}, iterations={stage3_config['max_iterations']}, conflicts={len(conflicts)}")
+            logger.info(f"[STAGE3] Config: algorithm={algorithm}, iterations={max_iter}, conflicts={len(conflicts)}")
             
             # Use orchestrator for optimal hardware utilization (GPU if available)
             orchestrator = get_orchestrator()
@@ -1404,7 +1414,9 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
         # Feature 8: Quality-Based Refinement (COMPLETE) - BEFORE callback
         if len(timetable_entries) > 0:
             quality_score = variant.get('score', 0)
-            if quality_score < 85:  # Below threshold
+            if quality_score < 50:
+                logger.warning(f"Quality {quality_score}% too low for refinement (needs fundamental fix, not optimization)")
+            elif quality_score < 85:  # Only refine if quality is reasonable (50-85%)
                 logger.warning(f"Quality {quality_score}% below threshold, attempting refinement...")
                 try:
                     saga.progress_tracker.set_stage('refinement')

@@ -63,19 +63,24 @@ class DjangoAPIClient:
             org_id = org_row['org_id']
             logger.info(f"Found organization: {org_row['org_name']} (ID: {org_id})")
             
-            # Optimized query with indexes
+            # Optimized query with student enrollments
             query = """
-                SELECT DISTINCT c.course_id, c.course_code, c.course_name, c.dept_id,
+                SELECT c.course_id, c.course_code, c.course_name, c.dept_id,
                        c.lecture_hours_per_week, c.room_type_required, 
                        c.min_room_capacity, c.course_type,
-                       co.primary_faculty_id
+                       co.primary_faculty_id,
+                       ARRAY_AGG(DISTINCT ce.student_id) FILTER (WHERE ce.student_id IS NOT NULL) as student_ids
                 FROM courses c
                 INNER JOIN course_offerings co ON c.course_id = co.course_id
+                LEFT JOIN course_enrollments ce ON co.offering_id = ce.offering_id AND ce.is_active = true
                 WHERE c.org_id = %s 
                 AND c.is_active = true
                 AND co.is_active = true
                 AND co.primary_faculty_id IS NOT NULL
                 AND co.semester_type = %s
+                GROUP BY c.course_id, c.course_code, c.course_name, c.dept_id,
+                         c.lecture_hours_per_week, c.room_type_required,
+                         c.min_room_capacity, c.course_type, co.primary_faculty_id
                 LIMIT 5000
             """
             
@@ -97,8 +102,13 @@ class DjangoAPIClient:
             logger.info(f"Query returned {len(rows)} rows in {query_time:.2f}s")
             
             courses = []
+            total_enrollments = 0
             for row in rows:
                 try:
+                    # Get student IDs from aggregated array
+                    student_ids = [str(sid) for sid in (row.get('student_ids') or []) if sid is not None]
+                    total_enrollments += len(student_ids)
+                    
                     course = Course(
                         course_id=str(row['course_id']),
                         course_code=row['course_code'],
@@ -110,7 +120,7 @@ class DjangoAPIClient:
                         type=row.get('course_type', 'core'),
                         subject_type=row.get('course_type', 'core'),
                         required_features=[],
-                        student_ids=[],
+                        student_ids=student_ids,
                         batch_ids=[]
                     )
                     courses.append(course)
@@ -132,7 +142,7 @@ class DjangoAPIClient:
                 logger.warning(f"Semester types in database: {[(r['semester_type'], r['semester_number'], r['count']) for r in debug_rows]}")
             
             cursor.close()
-            logger.info(f"Fetched {len(courses)} courses from database")
+            logger.info(f"Fetched {len(courses)} courses with {total_enrollments} total student enrollments")
             return courses
 
         except Exception as e:
