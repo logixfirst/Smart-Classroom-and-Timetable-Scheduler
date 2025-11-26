@@ -426,7 +426,7 @@ class TimetableGenerationSaga:
         
         self.progress_tracker.set_stage('clustering')
         
-        clusterer = LouvainClusterer(target_cluster_size=10)
+        clusterer = LouvainClusterer(target_cluster_size=10, progress_tracker=self.progress_tracker)
         clusters = await asyncio.to_thread(clusterer.cluster_courses, courses)
         
         # Check cancellation after clustering

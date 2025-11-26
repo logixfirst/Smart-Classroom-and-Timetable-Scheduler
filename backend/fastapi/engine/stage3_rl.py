@@ -814,16 +814,17 @@ class RLConflictResolver:
 
 
 def _update_rl_progress(progress_tracker, current_episode: int, total_episodes: int, resolved: int, total_conflicts: int):
-    """Update RL progress using unified tracker"""
+    """Update RL progress using work-based tracking (sync method)"""
     try:
         if not progress_tracker:
             return
         
-        message = f'RL Episode {current_episode}/{total_episodes}: {resolved}/{total_conflicts} conflicts resolved'
+        # Use work-based progress (sync method, no async calls)
+        progress_tracker.update_work_progress(current_episode)
         
-        # Use unified progress tracker
-        import asyncio
-        asyncio.create_task(progress_tracker.update(message))
+        # Log every 10 episodes
+        if current_episode % 10 == 0:
+            logger.info(f'RL Episode {current_episode}/{total_episodes}: {resolved}/{total_conflicts} conflicts resolved')
     except Exception as e:
         logger.debug(f"Failed to update RL progress: {e}")
 
@@ -839,6 +840,11 @@ def resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, rl_agent=None,
     
     # RL episodes for conflict resolution - MORE AGGRESSIVE
     max_episodes = min(200, len(conflicts) * 3)  # More episodes for better resolution
+    
+    # Set total work items for progress tracking
+    if progress_tracker:
+        progress_tracker.stage_items_total = max_episodes
+        progress_tracker.stage_items_done = 0
     
     # Adaptive batch size based on RAM
     import psutil

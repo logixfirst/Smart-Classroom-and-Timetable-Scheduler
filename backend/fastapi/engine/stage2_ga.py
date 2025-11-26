@@ -82,24 +82,30 @@ class GeneticAlgorithmOptimizer:
         self.faculty = faculty
         self.students = students
         self.initial_solution = initial_solution
-        # Limit population size to prevent RAM exhaustion
-        import psutil
-        mem = psutil.virtual_memory()
-        available_gb = mem.available / (1024**3)
         
-        # Adaptive population size based on available RAM
-        if available_gb < 3.0:
-            self.population_size = min(population_size, 10)
-            self.generations = min(generations, 15)
-            logger.warning(f"Low RAM ({available_gb:.1f}GB), reducing pop={self.population_size}, gen={self.generations}")
-        elif available_gb < 5.0:
-            self.population_size = min(population_size, 15)
-            self.generations = min(generations, 20)
-            logger.info(f"Medium RAM ({available_gb:.1f}GB), pop={self.population_size}, gen={self.generations}")
+        # CRITICAL: ALWAYS use hardware_config if provided (overrides RAM detection)
+        if hardware_config:
+            self.population_size = hardware_config.get('population', population_size)
+            self.generations = hardware_config.get('generations', generations)
+            logger.info(f"Hardware config: pop={self.population_size}, gen={self.generations}")
         else:
-            self.population_size = population_size
-            self.generations = generations
-            logger.info(f"Good RAM ({available_gb:.1f}GB), pop={self.population_size}, gen={self.generations}")
+            # Fallback: RAM-based auto-detection
+            import psutil
+            mem = psutil.virtual_memory()
+            available_gb = mem.available / (1024**3)
+            
+            if available_gb < 3.0:
+                self.population_size = min(population_size, 10)
+                self.generations = min(generations, 15)
+                logger.warning(f"Low RAM ({available_gb:.1f}GB), reducing pop={self.population_size}, gen={self.generations}")
+            elif available_gb < 5.0:
+                self.population_size = min(population_size, 15)
+                self.generations = min(generations, 20)
+                logger.info(f"Medium RAM ({available_gb:.1f}GB), pop={self.population_size}, gen={self.generations}")
+            else:
+                self.population_size = population_size
+                self.generations = generations
+                logger.info(f"Good RAM ({available_gb:.1f}GB), pop={self.population_size}, gen={self.generations}")
         self.mutation_rate = mutation_rate
         self.crossover_rate = crossover_rate
         self.elitism_rate = elitism_rate
@@ -130,7 +136,10 @@ class GeneticAlgorithmOptimizer:
             # Use hardware detector config
             self.use_gpu = hardware_config.get('use_gpu', False) and TORCH_AVAILABLE
             self.gpu_offload_conflicts = self.use_gpu and gpu_offload_conflicts
-            logger.info(f"Hardware config: use_gpu={self.use_gpu}, pop={self.population_size}")
+            self.use_sample_fitness = hardware_config.get('fitness_evaluation', 'full') == 'sample_based'
+            if self.use_sample_fitness:
+                self.sample_size = hardware_config.get('sample_students', 50)
+            logger.info(f"Hardware config applied: use_gpu={self.use_gpu}, pop={self.population_size}, gen={self.generations}, sample_fitness={self.use_sample_fitness}")
         else:
             # Fallback: auto-detect
             self.use_gpu = TORCH_AVAILABLE and DEVICE is not None
@@ -581,6 +590,12 @@ class GeneticAlgorithmOptimizer:
         """Run GA evolution with early stopping and caching"""
         self.job_id = job_id  # Set BEFORE initialization
         self._stop_flag = False  # Add stop flag
+        
+        # Set total items for work-based progress
+        if hasattr(self, 'progress_tracker') and self.progress_tracker:
+            self.progress_tracker.stage_items_total = self.generations
+            self.progress_tracker.stage_items_done = 0
+        
         self.initialize_population()
         
         best_solution = self.initial_solution
@@ -738,41 +753,21 @@ class GeneticAlgorithmOptimizer:
             if not self.progress_tracker:
                 return
             
-            mode = "GPU" if self.use_gpu else "CPU"
-            message = f'GA Gen {current_gen}/{total_gen} ({mode}): fitness={fitness:.2f}'
-            
-            # Use unified progress tracker (no manual progress calculation)
-            import asyncio
-            asyncio.create_task(self.progress_tracker.update(message))
+            # Update work progress (generations completed)
+            self.progress_tracker.update_work_progress(current_gen)
         except Exception as e:
             # Silent fail - don't block GA
             pass
     
     def _update_init_progress(self, current: int, total: int):
         """Update progress during GA initialization"""
-        try:
-            if not self.progress_tracker:
-                return
-            
-            message = f'Initializing GA: {current}/{total} individuals'
-            
-            # Use unified progress tracker
-            import asyncio
-            asyncio.create_task(self.progress_tracker.update(message))
-        except:
-            pass
+        # Skip - initialization is fast, no need to update
+        pass
     
     def _update_init_progress_direct(self, message: str):
         """Direct progress update with custom message"""
-        try:
-            if not self.progress_tracker:
-                return
-            
-            # Use unified progress tracker
-            import asyncio
-            asyncio.create_task(self.progress_tracker.update(message))
-        except:
-            pass
+        # Skip - initialization is fast
+        pass
     
     def evolve_island_model(self, num_islands: int = 4, migration_interval: int = 5, job_id: str = None, use_celery: bool = False) -> Dict:
         """RAM-safe parallel island model with ThreadPoolExecutor OR Celery (Feature 10: Distributed Celery)"""

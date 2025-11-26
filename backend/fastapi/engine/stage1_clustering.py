@@ -17,8 +17,9 @@ class LouvainClusterer:
     Optimizes cluster sizes for CP-SAT feasibility
     """
     
-    def __init__(self, target_cluster_size: int = 10, edge_threshold: float = None):
+    def __init__(self, target_cluster_size: int = 10, edge_threshold: float = None, progress_tracker=None):
         self.target_cluster_size = target_cluster_size
+        self.progress_tracker = progress_tracker
         # Adaptive edge threshold based on RAM
         if edge_threshold is None:
             import psutil
@@ -41,14 +42,26 @@ class LouvainClusterer:
         Cluster courses using Louvain community detection
         Returns: Dictionary mapping cluster_id -> list of courses
         """
-        # Build constraint graph
+        # Set total work items (3 phases: graph=50%, louvain=30%, optimize=20%)
+        total_work = 100
+        if self.progress_tracker:
+            self.progress_tracker.stage_items_total = total_work
+            self.progress_tracker.stage_items_done = 0
+        
+        # Build constraint graph (0-50%)
         G = self._build_constraint_graph(courses)
+        if self.progress_tracker:
+            self.progress_tracker.update_work_progress(50)
         
-        # Run Louvain clustering
+        # Run Louvain clustering (50-80%)
         partition = self._run_louvain(G)
+        if self.progress_tracker:
+            self.progress_tracker.update_work_progress(80)
         
-        # Optimize cluster sizes
+        # Optimize cluster sizes (80-100%)
         final_clusters = self._optimize_cluster_sizes(partition, courses)
+        if self.progress_tracker:
+            self.progress_tracker.update_work_progress(100)
         
         logger.info(f"[STAGE1] Louvain clustering: {len(final_clusters)} clusters from {len(courses)} courses")
         return final_clusters
@@ -72,7 +85,7 @@ class LouvainClusterer:
         chunk_size = max(1, len(courses) // num_workers)
         chunks = [(i, min(i + chunk_size, len(courses))) for i in range(0, len(courses), chunk_size)]
         
-        # Parallel edge computation
+        # Parallel edge computation with progress tracking
         with ProcessPoolExecutor(max_workers=num_workers) as executor:
             futures = [
                 executor.submit(self._compute_edges_for_chunk, courses, start, end)
@@ -80,10 +93,17 @@ class LouvainClusterer:
             ]
             
             edges_added = 0
+            completed_chunks = 0
             for future in futures:
                 edges = future.result()
                 G.add_weighted_edges_from(edges)
                 edges_added += len(edges)
+                
+                # Update progress (graph building is 0-50% of clustering)
+                completed_chunks += 1
+                if self.progress_tracker:
+                    progress = int(50 * completed_chunks / len(chunks))
+                    self.progress_tracker.update_work_progress(progress)
         
         logger.info(f"Built graph: {len(G.nodes)} nodes, {edges_added} edges")
         return G
