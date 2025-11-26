@@ -1332,7 +1332,7 @@ async def lifespan(app: FastAPI):
         
         redis_client_global = app.state.redis_client
         app.state.redis_client.ping()
-        logger.info("✅ Redis connection successful")
+        logger.info("[OK] Redis connection successful")
         
     except Exception as e:
         logger.error(f"❌ Redis initialization failed: {e}")
