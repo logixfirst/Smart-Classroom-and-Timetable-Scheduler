@@ -154,7 +154,7 @@ class TimetableGenerationSaga:
             logger.info(f"Using strategy: {self.strategy.profile_name}")
         else:
             self.strategy = None
-            estimated_time = 300  # Default 5 minutes
+            estimated_time = 90  # Realistic 1.5 minutes based on actual runtime
         
         # Initialize enterprise progress tracker
         self.progress_tracker = EnterpriseProgressTracker(job_id, estimated_time, redis_client_global)
@@ -216,10 +216,18 @@ class TimetableGenerationSaga:
                 
                 logger.info(f"[SAGA] Job {job_id}: Executing {step_name}")
                 
-                # Execute step with timeout
+                # Adaptive timeout per stage
+                if step_name == 'stage2_ga_optimization':
+                    step_timeout = 900  # 15 minutes for GA (includes initialization)
+                elif step_name == 'stage2_cpsat_solving':
+                    step_timeout = 600  # 10 minutes for CP-SAT
+                else:
+                    step_timeout = 300  # 5 minutes for other stages
+                
+                # Execute step with adaptive timeout
                 result = await asyncio.wait_for(
                     execute_func(job_id, request_data),
-                    timeout=300  # 5 minutes per step
+                    timeout=step_timeout
                 )
                 
                 self.completed_steps.append((step_name, compensate_func, result))
@@ -278,7 +286,6 @@ class TimetableGenerationSaga:
         
         # Set stage for progress tracking
         self.progress_tracker.set_stage('load_data')
-        await self.progress_tracker.update("Detecting hardware capabilities...")
         
         # Detect hardware fresh for each generation (RAM availability changes)
         global hardware_profile, adaptive_executor
@@ -290,11 +297,7 @@ class TimetableGenerationSaga:
         else:
             logger.warning("[HARDWARE] ⚠️ No GPU detected")
         
-        # Update progress
-        hw_info = f"CPU: {hardware_profile.cpu_cores} cores, RAM: {hardware_profile.available_ram_gb:.1f}GB"
-        if hardware_profile.has_nvidia_gpu:
-            hw_info += f", GPU: {hardware_profile.gpu_memory_gb:.1f}GB"
-        await self.progress_tracker.update(f"Hardware detected - {hw_info}")
+        # Hardware info logged (background task handles progress)
         
         client = DjangoAPIClient()
         try:
@@ -324,9 +327,6 @@ class TimetableGenerationSaga:
             
             logger.info(f"[DATA] Loaded {len(courses)} courses, {len(faculty)} faculty, {len(rooms)} rooms")
             
-            # Update progress
-            await self.progress_tracker.update(f"Loaded {len(courses)} courses, {len(faculty)} faculty, {len(rooms)} rooms")
-            
             return {
                 'courses': courses,
                 'faculty': faculty,
@@ -345,9 +345,8 @@ class TimetableGenerationSaga:
         data = self.job_data[job_id]['results']['load_data']
         courses = data['courses']
         
-        # Set stage and update progress
+        # Set stage (background task will handle progress updates)
         self.progress_tracker.set_stage('clustering')
-        await self.progress_tracker.update(f"Clustering {len(courses)} courses...")
         
         # Use orchestrator for optimal hardware utilization
         orchestrator = get_orchestrator()
@@ -358,9 +357,6 @@ class TimetableGenerationSaga:
             courses,
             clusterer
         )
-        
-        # Update progress
-        await self.progress_tracker.update(f"Created {len(clusters)} clusters")
         
         return clusters
     
@@ -404,9 +400,8 @@ class TimetableGenerationSaga:
         all_solutions = {}
         total_clusters = len(clusters)
         
-        # Set stage for CP-SAT
+        # Set stage (background task will handle progress updates)
         self.progress_tracker.set_stage('cpsat')
-        await self.progress_tracker.update(f"Solving {total_clusters} clusters with CP-SAT...")
         completed = 0
         
         if max_parallel == 1:
@@ -681,12 +676,10 @@ class TimetableGenerationSaga:
         
         if not initial_schedule:
             logger.warning("[STAGE2B] No initial schedule from CP-SAT, skipping GA")
-            await self._update_progress(job_id, 70, "Skipping GA (no initial solution)")
             return cpsat_result
         
         logger.info(f"[STAGE2B] Starting Island Model GA with {len(initial_schedule)} initial assignments")
         self.progress_tracker.set_stage('ga')
-        await self.progress_tracker.update("Initializing Genetic Algorithm...")
         
         try:
             # Prepare data
@@ -744,8 +737,6 @@ class TimetableGenerationSaga:
                 sample_size = 0
                 logger.info(f"[STAGE2B] Adaptive config: RAM={available_gb:.1f}GB, pop={pop_size}, gen={generations}, islands={num_islands}")
             
-            await self.progress_tracker.update(f"Creating GA population (size: {pop_size})...")
-            
             # Pass redis client to GA for progress updates
             ga_optimizer = GeneticAlgorithmOptimizer(
                 courses=courses,
@@ -764,11 +755,11 @@ class TimetableGenerationSaga:
                 sample_size=sample_size if hasattr(self, 'strategy') and self.strategy else 200
             )
             
-            # Set redis client for GA progress updates
-            ga_optimizer.redis_client = redis_client_global
+            # Pass progress tracker to GA for unified progress updates
+            ga_optimizer.progress_tracker = self.progress_tracker
+            ga_optimizer.job_id = job_id
             
             logger.info(f"[STAGE2B] GA config: pop={pop_size}, gen={generations}, GPU={has_gpu}, assignments={len(initial_schedule)}")
-            await self.progress_tracker.update(f"GA initialized, starting evolution...")
             
             # Feature 10: Check if Celery distributed mode is enabled
             use_celery = os.getenv('USE_CELERY_DISTRIBUTED', 'false').lower() == 'true' and CELERY_AVAILABLE
@@ -777,14 +768,11 @@ class TimetableGenerationSaga:
             if has_gpu and num_islands > 1:
                 if use_celery:
                     logger.info(f"[STAGE2B] ✅ Using Distributed Celery Island Model ({num_islands} workers)")
-                    await self.progress_tracker.update(f"Evolving with {num_islands} distributed Celery workers...")
                 else:
                     logger.info(f"[STAGE2B] Using GPU Island Model ({num_islands} islands)")
-                    await self.progress_tracker.update(f"Evolving with {num_islands} GPU islands...")
                 use_island_model = True
             else:
                 logger.info(f"[STAGE2B] Using single-thread GA")
-                await self.progress_tracker.update("Evolving population...")
                 use_island_model = False
                 use_celery = False
             
@@ -821,7 +809,6 @@ class TimetableGenerationSaga:
                 final_fitness = ga_optimizer.fitness(optimized_schedule)
                 
                 logger.info(f"[STAGE2B] GA complete: fitness={final_fitness:.4f}")
-                await self.progress_tracker.update(f"GA optimization complete")
                 
                 # Cleanup GA optimizer
                 del ga_optimizer
@@ -835,25 +822,38 @@ class TimetableGenerationSaga:
                 }
             except asyncio.TimeoutError:
                 logger.warning(f"[STAGE2B] GA timed out after {timeout_seconds}s, using CP-SAT result")
-                await self.progress_tracker.update(f"GA timed out, using CP-SAT result")
-                # Stop GA on timeout
+                # CRITICAL: Stop GA immediately to prevent zombie threads
                 if 'ga_optimizer' in locals():
-                    ga_optimizer.stop()
-                    del ga_optimizer
+                    try:
+                        ga_optimizer.stop()
+                        logger.info("[STAGE2B] GA stopped successfully")
+                    except Exception as e:
+                        logger.error(f"[STAGE2B] Error stopping GA: {e}")
+                    try:
+                        del ga_optimizer
+                    except:
+                        pass
                 gc.collect()
+                gc.collect()  # Double collect
                 return cpsat_result
             
         except Exception as e:
             logger.error(f"[STAGE2B] GA optimization failed: {e}")
-            await self.progress_tracker.update("GA failed, using CP-SAT result")
-            # Stop GA on error
+            import traceback
+            logger.error(traceback.format_exc())
+            # CRITICAL: Stop GA immediately on error
             if 'ga_optimizer' in locals():
                 try:
                     ga_optimizer.stop()
+                    logger.info("[STAGE2B] GA stopped after error")
+                except Exception as stop_err:
+                    logger.error(f"[STAGE2B] Error stopping GA: {stop_err}")
+                try:
                     del ga_optimizer
                 except:
                     pass
             gc.collect()
+            gc.collect()  # Double collect
             return cpsat_result
     
     async def _stage3_rl_conflict_resolution(self, job_id: str, request_data: dict):
@@ -868,32 +868,25 @@ class TimetableGenerationSaga:
         
         if not schedule:
             logger.warning("[STAGE3] No schedule from GA, skipping RL")
-            await self._update_progress(job_id, 90, "Skipping RL (no schedule)")
             return ga_result
         
         logger.info(f"[STAGE3] Starting RL conflict resolution with {len(schedule)} assignments")
         self.progress_tracker.set_stage('rl')
-        await self.progress_tracker.update("Analyzing schedule for conflicts...")
         
         try:
             # Quick conflict detection
             load_data = data['load_data']
             conflicts = self._detect_conflicts(schedule, load_data)
             
-            await self.progress_tracker.update(f"Detected {len(conflicts)} conflicts")
-            
             # OPTIMIZATION: Skip RL if very few conflicts
             if len(conflicts) < 10:
                 logger.info(f"[STAGE3] Only {len(conflicts)} conflicts, skipping RL")
-                await self.progress_tracker.update(f"Minimal conflicts, skipping RL")
                 return ga_result
             
             logger.info(f"[STAGE3] Detected {len(conflicts)} conflicts, resolving with RL")
             
             # RL Conflict Resolver with GPU support
             has_gpu = hardware_profile.has_nvidia_gpu if hardware_profile else False
-            
-            await self.progress_tracker.update(f"Initializing RL agent...")
             
             resolver = RLConflictResolver(
                 courses=load_data['courses'],
@@ -904,31 +897,28 @@ class TimetableGenerationSaga:
                 discount_factor=0.85,
                 epsilon=0.10,
                 max_iterations=100,
-                use_gpu=has_gpu,  # Force GPU if available
-                org_id=request_data.get('organization_id')  # For transfer learning
+                use_gpu=has_gpu,
+                org_id=request_data.get('organization_id'),
+                progress_tracker=self.progress_tracker  # Pass unified progress tracker
             )
             
             logger.info(f"[STAGE3] RL config: GPU={has_gpu}, conflicts={len(conflicts)}")
-            
-            await self.progress_tracker.update("Training RL agent...")
             
             # Use orchestrator for optimal hardware utilization (GPU if available)
             orchestrator = get_orchestrator()
             
             # RL training
-            await self.progress_tracker.update("RL resolving conflicts...")
             resolved_schedule = await asyncio.to_thread(
                 orchestrator.execute_stage3_rl,
                 resolver,
-                schedule
+                schedule,
+                job_id
             )
-            await self.progress_tracker.update("Verifying conflict resolution...")
             
             # Verify resolution
             remaining_conflicts = self._detect_conflicts(resolved_schedule, load_data)
             
             logger.info(f"[STAGE3] RL complete: {len(conflicts)} → {len(remaining_conflicts)} conflicts")
-            await self.progress_tracker.update(f"RL complete: {len(remaining_conflicts)} conflicts remaining")
             
             gc.collect()
             
@@ -941,7 +931,6 @@ class TimetableGenerationSaga:
             
         except Exception as e:
             logger.error(f"[STAGE3] RL conflict resolution failed: {e}")
-            await self.progress_tracker.update("RL failed, using GA result")
             gc.collect()
             return ga_result
     
@@ -1407,12 +1396,8 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
         
         logger.info(f"[ENTERPRISE] Variant created: {len(timetable_entries)} entries, {actual_conflicts} conflicts")
         
-        # Finalization stage
+        # Finalization stage (background task handles progress)
         saga.progress_tracker.set_stage('finalize')
-        await saga.progress_tracker.update(f'Saving timetable with {len(timetable_entries)} classes...')
-        
-        # Mark as complete (but don't call callback yet - refinement may improve quality)
-        await saga.progress_tracker.complete(f'Generated timetable with {len(timetable_entries)} classes')
         logger.info(f"✅ Job {job_id} completed with {len(timetable_entries)} classes")
         
         # Feature 8: Quality-Based Refinement (COMPLETE) - BEFORE callback
@@ -1422,7 +1407,6 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
                 logger.warning(f"Quality {quality_score}% below threshold, attempting refinement...")
                 try:
                     saga.progress_tracker.set_stage('refinement')
-                    await saga.progress_tracker.update(f'Refining quality from {quality_score}%...')
                     
                     # Quick GA refinement pass (5 gens, small pop)
                     from engine.stage2_ga import GeneticAlgorithmOptimizer
@@ -1516,6 +1500,9 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
                     if 'ga_refine' in locals():
                         ga_refine.stop()
                         del ga_refine
+        
+        # Mark as complete
+        await saga.progress_tracker.complete(f'Generated timetable with {len(variant.get("timetable_entries", []))} classes')
         
         # CRITICAL: Call Django callback AFTER all processing (including refinement)
         logger.info(f"[CALLBACK] Sending final variant with {len(variant.get('timetable_entries', []))} entries to Django")

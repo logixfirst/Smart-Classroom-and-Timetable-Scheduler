@@ -150,7 +150,7 @@ class GeneticAlgorithmOptimizer:
             logger.warning(f"GPU not available (TORCH_AVAILABLE={TORCH_AVAILABLE}, DEVICE={DEVICE})")
         
         self.use_island_model = False  # Set externally
-        self.redis_client = None  # Set externally for progress updates
+        self.progress_tracker = None  # Set externally for unified progress updates
         
         # NEVER use multicore - it exhausts RAM
         self.num_workers = 1
@@ -185,7 +185,7 @@ class GeneticAlgorithmOptimizer:
         self.population = [self.initial_solution]  # No copy to save memory
         
         # Update progress at start
-        if hasattr(self, 'job_id') and self.job_id and self.redis_client:
+        if hasattr(self, 'progress_tracker') and self.progress_tracker:
             self._update_init_progress(1, self.population_size)
         
         # Add perturbed versions (reuse objects) with progress
@@ -194,7 +194,7 @@ class GeneticAlgorithmOptimizer:
             if perturbed:
                 self.population.append(perturbed)
             # Update progress EVERY individual for smooth progress
-            if hasattr(self, 'job_id') and self.job_id and self.redis_client:
+            if hasattr(self, 'progress_tracker') and self.progress_tracker:
                 self._update_init_progress(i + 2, self.population_size)
         
         logger.info(f"Initialized GA population: {len(self.population)} individuals")
@@ -559,9 +559,9 @@ class GeneticAlgorithmOptimizer:
                 cache_size = len(self.fitness_cache)
                 logger.info(f"GA Gen {generation}/{self.generations} ({mode}): Best={best_fitness:.4f}, Cache={cache_size}")
             
-            # Redis update EVERY generation (smooth progress) - CRITICAL for stuck progress
-            if job_id and self.redis_client:
-                self._update_ga_progress_batch(job_id, generation + 1, self.generations, best_fitness)
+            # Update EVERY generation (smooth progress)
+            if hasattr(self, 'progress_tracker') and self.progress_tracker:
+                self._update_ga_progress_batch(generation + 1, self.generations, best_fitness)
             
             # Check cancellation every 3 generations (more frequent)
             if job_id and generation % 3 == 0 and self._check_cancellation():
@@ -578,8 +578,8 @@ class GeneticAlgorithmOptimizer:
             self._cleanup_gpu()
         
         # Final progress update
-        if job_id:
-            self._update_ga_progress(job_id, self.generations, self.generations, best_fitness)
+        if hasattr(self, 'progress_tracker') and self.progress_tracker:
+            self._update_ga_progress_batch(self.generations, self.generations, best_fitness)
         
         logger.info(f"GA complete: Final fitness={best_fitness:.4f}")
         self._stop_flag = True  # Set stop flag
@@ -625,30 +625,18 @@ class GeneticAlgorithmOptimizer:
         except Exception as e:
             logger.debug(f"Failed to update GA progress: {e}")
     
-    def _update_ga_progress_batch(self, job_id: str, current_gen: int, total_gen: int, fitness: float):
-        """Batched Redis update - called every generation for smooth progress"""
+    def _update_ga_progress_batch(self, current_gen: int, total_gen: int, fitness: float):
+        """Update progress using unified tracker - called every generation"""
         try:
-            if not self.redis_client:
+            if not self.progress_tracker:
                 return
             
-            import json
-            from datetime import datetime, timezone
-            
-            # GA is 65-80% of total progress (15% range)
-            ga_progress = 65 + int((current_gen / total_gen) * 15)
             mode = "GPU" if self.use_gpu else "CPU"
+            message = f'GA Gen {current_gen}/{total_gen} ({mode}): fitness={fitness:.2f}'
             
-            progress_data = {
-                'job_id': job_id,
-                'progress': ga_progress,
-                'status': 'running',
-                'stage': f'GA Gen {current_gen}/{total_gen} ({mode})',
-                'message': f'GA optimization: Gen {current_gen}/{total_gen} (fitness: {fitness:.2f}, mode: {mode})',
-                'timestamp': datetime.now(timezone.utc).isoformat()
-            }
-            
-            # Direct Redis call using provided client
-            self.redis_client.setex(f"progress:job:{job_id}", 3600, json.dumps(progress_data))
+            # Use unified progress tracker (no manual progress calculation)
+            import asyncio
+            asyncio.create_task(self.progress_tracker.update(message))
         except Exception as e:
             # Silent fail - don't block GA
             pass
@@ -656,47 +644,26 @@ class GeneticAlgorithmOptimizer:
     def _update_init_progress(self, current: int, total: int):
         """Update progress during GA initialization"""
         try:
-            if not self.redis_client or not hasattr(self, 'job_id') or not self.job_id:
+            if not self.progress_tracker:
                 return
             
-            import json
-            from datetime import datetime, timezone
+            message = f'Initializing GA: {current}/{total} individuals'
             
-            # Initialization is 62-64% (2% range)
-            init_progress = 62 + int((current / total) * 2)
-            
-            progress_data = {
-                'job_id': self.job_id,
-                'progress': init_progress,
-                'status': 'running',
-                'stage': f'Initializing GA population {current}/{total}',
-                'message': f'Creating GA population: {current}/{total} individuals',
-                'timestamp': datetime.now(timezone.utc).isoformat()
-            }
-            
-            self.redis_client.setex(f"progress:job:{self.job_id}", 3600, json.dumps(progress_data))
+            # Use unified progress tracker
+            import asyncio
+            asyncio.create_task(self.progress_tracker.update(message))
         except:
             pass
     
-    def _update_init_progress_direct(self, progress: int, message: str):
+    def _update_init_progress_direct(self, message: str):
         """Direct progress update with custom message"""
         try:
-            if not self.redis_client or not hasattr(self, 'job_id') or not self.job_id:
+            if not self.progress_tracker:
                 return
             
-            import json
-            from datetime import datetime, timezone
-            
-            progress_data = {
-                'job_id': self.job_id,
-                'progress': progress,
-                'status': 'running',
-                'stage': message,
-                'message': message,
-                'timestamp': datetime.now(timezone.utc).isoformat()
-            }
-            
-            self.redis_client.setex(f"progress:job:{self.job_id}", 3600, json.dumps(progress_data))
+            # Use unified progress tracker
+            import asyncio
+            asyncio.create_task(self.progress_tracker.update(message))
         except:
             pass
     
@@ -723,10 +690,9 @@ class GeneticAlgorithmOptimizer:
         # Create islands (in-memory, lightweight) with progress updates
         islands = []
         for i in range(num_islands):
-            # Update progress during island creation (62-64% range)
-            if job_id and self.redis_client:
-                init_progress = 62 + int((i + 1) / num_islands * 2)
-                self._update_init_progress_direct(init_progress, f"Creating island {i+1}/{num_islands}")
+            # Update progress during island creation
+            if hasattr(self, 'progress_tracker') and self.progress_tracker:
+                self._update_init_progress_direct(f"Creating island {i+1}/{num_islands}")
             
             # Create island population
             island_pop = [self._perturb_solution(self.initial_solution) for _ in range(island_pop_size)]
@@ -752,9 +718,9 @@ class GeneticAlgorithmOptimizer:
                 return best_solution
             
             # Update progress at start of epoch
-            if job_id:
+            if hasattr(self, 'progress_tracker') and self.progress_tracker:
                 gen_equiv = epoch * migration_interval
-                self._update_ga_progress_batch(job_id, gen_equiv, self.generations, best_fitness)
+                self._update_ga_progress_batch(gen_equiv, self.generations, best_fitness)
             
             # Parallel island evolution (threads share memory)
             with ThreadPoolExecutor(max_workers=num_islands) as executor:
@@ -781,10 +747,10 @@ class GeneticAlgorithmOptimizer:
                         
                         # Update progress after each island completes
                         completed_islands += 1
-                        if job_id:
+                        if hasattr(self, 'progress_tracker') and self.progress_tracker:
                             # Interpolate progress within epoch
                             gen_equiv = epoch * migration_interval + (completed_islands / num_islands) * migration_interval
-                            self._update_ga_progress_batch(job_id, int(gen_equiv), self.generations, best_fitness)
+                            self._update_ga_progress_batch(int(gen_equiv), self.generations, best_fitness)
                     except Exception as e:
                         logger.error(f"Island {island['id']} failed: {e}")
                         completed_islands += 1
@@ -798,9 +764,9 @@ class GeneticAlgorithmOptimizer:
             logger.info(f"Island Epoch {epoch + 1}/{num_epochs}: Best={best_fitness:.4f}")
             
             # Final progress update for epoch
-            if job_id:
+            if hasattr(self, 'progress_tracker') and self.progress_tracker:
                 gen_equiv = (epoch + 1) * migration_interval
-                self._update_ga_progress_batch(job_id, gen_equiv, self.generations, best_fitness)
+                self._update_ga_progress_batch(gen_equiv, self.generations, best_fitness)
         
         logger.info(f"Parallel Island Model complete: fitness={best_fitness:.4f}")
         return best_solution

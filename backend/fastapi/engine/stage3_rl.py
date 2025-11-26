@@ -545,7 +545,8 @@ class RLConflictResolver:
         use_gpu: bool = False,
         gpu_device=None,
         org_id: str = None,
-        use_dqn_threshold: int = 100  # Use DQN if conflicts > 100
+        use_dqn_threshold: int = 100,
+        progress_tracker=None  # Unified progress tracker
     ):
         self.courses = courses
         self.faculty = faculty
@@ -557,6 +558,7 @@ class RLConflictResolver:
         self.max_iterations = max_iterations
         self.org_id = org_id
         self.use_dqn_threshold = use_dqn_threshold
+        self.progress_tracker = progress_tracker
         
         # FORCE GPU if available for Stage 3 context building
         self.use_gpu = TORCH_AVAILABLE if use_gpu else False
@@ -627,7 +629,7 @@ class RLConflictResolver:
             resolved = self._resolve_with_dqn(conflicts, timetable_data)
         else:
             # Standard Q-learning for normal conflicts
-            resolved = resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, self.rl_agent, job_id)
+            resolved = resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, self.rl_agent, self.progress_tracker)
         
         logger.info(f"RL resolved {len(resolved)} conflicts")
         
@@ -812,34 +814,21 @@ class RLConflictResolver:
         return conflicts
 
 
-def _update_rl_progress(job_id: str, current_episode: int, total_episodes: int, resolved: int, total_conflicts: int):
-    """Update RL progress in Redis"""
+def _update_rl_progress(progress_tracker, current_episode: int, total_episodes: int, resolved: int, total_conflicts: int):
+    """Update RL progress using unified tracker"""
     try:
-        import redis
-        import os
-        import json
-        from datetime import datetime, timezone
+        if not progress_tracker:
+            return
         
-        redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1")
-        r = redis.from_url(redis_url, decode_responses=True)
+        message = f'RL Episode {current_episode}/{total_episodes}: {resolved}/{total_conflicts} conflicts resolved'
         
-        # RL is 80-96% of total progress (16% range)
-        rl_progress = 80 + int((current_episode / total_episodes) * 16)
-        
-        progress_data = {
-            'job_id': job_id,
-            'progress': rl_progress,
-            'status': 'running',
-            'stage': f'RL Episode {current_episode}/{total_episodes}',
-            'message': f'Resolving conflicts with RL: {resolved}/{total_conflicts} resolved (Episode {current_episode}/{total_episodes})',
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        }
-        
-        r.setex(f"progress:job:{job_id}", 3600, json.dumps(progress_data))
+        # Use unified progress tracker
+        import asyncio
+        asyncio.create_task(progress_tracker.update(message))
     except Exception as e:
         logger.debug(f"Failed to update RL progress: {e}")
 
-def resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, rl_agent=None, job_id=None):
+def resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, rl_agent=None, progress_tracker=None):
     """RAM-safe parallel batch RL conflict resolution"""
     
     if rl_agent is None:
@@ -903,11 +892,11 @@ def resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, rl_agent=None,
                 except Exception as e:
                     logger.debug(f"Conflict resolution failed: {e}")
         
-        # Periodic cleanup and progress update
-        if episode % (batch_size * 2) == 0:
+        # Periodic cleanup and progress update (EVERY batch for smooth progress)
+        if episode % batch_size == 0:
             rl_agent.context_cache.clear()
-            if job_id:
-                _update_rl_progress(job_id, episode, max_episodes, rl_agent.conflicts_resolved, initial_conflicts)
+            if progress_tracker:
+                _update_rl_progress(progress_tracker, episode, max_episodes, rl_agent.conflicts_resolved, initial_conflicts)
     
     # Final cleanup
     rl_agent.q_table.clear()

@@ -227,7 +227,7 @@ class ProgressUpdateTask:
         logger.info(f"[PROGRESS] Stopped background updates for {self.tracker.job_id}")
     
     async def _update_loop(self):
-        """Update progress every 2 seconds"""
+        """Update progress every 2 seconds for smooth tracking"""
         try:
             while self.running:
                 await self.tracker.update(f"Processing: {self.tracker.current_stage}")
