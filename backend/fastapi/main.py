@@ -36,7 +36,14 @@ from engine.distributed_tasks import discover_workers, select_optimal_workers
 # Fix missing import
 import os
 
-# Feature 10: Celery detection
+# Configure logging FIRST (before any logger usage)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Feature 10: Celery detection (after logger is defined)
 try:
     from celery import Celery
     CELERY_AVAILABLE = True
@@ -44,13 +51,6 @@ try:
 except ImportError:
     CELERY_AVAILABLE = False
     logger.info("⚠️ Celery not available - Distributed processing disabled")
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 # Global hardware profile and executor
 hardware_profile: Optional[HardwareProfile] = None
@@ -428,8 +428,6 @@ class TimetableGenerationSaga:
                     
                     gc.collect()
                     completed += 1
-                    # Update progress message only
-                    await self.progress_tracker.update(f"CP-SAT: {completed}/{total_clusters} clusters solved")
                 except Exception as e:
                     logger.error(f"Cluster {cluster_id} failed: {e}")
                     completed += 1
@@ -458,7 +456,6 @@ class TimetableGenerationSaga:
                         if solution:
                             all_solutions.update(solution)
                         completed += 1
-                        await self.progress_tracker.update(f"CP-SAT: {completed}/{total_clusters} clusters solved")
                     except Exception as e:
                         logger.error(f"Cluster {cluster_id} failed: {e}")
                         completed += 1
@@ -1354,18 +1351,56 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
         final_conflicts = saga._detect_conflicts(solution, load_data) if hasattr(saga, '_detect_conflicts') else []
         actual_conflicts = len(final_conflicts)
         
-        # Calculate quality score based on conflicts (fewer conflicts = higher score)
-        quality_score = max(70, min(95, 95 - (actual_conflicts / max(len(solution), 1)) * 100))
+        # Calculate ACTUAL metrics from GA fitness function
+        from engine.stage2_ga import GeneticAlgorithmOptimizer
         
-        # Create variant with 3-stage metrics
+        # Create temporary GA instance to calculate real metrics
+        temp_ga = GeneticAlgorithmOptimizer(
+            courses=load_data['courses'],
+            rooms=load_data['rooms'],
+            time_slots=load_data['time_slots'],
+            faculty=load_data['faculty'],
+            students={},
+            initial_solution=solution,
+            population_size=1,
+            generations=1
+        )
+        
+        # Calculate actual soft constraint scores (0-100 scale)
+        faculty_satisfaction = int(temp_ga._faculty_preference_satisfaction(solution) * 100)
+        room_utilization = int(temp_ga._room_utilization(solution) * 100)
+        compactness = int(temp_ga._schedule_compactness(solution) * 100)
+        workload_balance = int(temp_ga._workload_balance(solution) * 100)
+        
+        # Overall quality score: weighted average of all metrics
+        quality_score = int(
+            faculty_satisfaction * 0.3 +
+            compactness * 0.3 +
+            room_utilization * 0.2 +
+            workload_balance * 0.2
+        )
+        
+        # Penalty for conflicts (reduce score by 1% per conflict, max 20% penalty)
+        conflict_penalty = min(20, (actual_conflicts / max(len(solution), 1)) * 100)
+        quality_score = max(0, quality_score - int(conflict_penalty))
+        
+        # Cleanup temp GA
+        del temp_ga
+        import gc
+        gc.collect()
+        
+        logger.info(f"[METRICS] Quality={quality_score}%, Faculty={faculty_satisfaction}%, Room={room_utilization}%, Compact={compactness}%, Workload={workload_balance}%")
+        
+        # Create variant with ACTUAL calculated metrics
         variant = {
             'id': 1,
             'name': '3-Stage AI Solution (Louvain→CP-SAT→GA→RL)',
-            'score': int(quality_score),
+            'score': quality_score,
             'conflicts': actual_conflicts,
-            'faculty_satisfaction': 85,
-            'room_utilization': 88,
-            'compactness': 82,
+            'faculty_satisfaction': faculty_satisfaction,
+            'room_utilization': room_utilization,
+            'compactness': compactness,
+            'workload_balance': workload_balance,
             'stage_metrics': stage_metrics,
             'timetable_entries': timetable_entries
         }
@@ -1376,14 +1411,11 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
         saga.progress_tracker.set_stage('finalize')
         await saga.progress_tracker.update(f'Saving timetable with {len(timetable_entries)} classes...')
         
-        # Mark as complete
+        # Mark as complete (but don't call callback yet - refinement may improve quality)
         await saga.progress_tracker.complete(f'Generated timetable with {len(timetable_entries)} classes')
         logger.info(f"✅ Job {job_id} completed with {len(timetable_entries)} classes")
         
-        # Call Django callback
-        await call_django_callback(job_id, 'completed', [variant])
-        
-        # Feature 8: Quality-Based Refinement (COMPLETE)
+        # Feature 8: Quality-Based Refinement (COMPLETE) - BEFORE callback
         if len(timetable_entries) > 0:
             quality_score = variant.get('score', 0)
             if quality_score < 85:  # Below threshold
@@ -1405,22 +1437,75 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
                         generations=5,
                         early_stop_patience=2
                     )
+                    # Set redis client for progress updates
+                    ga_refine.redis_client = redis_client_global
+                    ga_refine.job_id = job_id
                     refined = await asyncio.to_thread(ga_refine.evolve, job_id)
                     
                     # CRITICAL: Stop GA immediately after completion
                     ga_refine.stop()
                     
-                    # Recalculate quality
+                    # Recalculate ACTUAL metrics after refinement
                     refined_conflicts = saga._detect_conflicts(refined, load_data) if hasattr(saga, '_detect_conflicts') else []
-                    new_quality = max(70, min(95, 95 - (len(refined_conflicts) / max(len(refined), 1)) * 100))
+                    
+                    # Calculate actual soft constraint scores for refined solution
+                    refined_faculty = int(ga_refine._faculty_preference_satisfaction(refined) * 100)
+                    refined_room = int(ga_refine._room_utilization(refined) * 100)
+                    refined_compact = int(ga_refine._schedule_compactness(refined) * 100)
+                    refined_workload = int(ga_refine._workload_balance(refined) * 100)
+                    
+                    # Overall quality score
+                    new_quality = int(
+                        refined_faculty * 0.3 +
+                        refined_compact * 0.3 +
+                        refined_room * 0.2 +
+                        refined_workload * 0.2
+                    )
+                    
+                    # Conflict penalty
+                    refined_penalty = min(20, (len(refined_conflicts) / max(len(refined), 1)) * 100)
+                    new_quality = max(0, new_quality - int(refined_penalty))
                     
                     if new_quality > quality_score:
                         logger.info(f"✅ Refinement improved quality: {quality_score}% → {new_quality}%")
                         solution = refined
-                        variant['score'] = int(new_quality)
+                        variant['score'] = new_quality
                         variant['conflicts'] = len(refined_conflicts)
+                        variant['faculty_satisfaction'] = refined_faculty
+                        variant['room_utilization'] = refined_room
+                        variant['compactness'] = refined_compact
+                        variant['workload_balance'] = refined_workload
+                        
+                        # Regenerate timetable entries with refined solution
+                        timetable_entries = []
+                        for (course_id, session), (time_slot_id, room_id) in refined.items():
+                            course = next((c for c in load_data.get('courses', []) if c.course_id == course_id), None)
+                            room = next((r for r in load_data.get('rooms', []) if r.room_id == room_id), None)
+                            time_slot = next((t for t in load_data.get('time_slots', []) if str(t.slot_id) == str(time_slot_id)), None)
+                            
+                            if course and room and time_slot:
+                                faculty_list = load_data.get('faculty', [])
+                                faculty = next((f for f in faculty_list if getattr(f, 'faculty_id', None) == getattr(course, 'faculty_id', None)), None)
+                                day_num = getattr(time_slot, 'day', 0)
+                                day_name = day_map.get(day_num, 'Monday')
+                                dept_id = getattr(course, 'department_id', 'Unknown')
+                                dept_name = getattr(course, 'department_name', dept_id)
+                                
+                                timetable_entries.append({
+                                    'day': day_name,
+                                    'time_slot': f"{getattr(time_slot, 'start_time', '09:00')}-{getattr(time_slot, 'end_time', '10:00')}",
+                                    'subject_code': getattr(course, 'course_code', 'N/A'),
+                                    'subject_name': getattr(course, 'course_name', 'Unknown'),
+                                    'faculty_name': getattr(faculty, 'faculty_name', 'TBA') if faculty else 'TBA',
+                                    'room_number': getattr(room, 'room_name', 'N/A'),
+                                    'batch_name': dept_name,
+                                    'department_id': dept_id
+                                })
+                        
+                        variant['timetable_entries'] = timetable_entries
+                        logger.info(f"✅ Updated variant: Quality={new_quality}%, Faculty={refined_faculty}%, Room={refined_room}%, Compact={refined_compact}%")
                     else:
-                        logger.info(f"⚠️ Refinement did not improve quality, keeping original")
+                        logger.info(f"⚠️ Refinement did not improve quality ({new_quality}% vs {quality_score}%), keeping original")
                     
                     # Cleanup GA refiner
                     del ga_refine
@@ -1431,6 +1516,10 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
                     if 'ga_refine' in locals():
                         ga_refine.stop()
                         del ga_refine
+        
+        # CRITICAL: Call Django callback AFTER all processing (including refinement)
+        logger.info(f"[CALLBACK] Sending final variant with {len(variant.get('timetable_entries', []))} entries to Django")
+        await call_django_callback(job_id, 'completed', [variant])
         
         logger.info(f"[ENTERPRISE] Job {job_id} completed successfully")
         

@@ -184,14 +184,18 @@ class GeneticAlgorithmOptimizer:
         """Initialize population with initial solution + perturbations"""
         self.population = [self.initial_solution]  # No copy to save memory
         
+        # Update progress at start
+        if hasattr(self, 'job_id') and self.job_id and self.redis_client:
+            self._update_init_progress(1, self.population_size)
+        
         # Add perturbed versions (reuse objects) with progress
         for i in range(self.population_size - 1):
             perturbed = self._perturb_solution(self.initial_solution)
             if perturbed:
                 self.population.append(perturbed)
             # Update progress EVERY individual for smooth progress
-            if self.job_id and self.redis_client:
-                self._update_init_progress(i + 1, self.population_size)
+            if hasattr(self, 'job_id') and self.job_id and self.redis_client:
+                self._update_init_progress(i + 2, self.population_size)
         
         logger.info(f"Initialized GA population: {len(self.population)} individuals")
     
@@ -478,9 +482,9 @@ class GeneticAlgorithmOptimizer:
     
     def evolve(self, job_id: str = None) -> Dict:
         """Run GA evolution with early stopping and caching"""
-        self.initialize_population()
-        self.job_id = job_id
+        self.job_id = job_id  # Set BEFORE initialization
         self._stop_flag = False  # Add stop flag
+        self.initialize_population()
         
         best_solution = self.initial_solution
         best_fitness = self.fitness(best_solution)
@@ -496,8 +500,6 @@ class GeneticAlgorithmOptimizer:
             if self.use_gpu:
                 try:
                     fitness_scores = self._gpu_batch_fitness()
-                    if generation == 0:
-                        logger.info(f"✅ GPU fitness working: {len(fitness_scores)} solutions evaluated")
                 except Exception as e:
                     logger.error(f"❌ GPU fitness FAILED: {e}, falling back to CPU")
                     self.use_gpu = False
@@ -654,7 +656,7 @@ class GeneticAlgorithmOptimizer:
     def _update_init_progress(self, current: int, total: int):
         """Update progress during GA initialization"""
         try:
-            if not self.redis_client or not self.job_id:
+            if not self.redis_client or not hasattr(self, 'job_id') or not self.job_id:
                 return
             
             import json
@@ -669,6 +671,28 @@ class GeneticAlgorithmOptimizer:
                 'status': 'running',
                 'stage': f'Initializing GA population {current}/{total}',
                 'message': f'Creating GA population: {current}/{total} individuals',
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            }
+            
+            self.redis_client.setex(f"progress:job:{self.job_id}", 3600, json.dumps(progress_data))
+        except:
+            pass
+    
+    def _update_init_progress_direct(self, progress: int, message: str):
+        """Direct progress update with custom message"""
+        try:
+            if not self.redis_client or not hasattr(self, 'job_id') or not self.job_id:
+                return
+            
+            import json
+            from datetime import datetime, timezone
+            
+            progress_data = {
+                'job_id': self.job_id,
+                'progress': progress,
+                'status': 'running',
+                'stage': message,
+                'message': message,
                 'timestamp': datetime.now(timezone.utc).isoformat()
             }
             
@@ -691,14 +715,20 @@ class GeneticAlgorithmOptimizer:
         
         logger.info(f"Parallel Island Model: {num_islands} islands (thread-parallel)")
         
+        # CRITICAL FIX: Each island gets equal share of population
+        # If pop_size=4 and num_islands=2, each island gets 2 individuals
+        island_pop_size = max(1, self.population_size // num_islands)
+        logger.info(f"Creating {num_islands} islands with {island_pop_size} individuals each (total: {num_islands * island_pop_size})")
+        
         # Create islands (in-memory, lightweight) with progress updates
         islands = []
-        island_pop_size = self.population_size // num_islands
         for i in range(num_islands):
-            # Update progress during island creation
+            # Update progress during island creation (62-64% range)
             if job_id and self.redis_client:
-                self._update_init_progress(i + 1, num_islands)
+                init_progress = 62 + int((i + 1) / num_islands * 2)
+                self._update_init_progress_direct(init_progress, f"Creating island {i+1}/{num_islands}")
             
+            # Create island population
             island_pop = [self._perturb_solution(self.initial_solution) for _ in range(island_pop_size)]
             islands.append({
                 'id': i,
@@ -878,62 +908,58 @@ class GeneticAlgorithmOptimizer:
             # For large schedules (>3000), use simplified fitness to avoid timeout
             simplified = len(self.initial_solution) > 3000
             
-            # CRITICAL: Increase batch processing to saturate GPU (process 32 solutions at once)
-            gpu_batch_size = min(32, batch_size)  # Process up to 32 solutions simultaneously
+            # Process entire population at once
+            batch_pop = self.population
+            current_batch_size = len(batch_pop)
             
+            # OPTIMIZATION: Parallelize CPU operations before GPU
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                feasibility_list = list(executor.map(lambda s: 1.0 if self._is_feasible(s) else 0.0, batch_pop))
+                violations_list = list(executor.map(self._count_violations, batch_pop))
+            
+            # Convert to GPU tensors
+            feasibility = torch.tensor(feasibility_list, device=DEVICE)
+            violations = torch.tensor(violations_list, device=DEVICE)
+            
+            # OPTIMIZATION: Parallelize soft constraint evaluation
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                faculty_futures = [executor.submit(self._gpu_faculty_preference_tensor, sol) for sol in batch_pop]
+                room_futures = [executor.submit(self._room_utilization, sol) for sol in batch_pop]
+                
+                faculty_list = [f.result() for f in faculty_futures]
+                room_list = [f.result() for f in room_futures]
+            
+            faculty_scores = torch.stack([f if isinstance(f, torch.Tensor) else torch.tensor(f, device=DEVICE) for f in faculty_list])
+            room_util_scores = torch.tensor(room_list, device=DEVICE)
+        
+            # Simplified fitness for large schedules (skip expensive compactness/workload)
             if simplified:
-                logger.info(f"GPU batch fitness (SIMPLIFIED): {batch_size} solutions, GPU batch: {gpu_batch_size}")
+                batch_fitness = feasibility * (
+                    0.6 * faculty_scores + 
+                    0.4 * room_util_scores
+                ) - (1.0 - feasibility) * 1000.0 * violations
             else:
-                logger.info(f"GPU batch fitness: {batch_size} solutions, GPU batch: {gpu_batch_size}")
-            
-            # Process in large batches to saturate GPU (32 solutions at once)
-            all_fitness = []
-            
-            for batch_start in range(0, batch_size, gpu_batch_size):
-                batch_end = min(batch_start + gpu_batch_size, batch_size)
-                batch_pop = self.population[batch_start:batch_end]
-                current_batch_size = len(batch_pop)
-                
-                # Convert batch to GPU tensors (vectorized)
-                feasibility = torch.tensor([1.0 if self._is_feasible(sol) else 0.0 for sol in batch_pop], device=DEVICE)
-                violations = torch.tensor([self._count_violations(sol) for sol in batch_pop], device=DEVICE)
-                
-                # Batched soft constraint evaluation on GPU
-                faculty_scores = torch.zeros(current_batch_size, device=DEVICE)
-                room_util_scores = torch.zeros(current_batch_size, device=DEVICE)
-                
-                for i, sol in enumerate(batch_pop):
-                    # Vectorized faculty preference (already on GPU)
-                    faculty_scores[i] = self._gpu_faculty_preference_tensor(sol)
-                    # Room utilization (fast)
-                    room_util_scores[i] = self._room_utilization(sol)
-            
-                # Simplified fitness for large schedules (skip expensive compactness/workload)
-                if simplified:
-                    batch_fitness = feasibility * (
-                        0.6 * faculty_scores + 
-                        0.4 * room_util_scores
-                    ) - (1.0 - feasibility) * 1000.0 * violations
-                else:
-                    # Full fitness for smaller schedules
-                    compactness_scores = torch.zeros(current_batch_size, device=DEVICE)
-                    workload_scores = torch.zeros(current_batch_size, device=DEVICE)
+                # Full fitness for smaller schedules - parallelize
+                with ThreadPoolExecutor(max_workers=4) as executor:
+                    compact_futures = [executor.submit(self._schedule_compactness, sol) for sol in batch_pop]
+                    workload_futures = [executor.submit(self._workload_balance, sol) for sol in batch_pop]
                     
-                    for i, sol in enumerate(batch_pop):
-                        compactness_scores[i] = self._schedule_compactness(sol)
-                        workload_scores[i] = self._workload_balance(sol)
-                    
-                    batch_fitness = feasibility * (
-                        0.3 * faculty_scores + 
-                        0.3 * compactness_scores + 
-                        0.2 * room_util_scores + 
-                        0.2 * workload_scores
-                    ) - (1.0 - feasibility) * 1000.0 * violations
+                    compact_list = [f.result() for f in compact_futures]
+                    workload_list = [f.result() for f in workload_futures]
                 
-                # Move batch results to CPU and accumulate
-                all_fitness.extend(batch_fitness.cpu().numpy().tolist())
+                compactness_scores = torch.tensor(compact_list, device=DEVICE)
+                workload_scores = torch.tensor(workload_list, device=DEVICE)
+                
+                batch_fitness = feasibility * (
+                    0.3 * faculty_scores + 
+                    0.3 * compactness_scores + 
+                    0.2 * room_util_scores + 
+                    0.2 * workload_scores
+                ) - (1.0 - feasibility) * 1000.0 * violations
             
-            logger.info(f"✅ GPU batch fitness complete: {len(all_fitness)} solutions processed")
+            # Move results to CPU
+            all_fitness = batch_fitness.cpu().numpy().tolist()
             return list(zip(self.population, all_fitness))
             
         except Exception as e:

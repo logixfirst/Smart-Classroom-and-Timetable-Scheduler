@@ -73,16 +73,17 @@ class EnterpriseProgressTracker:
         # Primary: Time-based progress (0-95%)
         time_progress = min(95, (elapsed / self.estimated_total_seconds) * 100)
         
-        # Secondary: Stage-based adjustment
-        stage_weight = self.stage_weights.get(self.current_stage, 0.1)
-        stage_progress = self.stage_start_progress + (stage_weight * 100 * 0.5)  # 50% through current stage
+        # Secondary: Stage-based progress (use stage base as minimum)
+        stage_progress = self.stage_start_progress
         
-        # Blend: 70% time-based, 30% stage-based
-        blended_progress = (time_progress * 0.7) + (stage_progress * 0.3)
+        # CRITICAL FIX: Use MAX of time-based and stage-based to prevent backward movement
+        # This ensures progress always moves forward when stages complete
+        blended_progress = max(time_progress, stage_progress)
         
         # Smoothing: Never go backwards, limit jumps
         if blended_progress < self.last_progress:
-            blended_progress = self.last_progress + self.min_progress_increment
+            # Force forward movement (minimum 1% increment)
+            blended_progress = self.last_progress + 1.0
         elif blended_progress - self.last_progress > self.max_progress_jump:
             blended_progress = self.last_progress + self.max_progress_jump
         
