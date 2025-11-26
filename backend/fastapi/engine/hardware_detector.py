@@ -526,7 +526,7 @@ def get_hardware_profile(force_refresh: bool = False) -> HardwareProfile:
     return hardware_detector.detect_hardware(force_refresh)
 
 def get_optimal_config(profile: HardwareProfile) -> Dict:
-    """Get hardware-adaptive optimal configuration based on complete methodology matrix"""
+    """Google/Linux-style adaptive config: streaming, memory-mapped, lazy evaluation"""
     
     cpu_cores = profile.cpu_cores
     total_ram = profile.total_ram_gb
@@ -534,15 +534,35 @@ def get_optimal_config(profile: HardwareProfile) -> Dict:
     has_gpu = profile.has_nvidia_gpu
     gpu_vram = profile.gpu_memory_gb
     
-    # Classify hardware tier (POTATO < LAPTOP < WORKSTATION < SERVER < DISTRIBUTED)
-    if available_ram < 6:
-        tier = "potato"
-    elif available_ram < 16:
-        tier = "laptop"
-    elif available_ram < 32:
-        tier = "workstation"
-    else:
-        tier = "server"
+    # LINUX KERNEL STYLE: Calculate memory pressure (0-100%)
+    import psutil
+    mem = psutil.virtual_memory()
+    memory_pressure = mem.percent
+    
+    # GOOGLE CHROME STYLE: Dynamic memory budget based on pressure
+    # Reserve 2GB for OS, use 70% of remaining for GA
+    reserved_for_os = 2.0
+    usable_ram = max(0.5, available_ram - reserved_for_os)
+    memory_budget_gb = usable_ram * 0.7  # 70% of usable RAM
+    
+    # Calculate max population based on ACTUAL memory budget
+    # Each timetable ≈ 20MB, keep total under budget
+    bytes_per_timetable = 20 * 1024 * 1024  # 20MB
+    max_population = int((memory_budget_gb * 1024 * 1024 * 1024) / bytes_per_timetable)
+    max_population = max(3, min(max_population, 50))  # Clamp 3-50
+    
+    # ADAPTIVE: Reduce further if memory pressure is high
+    if memory_pressure > 80:
+        max_population = max(3, max_population // 4)  # Emergency: divide by 4
+    elif memory_pressure > 70:
+        max_population = max(3, max_population // 2)  # High pressure: divide by 2
+    
+    # Calculate generations based on time budget (not memory)
+    # Target: 10-15 minutes total, GA should be 80% = 8-12 minutes
+    # Each generation ≈ 30s, so max 24 generations for 12 min
+    max_generations = min(24, max_population * 2)  # Scale with population
+    
+    logger.info(f"[MEMORY] Pressure: {memory_pressure:.1f}%, Budget: {memory_budget_gb:.1f}GB, Max pop: {max_population}, Max gen: {max_generations}")
     
     # STAGE 1: LOUVAIN CLUSTERING
     if tier == "potato":
@@ -644,36 +664,42 @@ def get_optimal_config(profile: HardwareProfile) -> Dict:
             'use_gpu': False
         }
     elif tier == "laptop":
+        # GOOGLE STYLE: Use calculated memory budget, not fixed caps
         stage2b = {
-            'algorithm': 'micro_ga',
-            'population': 3,  # CRITICAL: Reduced from 12 to prevent memory exhaustion
-            'generations': 5,  # CRITICAL: Reduced from 18 to prevent Windows freeze
+            'algorithm': 'streaming_ga',  # Stream-based, not batch
+            'population': max_population,
+            'generations': max_generations,
             'islands': 1,
-            'parallel_fitness': False,  # CRITICAL: Disabled to save memory
-            'parallel_mode': 'sequential',  # CRITICAL: Sequential to prevent memory spikes
+            'parallel_fitness': False,
+            'parallel_mode': 'sequential',
             'fitness_workers': 1,
-            'fitness_evaluation': 'sample_based',  # CRITICAL: Sample-based to reduce memory
-            'sample_students': 50,  # CRITICAL: Only evaluate 50 students per fitness
-            'fitness_cache': True,
+            'fitness_evaluation': 'streaming',  # Process one at a time
+            'sample_students': 50,
+            'fitness_cache': False,  # No cache to save memory
             'early_stopping': True,
-            'early_stop_patience': 2,
-            'use_gpu': False
+            'early_stop_patience': 3,
+            'use_gpu': False,
+            'memory_limit_gb': memory_budget_gb,  # Pass budget to GA
+            'streaming_mode': True  # Enable streaming
         }
     elif tier == "workstation":
+        # LINUX STYLE: Use memory budget, enable parallel if pressure < 60%
         stage2b = {
-            'algorithm': 'island_ga',
-            'population': 20,
-            'generations': 30,
-            'islands': 4,
-            'parallel_mode': 'process',
-            'island_workers': 4,
+            'algorithm': 'streaming_ga',
+            'population': max_population,
+            'generations': max_generations,
+            'islands': 1 if memory_pressure > 60 else 2,
+            'parallel_mode': 'sequential' if memory_pressure > 60 else 'thread',
+            'island_workers': 1,
             'migration_frequency': 5,
             'migration_rate': 0.1,
-            'fitness_evaluation': 'full',
-            'fitness_cache': True,
+            'fitness_evaluation': 'streaming',
+            'fitness_cache': False,
             'early_stopping': True,
             'use_gpu': use_gpu_ga,
-            'gpu_strategy': 'fitness_only'
+            'gpu_strategy': 'fitness_only',
+            'memory_limit_gb': memory_budget_gb,
+            'streaming_mode': True
         }
     else:  # server
         stage2b = {

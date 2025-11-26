@@ -1,4 +1,4 @@
-import numpy as np
+﻿import numpy as np
 import logging
 from collections import defaultdict
 from typing import List, Dict, Optional
@@ -13,21 +13,21 @@ try:
             torch.cuda.synchronize()  # Quick sync check
             DEVICE = torch.device('cuda')
             logger = logging.getLogger(__name__)
-            logger.info(f"✅ RL using GPU: {torch.cuda.get_device_name(0)}")
+            logger.info(f"[OK] RL using GPU: {torch.cuda.get_device_name(0)}")
         except RuntimeError:
             TORCH_AVAILABLE = False
             DEVICE = torch.device('cpu')
             logger = logging.getLogger(__name__)
-            logger.warning("⚠️ GPU busy - RL using CPU")
+            logger.warning("[WARN] GPU busy - RL using CPU")
     else:
         DEVICE = torch.device('cpu')
         logger = logging.getLogger(__name__)
-        logger.info("⚠️ RL using CPU (GPU not available)")
+        logger.info("[WARN] RL using CPU (GPU not available)")
 except ImportError:
     TORCH_AVAILABLE = False
     DEVICE = None
     logger = logging.getLogger(__name__)
-    logger.info("⚠️ RL using CPU (PyTorch not installed)")
+    logger.info("[WARN] RL using CPU (PyTorch not installed)")
 
 from models.timetable_models import Course, Room, TimeSlot, Faculty
 
@@ -184,9 +184,9 @@ class BehavioralContext:
                     self.faculty_effectiveness = data.get('faculty_effectiveness', {})
                     self.co_enrollment_cache = data.get('co_enrollment', {})
                     self.has_data = True
-                    logger.info(f"✅ Behavioral data loaded for {self.org_id}")
+                    logger.info(f"[OK] Behavioral data loaded for {self.org_id}")
             else:
-                logger.info(f"⚠️ No behavioral data for {self.org_id}, using defaults")
+                logger.info(f"[WARN] No behavioral data for {self.org_id}, using defaults")
         except Exception as e:
             logger.warning(f"Failed to load behavioral data: {e}")
     
@@ -231,7 +231,7 @@ class BehavioralContext:
                             self.co_enrollment_cache[str(course_i.course_id)][str(course_j.course_id)] = similarity
                             self.co_enrollment_cache[str(course_j.course_id)][str(course_i.course_id)] = similarity
             
-            logger.info(f"✅ Computed co-enrollment for {len(limited_courses)} courses")
+            logger.info(f"[OK] Computed co-enrollment for {len(limited_courses)} courses")
         except Exception as e:
             logger.warning(f"Co-enrollment computation failed: {e}")
     
@@ -256,7 +256,7 @@ class BehavioralContext:
             with open(data_path, 'w') as f:
                 json.dump(data, f, indent=2)
             
-            logger.info(f"✅ Behavioral data saved for {self.org_id}")
+            logger.info(f"[OK] Behavioral data saved for {self.org_id}")
         except Exception as e:
             logger.error(f"Failed to save behavioral data: {e}")
 
@@ -284,10 +284,10 @@ class ContextAwareRLAgent:
             from engine.rl_transfer_learning import bootstrap_new_university
             self.q_table, self.expected_quality = bootstrap_new_university(org_id, org_features)
             if self.q_table:
-                logger.info(f"✅ Transfer Learning: Bootstrapped Q-table with {len(self.q_table)} states")
-                logger.info(f"✅ Expected quality: {self.expected_quality*100:.0f}% (10% boost from transfer learning)")
+                logger.info(f"[OK] Transfer Learning: Bootstrapped Q-table with {len(self.q_table)} states")
+                logger.info(f"[OK] Expected quality: {self.expected_quality*100:.0f}% (10% boost from transfer learning)")
             else:
-                logger.info(f"⚠️ No transfer learning available, starting from scratch (75% baseline quality)")
+                logger.info(f"[WARN] No transfer learning available, starting from scratch (75% baseline quality)")
         else:
             self.q_table = {}  # Empty Q-table
             self.expected_quality = 0.75
@@ -295,7 +295,7 @@ class ContextAwareRLAgent:
         # Add behavioral boost if data available
         if self.behavioral.has_data:
             self.expected_quality += 0.05  # +5% from behavioral context
-            logger.info(f"✅ Behavioral Context: +5% quality boost (total: {self.expected_quality*100:.0f}%)")
+            logger.info(f"[OK] Behavioral Context: +5% quality boost (total: {self.expected_quality*100:.0f}%)")
         
         self.context_cache = {}  # Lazy context storage
         self.max_cache_size = 50  # Reduced from 100
@@ -306,7 +306,7 @@ class ContextAwareRLAgent:
         self.use_gpu = use_gpu and TORCH_AVAILABLE
         
         if self.use_gpu:
-            logger.info("🚀 RL using GPU for context building")
+            logger.info("[GPU] RL using GPU for context building")
         else:
             logger.info("RL using CPU for context building")
     
@@ -565,7 +565,7 @@ class RLConflictResolver:
         self.gpu_device = gpu_device
         
         if self.use_gpu:
-            logger.info("🚀 FORCING GPU for RL context building")
+            logger.info("[GPU] FORCING GPU for RL context building")
         else:
             logger.info("GPU not available for RL, using CPU")
         
@@ -591,10 +591,10 @@ class RLConflictResolver:
         
         # Compute co-enrollment patterns if no historical data
         if not self.rl_agent.behavioral.has_data:
-            logger.info("⚠️ No historical data, computing co-enrollment from current semester...")
+            logger.info("[WARN] No historical data, computing co-enrollment from current semester...")
             self.rl_agent.behavioral.compute_co_enrollment(courses)
             self.rl_agent.expected_quality += 0.03  # +3% from co-enrollment
-            logger.info(f"✅ Co-enrollment computed: +3% quality boost (total: {self.rl_agent.expected_quality*100:.0f}%)")
+            logger.info(f"[OK] Co-enrollment computed: +3% quality boost (total: {self.rl_agent.expected_quality*100:.0f}%)")
     
     def resolve_conflicts(self, schedule: Dict, job_id: str = None) -> Dict:
         """Resolve conflicts in schedule using RL with Transfer Learning"""
@@ -614,10 +614,10 @@ class RLConflictResolver:
         conflicts = self._detect_conflicts(schedule)
         
         if not conflicts:
-            logger.info("✅ No conflicts detected")
+            logger.info("[OK] No conflicts detected")
             return schedule
         
-        logger.info(f"⚠️ Detected {len(conflicts)} conflicts, resolving...")
+        logger.info(f"[WARN] Detected {len(conflicts)} conflicts, resolving...")
         
         # ALWAYS use enhanced RL (no DQN - it's not resolving conflicts properly)
         resolved = resolve_conflicts_with_enhanced_rl(
@@ -631,10 +631,10 @@ class RLConflictResolver:
         
         # Verify resolution
         remaining_conflicts = self._detect_conflicts(timetable_data['current_solution'])
-        logger.info(f"✅ RL resolved {len(conflicts) - len(remaining_conflicts)}/{len(conflicts)} conflicts")
+        logger.info(f"[OK] RL resolved {len(conflicts) - len(remaining_conflicts)}/{len(conflicts)} conflicts")
         
         if remaining_conflicts:
-            logger.warning(f"⚠️ {len(remaining_conflicts)} conflicts remain unresolved")
+            logger.warning(f"[WARN] {len(remaining_conflicts)} conflicts remain unresolved")
         
         return timetable_data['current_solution']
     
@@ -654,7 +654,7 @@ class RLConflictResolver:
             }
             
             save_university_knowledge(self.org_id, self.rl_agent.q_table, org_features)
-            logger.info(f"✅ Saved learned knowledge for {self.org_id} (available for future transfer learning)")
+            logger.info(f"[OK] Saved learned knowledge for {self.org_id} (available for future transfer learning)")
             
             # Save behavioral data (including co-enrollment)
             self.rl_agent.behavioral.save_behavioral_data()
@@ -876,7 +876,7 @@ def resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, rl_agent=None,
                 return resolved
             last_cancel_check = current_time
         if not remaining_conflicts:
-            logger.info(f"✅ All conflicts resolved at episode {episode}")
+            logger.info(f"[OK] All conflicts resolved at episode {episode}")
             break
         
         # Process batch of remaining conflicts

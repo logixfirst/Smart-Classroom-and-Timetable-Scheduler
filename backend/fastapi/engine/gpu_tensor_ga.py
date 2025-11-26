@@ -1,4 +1,4 @@
-"""
+﻿"""
 GPU-Tensor Genetic Algorithm - 90%+ GPU Utilization
 Fully vectorized GA using PyTorch tensors for timetable optimization
 """
@@ -39,7 +39,7 @@ class GPUTensorGA:
         self._build_encoding()
         self._build_constraint_tensors()
         
-        logger.info(f"✅ GPU Tensor GA: pop={population_size}, device={self.device}")
+        logger.info(f"[OK] GPU Tensor GA: pop={population_size}, device={self.device}")
     
     def _build_encoding(self):
         """Encode solution as integer tensor [pop_size, num_assignments]"""
@@ -82,7 +82,7 @@ class GPUTensorGA:
         
         self.slot_matrix = slot_matrix
         
-        logger.info(f"✅ Constraint tensors on GPU: {self.device}")
+        logger.info(f"[OK] Constraint tensors on GPU: {self.device}")
     
     def encode_solution(self, solution: Dict) -> torch.Tensor:
         """Convert dict solution to tensor [num_assignments]"""
@@ -197,5 +197,5 @@ class GPUTensorGA:
             if gen % 10 == 0:
                 logger.info(f"GPU GA Gen {gen}/{self.generations}: fitness={best_fitness:.4f}")
         
-        logger.info(f"✅ GPU GA complete: fitness={best_fitness:.4f}")
+        logger.info(f"[OK] GPU GA complete: fitness={best_fitness:.4f}")
         return best_solution

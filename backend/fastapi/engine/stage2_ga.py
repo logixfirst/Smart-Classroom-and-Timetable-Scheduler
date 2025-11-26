@@ -1,4 +1,4 @@
-"""
+﻿"""
 Stage 2B: Genetic Algorithm Optimizer with GPU Acceleration
 Optimizes CP-SAT solution for soft constraints
 Auto-detects and uses GPU if available, falls back to CPU
@@ -36,19 +36,19 @@ try:
             torch.cuda.synchronize()
             TORCH_AVAILABLE = True
             DEVICE = torch.device('cuda')
-            logger.info(f"✅ GPU READY: {torch.cuda.get_device_name(0)} - GA will use GPU acceleration")
+            logger.info(f"[OK] GPU READY: {torch.cuda.get_device_name(0)} - GA will use GPU acceleration")
         except Exception as e:
             TORCH_AVAILABLE = False
             DEVICE = torch.device('cpu')
-            logger.error(f"❌ GPU test failed: {e} - GA will use CPU")
+            logger.error(f"[ERROR] GPU test failed: {e} - GA will use CPU")
     else:
         TORCH_AVAILABLE = False
         DEVICE = torch.device('cpu')
-        logger.warning("⚠️ CUDA not available - GA will use CPU")
+        logger.warning("[WARN] CUDA not available - GA will use CPU")
 except ImportError:
     TORCH_AVAILABLE = False
     DEVICE = None
-    logger.warning("⚠️ PyTorch not installed - GA will use CPU-only mode")
+    logger.warning("[WARN] PyTorch not installed - GA will use CPU-only mode")
 
 
 class GeneticAlgorithmOptimizer:
@@ -74,9 +74,13 @@ class GeneticAlgorithmOptimizer:
         use_sample_fitness: bool = False,
         sample_size: int = 200,
         gpu_offload_conflicts: bool = True,
-        hardware_config: Dict = None  # NEW: Hardware config from detector
+        hardware_config: Dict = None,  # Hardware config from detector
+        streaming_mode: bool = False,  # Google/Linux streaming mode
+        memory_limit_gb: float = None  # Memory budget
     ):
         self.courses = courses
+        self.streaming_mode = streaming_mode
+        self.memory_limit_gb = memory_limit_gb
         self.rooms = rooms
         self.time_slots = time_slots
         self.faculty = faculty
@@ -87,7 +91,9 @@ class GeneticAlgorithmOptimizer:
         if hardware_config:
             self.population_size = hardware_config.get('population', population_size)
             self.generations = hardware_config.get('generations', generations)
-            logger.info(f"Hardware config: pop={self.population_size}, gen={self.generations}")
+            self.streaming_mode = hardware_config.get('streaming_mode', streaming_mode)
+            self.memory_limit_gb = hardware_config.get('memory_limit_gb', memory_limit_gb)
+            logger.info(f"Hardware config: pop={self.population_size}, gen={self.generations}, streaming={self.streaming_mode}, mem={self.memory_limit_gb}GB")
         else:
             # Fallback: RAM-based auto-detection
             import psutil
@@ -124,7 +130,7 @@ class GeneticAlgorithmOptimizer:
             all_students = list(students.keys())
             if len(all_students) > sample_size:
                 self.sample_students = set(random.sample(all_students, sample_size))
-                logger.info(f"✅ Sample fitness enabled: {sample_size}/{len(all_students)} students")
+                logger.info(f"[OK] Sample fitness enabled: {sample_size}/{len(all_students)} students")
             else:
                 self.sample_students = set(all_students)
                 self.use_sample_fitness = False
@@ -152,9 +158,9 @@ class GeneticAlgorithmOptimizer:
                 self._init_gpu_tensors()
                 if self.gpu_offload_conflicts:
                     self._init_gpu_conflict_detection()
-                logger.info(f"✅ GPU ENABLED: pop={self.population_size}, courses={len(courses)}")
+                logger.info(f"[OK] GPU ENABLED: pop={self.population_size}, courses={len(courses)}")
             except Exception as e:
-                logger.error(f"❌ GPU init failed: {e}")
+                logger.error(f"[ERROR] GPU init failed: {e}")
                 self.use_gpu = False
                 self.gpu_offload_conflicts = False
                 logger.warning(f"Falling back to CPU")
@@ -619,7 +625,7 @@ class GeneticAlgorithmOptimizer:
                 try:
                     fitness_scores = self._gpu_batch_fitness()
                 except Exception as e:
-                    logger.error(f"❌ GPU fitness FAILED: {e}, falling back to CPU")
+                    logger.error(f"[ERROR] GPU fitness FAILED: {e}, falling back to CPU")
                     self.use_gpu = False
                     fitness_scores = [(sol, self.fitness(sol)) for sol in self.population]
             else:
@@ -664,9 +670,11 @@ class GeneticAlgorithmOptimizer:
             del old_population
             del fitness_scores
             
-            # Periodic garbage collection
-            if generation % 5 == 0:
-                import gc
+            # GOOGLE/LINUX: Aggressive GC in streaming mode
+            import gc
+            if self.streaming_mode:
+                gc.collect()
+            elif generation % 5 == 0:
                 gc.collect()
             
             # Update progress EVERY generation for smooth progress bar
@@ -779,7 +787,7 @@ class GeneticAlgorithmOptimizer:
         
         # Feature 10: Distributed Celery support
         if use_celery and CELERY_AVAILABLE:
-            logger.info(f"✅ Distributed Island Model: {num_islands} islands (Celery workers)")
+            logger.info(f"[OK] Distributed Island Model: {num_islands} islands (Celery workers)")
             return self._evolve_island_celery(num_islands, migration_interval, job_id)
         
         logger.info(f"Parallel Island Model: {num_islands} islands (thread-parallel)")
@@ -932,7 +940,7 @@ class GeneticAlgorithmOptimizer:
                     faculty_prefs[i, j] = prefs.get(t_slot.slot_id, 0.5)
         
         self.faculty_prefs_tensor = torch.tensor(faculty_prefs, device=DEVICE, dtype=torch.float32)
-        logger.info(f"✅ GPU tensors initialized: {self.faculty_prefs_tensor.shape}")
+        logger.info(f"[OK] GPU tensors initialized: {self.faculty_prefs_tensor.shape}")
     
     def _init_gpu_conflict_detection(self):
         """Initialize GPU-based conflict detection (saves 80% RAM)"""
@@ -962,7 +970,7 @@ class GeneticAlgorithmOptimizer:
             self.gpu_fitness_cache = {}  # Maps hash -> fitness value (stored in VRAM context)
             
             ram_saved = len(student_enrollments) * 0.1  # Estimate MB saved
-            logger.info(f"✅ GPU conflict detection: {len(student_enrollments)} students offloaded (~{ram_saved:.1f}MB RAM saved)")
+            logger.info(f"[OK] GPU conflict detection: {len(student_enrollments)} students offloaded (~{ram_saved:.1f}MB RAM saved)")
         except Exception as e:
             logger.error(f"GPU conflict detection init failed: {e}")
             self.gpu_offload_conflicts = False
@@ -1031,7 +1039,7 @@ class GeneticAlgorithmOptimizer:
             return list(zip(self.population, all_fitness))
             
         except Exception as e:
-            logger.error(f"❌ GPU batch fitness failed: {e}, falling back to single-core CPU")
+            logger.error(f"[ERROR] GPU batch fitness failed: {e}, falling back to single-core CPU")
             import traceback
             logger.error(traceback.format_exc())
             self.use_gpu = False
@@ -1117,10 +1125,10 @@ class GeneticAlgorithmOptimizer:
         from celery import group
         
         if not celery_app or not evolve_island_task:
-            logger.error("❌ Celery not available, falling back to thread-parallel")
+            logger.error("[ERROR] Celery not available, falling back to thread-parallel")
             return self.evolve_island_model(num_islands, migration_interval, job_id, use_celery=False)
         
-        logger.info(f"✅ Starting distributed island evolution with {num_islands} Celery workers")
+        logger.info(f"[OK] Starting distributed island evolution with {num_islands} Celery workers")
         
         # Serialize data for Celery
         courses_dict = [c.__dict__ for c in self.courses]
@@ -1170,7 +1178,7 @@ class GeneticAlgorithmOptimizer:
                 gen_equiv = (epoch + 1) * migration_interval
                 self._update_ga_progress_batch(job_id, gen_equiv, self.generations, best_fitness)
         
-        logger.info(f"✅ Distributed island model complete: fitness={best_fitness:.4f}")
+        logger.info(f"[OK] Distributed island model complete: fitness={best_fitness:.4f}")
         return best_solution
 
 

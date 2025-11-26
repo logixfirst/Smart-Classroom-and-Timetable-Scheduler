@@ -1,4 +1,4 @@
-"""
+﻿"""
 Celery tasks for distributed Island GA
 """
 from celery import Task
@@ -49,9 +49,9 @@ try:
             'fitness': fitness
         }
     
-    logger.info("✅ Celery tasks registered for distributed GA")
+    logger.info("[OK] Celery tasks registered for distributed GA")
     
 except ImportError:
-    logger.warning("⚠️ Celery not available - distributed GA disabled")
+    logger.warning("[WARN] Celery not available - distributed GA disabled")
     celery_app = None
     evolve_island_task = None

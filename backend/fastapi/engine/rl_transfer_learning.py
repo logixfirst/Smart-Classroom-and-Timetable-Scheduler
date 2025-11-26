@@ -1,4 +1,4 @@
-"""
+﻿"""
 Q-Learning Transfer Learning System
 Bootstrap new universities using knowledge from similar institutions
 Improves Semester 1 quality from 75% → 85%
@@ -224,11 +224,11 @@ def bootstrap_new_university(org_id: str, features: Dict) -> Tuple[Dict, float]:
     if qtable:
         # With transfer learning: 85% quality
         expected_quality = 0.85
-        logger.info(f"✅ Transfer learning enabled: Expected quality 85% (10% boost)")
+        logger.info(f"[OK] Transfer learning enabled: Expected quality 85% (10% boost)")
     else:
         # Without transfer learning: 75% quality
         expected_quality = 0.75
-        logger.info(f"⚠️ No transfer learning: Expected quality 75% (baseline)")
+        logger.info(f"[WARN] No transfer learning: Expected quality 75% (baseline)")
     
     return qtable, expected_quality
 

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Conflict Resolution Service - Automatic conflict resolution with escalation hierarchy
 Implements: swap time slots → room change → faculty reassignment → manual review
 """
@@ -116,25 +116,25 @@ class ConflictResolutionService:
         # Step 1: Try automatic time slot swap
         result = self._try_time_slot_swap(conflict)
         if result['success']:
-            logger.info(f"✅ Resolved by time slot swap")
+            logger.info(f"[OK] Resolved by time slot swap")
             return result
         
         # Step 2: Try room change
         if conflict.conflict_type == "room":
             result = self._try_room_change(conflict)
             if result['success']:
-                logger.info(f"✅ Resolved by room change")
+                logger.info(f"[OK] Resolved by room change")
                 return result
         
         # Step 3: Try faculty reassignment
         if conflict.conflict_type == "faculty":
             result = self._try_faculty_reassignment(conflict)
             if result['success']:
-                logger.info(f"✅ Resolved by faculty reassignment")
+                logger.info(f"[OK] Resolved by faculty reassignment")
                 return result
         
         # Step 4: Flag for manual review
-        logger.warning(f"⚠️ Conflict requires manual review")
+        logger.warning(f"[WARN] Conflict requires manual review")
         return {
             'success': False,
             'method': 'manual_review_required',

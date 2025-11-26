@@ -1,4 +1,4 @@
-"""
+﻿"""
 GPU Detection and Management for Tensor GA
 """
 import torch
@@ -19,7 +19,7 @@ class GPUManager:
     def _detect_gpu(self):
         """Detect GPU and capabilities"""
         if not torch.cuda.is_available():
-            logger.info("⚠️ No GPU available - using CPU")
+            logger.info("[WARN] No GPU available - using CPU")
             return
         
         try:
@@ -29,9 +29,9 @@ class GPUManager:
             self.gpu_memory_gb = props.total_memory / (1024**3)
             self.has_gpu = True
             
-            logger.info(f"✅ GPU: {self.gpu_name} ({self.gpu_memory_gb:.1f}GB VRAM)")
+            logger.info(f"[OK] GPU: {self.gpu_name} ({self.gpu_memory_gb:.1f}GB VRAM)")
         except Exception as e:
-            logger.error(f"❌ GPU detection failed: {e}")
+            logger.error(f"[ERROR] GPU detection failed: {e}")
             self.device = torch.device('cpu')
     
     def get_optimal_population_size(self) -> int:

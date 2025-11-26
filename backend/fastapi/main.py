@@ -1,4 +1,4 @@
-"""
+﻿"""
 Enterprise FastAPI Timetable Generation Service
 Hardware-Adaptive Cloud-Distributed System with GPU Acceleration
 
@@ -372,14 +372,14 @@ class TimetableGenerationSaga:
             logger.info(f"[DATA] Loaded {len(courses)} courses, {len(faculty)} faculty, {len(rooms)} rooms, {len(time_slots)} time_slots, {len(students)} students")
             
             if len(rooms) == 0:
-                logger.error("[DATA] ❌ NO ROOMS LOADED - Scheduler will fail!")
+                logger.error("[DATA] [ERROR] NO ROOMS LOADED - Scheduler will fail!")
             else:
                 # Show room capacity distribution
                 room_capacities = [r.capacity for r in rooms]
                 logger.info(f"[DATA] Room capacities: min={min(room_capacities)}, max={max(room_capacities)}, avg={sum(room_capacities)/len(room_capacities):.1f}")
             
             if len(time_slots) == 0:
-                logger.error("[DATA] ❌ NO TIME SLOTS GENERATED - Scheduler will fail!")
+                logger.error("[DATA] [ERROR] NO TIME SLOTS GENERATED - Scheduler will fail!")
             else:
                 logger.info(f"[DATA] Time slots: {len(time_slots)} slots across {len(set(t.day for t in time_slots))} days")
             
@@ -461,7 +461,7 @@ class TimetableGenerationSaga:
         
         # Emergency cleanup if memory > 75%
         if mem_usage['percent'] > 75:
-            logger.warning(f"[STAGE2] ⚠️ High memory ({mem_usage['percent']:.1f}%), forcing cleanup")
+            logger.warning(f"[STAGE2] [WARN] High memory ({mem_usage['percent']:.1f}%), forcing cleanup")
             aggressive_cleanup()
             mem = psutil.virtual_memory()
             available_gb = mem.available / (1024**3)
@@ -590,7 +590,7 @@ class TimetableGenerationSaga:
         # Decision thresholds with detailed recommendations
         # THRESHOLD: 60% - CP-SAT must schedule at least 60% of courses to continue
         if success_rate < 60:
-            logger.error(f"[CP-SAT DECISION] ❌ ABORT: Success rate {success_rate:.1f}% < 60% threshold")
+            logger.error(f"[CP-SAT DECISION] [ERROR] ABORT: Success rate {success_rate:.1f}% < 60% threshold")
             logger.error(f"[CP-SAT DECISION] CP-SAT is not performing adequately")
             logger.error(f"[CP-SAT DECISION] Likely causes:")
             logger.error(f"[CP-SAT DECISION]   1. Room/course/faculty department matching disabled but still failing")
@@ -604,11 +604,11 @@ class TimetableGenerationSaga:
             logger.error(f"[CP-SAT DECISION] GA uses population-based search to explore solution space better")
             raise asyncio.CancelledError(f"CP-SAT success rate {success_rate:.1f}% below minimum threshold (60%). Switch to Genetic Algorithm.")
         elif success_rate < 85:
-            logger.info(f"[CP-SAT DECISION] ✅ GOOD: Success rate {success_rate:.1f}% (60-85% range)")
+            logger.info(f"[CP-SAT DECISION] [OK] GOOD: Success rate {success_rate:.1f}% (60-85% range)")
             logger.info(f"[CP-SAT DECISION] CP-SAT performing well")
             logger.info(f"[CP-SAT DECISION] RECOMMENDATION: GA/RL will optimize remaining courses")
         else:
-            logger.info(f"[CP-SAT DECISION] ✅ EXCELLENT: Success rate {success_rate:.1f}% (>85%)")
+            logger.info(f"[CP-SAT DECISION] [OK] EXCELLENT: Success rate {success_rate:.1f}% (>85%)")
             logger.info(f"[CP-SAT DECISION] CP-SAT performing optimally")
             logger.info(f"[CP-SAT DECISION] RECOMMENDATION: GA/RL will fine-tune quality metrics")
         
@@ -863,7 +863,7 @@ class TimetableGenerationSaga:
                 generations = ga_config['generations']
                 logger.info(f"[STAGE2B] GPU Tensor GA: pop={pop_size}, gen={generations}")
                 
-                logger.info(f"[STAGE2B] ✅ GPU Tensor GA: pop={pop_size}, gen={generations}")
+                logger.info(f"[STAGE2B] [OK] GPU Tensor GA: pop={pop_size}, gen={generations}")
                 
                 gpu_ga = GPUTensorGA(
                     courses=courses,
@@ -890,14 +890,14 @@ class TimetableGenerationSaga:
                 final_fitness = temp_ga.fitness(optimized_schedule)
                 del temp_ga
                 
-                logger.info(f"[STAGE2B] ✅ GPU GA complete: fitness={final_fitness:.4f}")
+                logger.info(f"[STAGE2B] [OK] GPU GA complete: fitness={final_fitness:.4f}")
                 
                 # CRITICAL: Force GPU cleanup after GA
                 del gpu_ga
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
                 gc.collect()
-                logger.info("[STAGE2B] ✅ GPU memory released")
+                logger.info("[STAGE2B] [OK] GPU memory released")
             else:
                 # CPU GA with hardware-optimal config
                 pop = ga_config.get('population', 12)
@@ -933,7 +933,7 @@ class TimetableGenerationSaga:
                 torch.cuda.synchronize()
             
             cleanup_stats = aggressive_cleanup()
-            logger.info(f"[STAGE2B] ✅ Freed {cleanup_stats['freed_mb']:.1f}MB before RL stage")
+            logger.info(f"[STAGE2B] [OK] Freed {cleanup_stats['freed_mb']:.1f}MB before RL stage")
             
             return {
                 'schedule': optimized_schedule,
@@ -974,7 +974,7 @@ class TimetableGenerationSaga:
         
         # Emergency cleanup if memory > 80%
         if mem_before['percent'] > 80:
-            logger.warning(f"[STAGE3] ⚠️ High memory ({mem_before['percent']:.1f}%), forcing cleanup")
+            logger.warning(f"[STAGE3] [WARN] High memory ({mem_before['percent']:.1f}%), forcing cleanup")
             aggressive_cleanup()
             mem_before = get_memory_usage()
             logger.info(f"[STAGE3] After cleanup: {mem_before['rss_mb']:.1f}MB ({mem_before['percent']:.1f}%)")
@@ -1046,7 +1046,7 @@ class TimetableGenerationSaga:
             
             # Aggressive cleanup after RL
             cleanup_stats = aggressive_cleanup()
-            logger.info(f"[STAGE3] ✅ Freed {cleanup_stats['freed_mb']:.1f}MB after RL")
+            logger.info(f"[STAGE3] [OK] Freed {cleanup_stats['freed_mb']:.1f}MB after RL")
             
             return {
                 'schedule': resolved_schedule,
@@ -1529,7 +1529,7 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
         
         # Finalization stage (background task handles progress)
         saga.progress_tracker.set_stage('finalize')
-        logger.info(f"✅ Job {job_id} completed with {len(timetable_entries)} classes")
+        logger.info(f"[OK] Job {job_id} completed with {len(timetable_entries)} classes")
         
         # Feature 8: Quality-Based Refinement (COMPLETE) - BEFORE callback
         if len(timetable_entries) > 0:
@@ -1584,7 +1584,7 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
                     new_quality = max(0, new_quality - int(refined_penalty))
                     
                     if new_quality > quality_score:
-                        logger.info(f"✅ Refinement improved quality: {quality_score}% → {new_quality}%")
+                        logger.info(f"[OK] Refinement improved quality: {quality_score}% → {new_quality}%")
                         solution = refined
                         variant['score'] = new_quality
                         variant['conflicts'] = len(refined_conflicts)
@@ -1620,9 +1620,9 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
                                 })
                         
                         variant['timetable_entries'] = timetable_entries
-                        logger.info(f"✅ Updated variant: Quality={new_quality}%, Faculty={refined_faculty}%, Room={refined_room}%, Compact={refined_compact}%")
+                        logger.info(f"[OK] Updated variant: Quality={new_quality}%, Faculty={refined_faculty}%, Room={refined_room}%, Compact={refined_compact}%")
                     else:
-                        logger.info(f"⚠️ Refinement did not improve quality ({new_quality}% vs {quality_score}%), keeping original")
+                        logger.info(f"[WARN] Refinement did not improve quality ({new_quality}% vs {quality_score}%), keeping original")
                     
                     # Cleanup GA refiner
                     del ga_refine
@@ -1922,14 +1922,14 @@ async def generate_variants_enterprise(request: GenerationRequest):
                 'timestamp': start_time
             }
             redis_client_global.setex(f"progress:job:{job_id}", 3600, json.dumps(progress_data))
-            logger.info(f"✅ Initial progress set in Redis for job {job_id}")
+            logger.info(f"[OK] Initial progress set in Redis for job {job_id}")
         else:
-            logger.error(f"❌ Redis not available for job {job_id}")
+            logger.error(f"[ERROR] Redis not available for job {job_id}")
         
         # Start enterprise generation in background (fire-and-forget)
         asyncio.create_task(run_enterprise_generation(job_id, request))
         
-        logger.info(f"[ENTERPRISE] ✅ Generation queued for job {job_id}")
+        logger.info(f"[ENTERPRISE] [OK] Generation queued for job {job_id}")
         
         return GenerationResponse(
             job_id=job_id,

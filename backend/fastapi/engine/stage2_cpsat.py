@@ -1,4 +1,4 @@
-"""
+﻿"""
 Adaptive CP-SAT Solver with Progressive Relaxation
 Optimized for large-scale timetabling with student constraints
 """
@@ -60,7 +60,7 @@ class AdaptiveCPSATSolver:
         # Auto-detect CPU cores for parallel solving
         import multiprocessing
         self.num_workers = min(8, multiprocessing.cpu_count())
-        logger.info(f"🚀 CP-SAT using {self.num_workers} CPU cores for parallel solving")
+        logger.info(f"[GPU] CP-SAT using {self.num_workers} CPU cores for parallel solving")
         
     def solve_cluster(self, cluster: List[Course], timeout: float = None) -> Optional[Dict]:
         """
@@ -72,36 +72,36 @@ class AdaptiveCPSATSolver:
         
         # Check cancellation before starting
         if self._check_cancellation():
-            logger.info(f"[CP-SAT DEBUG] ❌ Job cancelled before cluster solve")
+            logger.info(f"[CP-SAT DEBUG] [ERROR] Job cancelled before cluster solve")
             return None
         
         # SHORTCUT 1: Skip large clusters immediately
         if len(cluster) > self.max_cluster_size:
-            logger.warning(f"[CP-SAT DEBUG] ❌ Cluster too large: {len(cluster)} > {self.max_cluster_size}")
+            logger.warning(f"[CP-SAT DEBUG] [ERROR] Cluster too large: {len(cluster)} > {self.max_cluster_size}")
             return None
         
         # SHORTCUT 2: Ultra-fast feasibility (< 50ms)
         logger.info(f"[CP-SAT DEBUG] Running feasibility check...")
         if not self._ultra_fast_feasibility(cluster):
-            logger.warning(f"[CP-SAT DEBUG] ❌ Failed feasibility check")
+            logger.warning(f"[CP-SAT DEBUG] [ERROR] Failed feasibility check")
             return None
-        logger.info(f"[CP-SAT DEBUG] ✅ Passed feasibility check")
+        logger.info(f"[CP-SAT DEBUG] [OK] Passed feasibility check")
         
         # SHORTCUT 3: Try only 2 strategies (not 3)
         for idx, strategy in enumerate(self.STRATEGIES[:2]):
             # Check cancellation between strategies
             if self._check_cancellation():
-                logger.info(f"[CP-SAT DEBUG] ❌ Job cancelled during strategy {idx+1}")
+                logger.info(f"[CP-SAT DEBUG] [ERROR] Job cancelled during strategy {idx+1}")
                 return None
             
             logger.info(f"[CP-SAT DEBUG] Trying strategy {idx+1}/2: {strategy['name']}")
             solution = self._try_cpsat_with_strategy(cluster, strategy)
             if solution:
-                logger.info(f"[CP-SAT DEBUG] ✅ Strategy {strategy['name']} succeeded with {len(solution)} assignments")
+                logger.info(f"[CP-SAT DEBUG] [OK] Strategy {strategy['name']} succeeded with {len(solution)} assignments")
                 return solution
-            logger.warning(f"[CP-SAT DEBUG] ❌ Strategy {strategy['name']} failed")
+            logger.warning(f"[CP-SAT DEBUG] [ERROR] Strategy {strategy['name']} failed")
         
-        logger.error(f"[CP-SAT DEBUG] ❌ All strategies failed for cluster")
+        logger.error(f"[CP-SAT DEBUG] [ERROR] All strategies failed for cluster")
         return None
     
     def _check_cancellation(self) -> bool:
@@ -137,7 +137,7 @@ class AdaptiveCPSATSolver:
             
             logger.info(f"[CP-SAT FEASIBILITY] Course {idx+1}: found {available} valid slots (needs {duration})")
             if available < duration:
-                logger.warning(f"[CP-SAT FEASIBILITY] ❌ Course {idx+1} insufficient slots: {available} < {duration}")
+                logger.warning(f"[CP-SAT FEASIBILITY] [ERROR] Course {idx+1} insufficient slots: {available} < {duration}")
                 return False
         
         # Quick faculty overload check
@@ -149,10 +149,10 @@ class AdaptiveCPSATSolver:
         max_load = max(faculty_load.values(), default=0)
         logger.info(f"[CP-SAT FEASIBILITY] Max faculty load: {max_load} (limit: {len(self.time_slots)})")
         if max_load > len(self.time_slots):
-            logger.warning(f"[CP-SAT FEASIBILITY] ❌ Faculty overloaded: {max_load} > {len(self.time_slots)}")
+            logger.warning(f"[CP-SAT FEASIBILITY] [ERROR] Faculty overloaded: {max_load} > {len(self.time_slots)}")
             return False
         
-        logger.info(f"[CP-SAT FEASIBILITY] ✅ All checks passed")
+        logger.info(f"[CP-SAT FEASIBILITY] [OK] All checks passed")
         return True
     
     def _quick_feasibility_check(self, cluster: List[Course]) -> bool:
@@ -310,7 +310,7 @@ class AdaptiveCPSATSolver:
         
         # Check if cancelled
         if callback and callback._cancelled:
-            logger.info(f"[CP-SAT SOLVE] ❌ CANCELLED by user")
+            logger.info(f"[CP-SAT SOLVE] [ERROR] CANCELLED by user")
             variables.clear()
             del valid_domains
             return None
@@ -340,7 +340,7 @@ class AdaptiveCPSATSolver:
             variables.clear()
             del valid_domains
             
-            logger.info(f"[CP-SAT SOLVE] ✅ SUCCESS: {len(solution)} assignments in {solver.WallTime():.2f}s")
+            logger.info(f"[CP-SAT SOLVE] [OK] SUCCESS: {len(solution)} assignments in {solver.WallTime():.2f}s")
             logger.info(f"[CP-SAT SOLVE] Coverage: {len(solution)}/{len(cluster)} courses ({len(solution)/len(cluster)*100:.1f}%)")
             return solution
         
@@ -348,7 +348,7 @@ class AdaptiveCPSATSolver:
         variables.clear()
         del valid_domains
         
-        logger.error(f"[CP-SAT SOLVE] ❌ FAILED: {status_name}")
+        logger.error(f"[CP-SAT SOLVE] [ERROR] FAILED: {status_name}")
         if status == cp_model.INFEASIBLE:
             logger.error(f"[CP-SAT SOLVE] Model is INFEASIBLE - constraints cannot be satisfied")
             logger.error(f"[CP-SAT SOLVE] Possible causes:")
@@ -418,12 +418,12 @@ class AdaptiveCPSATSolver:
                 logger.debug(f"[CP-SAT DOMAINS]   Session {session}: {len(valid_pairs)} pairs")
                 
                 if len(valid_pairs) == 0:
-                    logger.error(f"[CP-SAT DOMAINS]   ❌ NO VALID PAIRS for course {course_idx+1} session {session}!")
+                    logger.error(f"[CP-SAT DOMAINS]   [ERROR] NO VALID PAIRS for course {course_idx+1} session {session}!")
         
         # Clear temporary data
         del room_features
         
-        logger.info(f"[CP-SAT DOMAINS] ✅ {total_valid_pairs} pairs for {len(cluster)} courses (avg: {total_valid_pairs/len(cluster):.0f})")
+        logger.info(f"[CP-SAT DOMAINS] [OK] {total_valid_pairs} pairs for {len(cluster)} courses (avg: {total_valid_pairs/len(cluster):.0f})")
         return valid_domains
     
     def _add_faculty_constraints(self, model, variables, cluster):
