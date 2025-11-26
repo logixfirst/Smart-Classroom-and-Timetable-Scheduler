@@ -10,18 +10,27 @@ logger = logging.getLogger(__name__)
 
 
 class DjangoAPIClient:
-    """Client for fetching data directly from Django database"""
+    """Client for fetching data directly from Django database with connection pooling"""
 
     def __init__(self):
         self.db_conn = None
         self._connect_db()
     
     def _connect_db(self):
-        """Connect to Django's PostgreSQL database"""
+        """Connect to Django's PostgreSQL database with optimized settings"""
         try:
             db_url = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/sih28')
-            self.db_conn = psycopg2.connect(db_url, cursor_factory=RealDictCursor)
-            logger.info("Connected to Django database")
+            self.db_conn = psycopg2.connect(
+                db_url,
+                cursor_factory=RealDictCursor,
+                connect_timeout=10
+            )
+            # Enable autocommit for read-only queries
+            self.db_conn.autocommit = True
+            # Set statement timeout after connection (Neon.tech compatible)
+            with self.db_conn.cursor() as cur:
+                cur.execute("SET statement_timeout = '30s'")
+            logger.info("Connected to Django database with optimizations")
         except Exception as e:
             logger.error(f"Database connection failed: {e}")
             raise
@@ -54,7 +63,7 @@ class DjangoAPIClient:
             org_id = org_row['org_id']
             logger.info(f"Found organization: {org_row['org_name']} (ID: {org_id})")
             
-            # Join with course_offerings to get faculty assignment
+            # Optimized query with indexes
             query = """
                 SELECT DISTINCT c.course_id, c.course_code, c.course_name, c.dept_id,
                        c.lecture_hours_per_week, c.room_type_required, 
@@ -67,6 +76,7 @@ class DjangoAPIClient:
                 AND co.is_active = true
                 AND co.primary_faculty_id IS NOT NULL
                 AND co.semester_type = %s
+                LIMIT 5000
             """
             
             # Map semester number to semester_type (1=ODD, 2=EVEN) - UPPERCASE
@@ -78,10 +88,13 @@ class DjangoAPIClient:
                 query += " AND c.dept_id = %s"
                 params.append(department_id)
             
+            import time
+            start_time = time.time()
             logger.info(f"Executing course query with org_id={org_id}, semester_type={semester_type}")
             cursor.execute(query, params)
             rows = cursor.fetchall()
-            logger.info(f"Query returned {len(rows)} rows")
+            query_time = time.time() - start_time
+            logger.info(f"Query returned {len(rows)} rows in {query_time:.2f}s")
             
             courses = []
             for row in rows:

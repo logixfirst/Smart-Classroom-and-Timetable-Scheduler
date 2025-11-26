@@ -315,6 +315,7 @@ class Course(models.Model):
             models.Index(fields=["organization"], name="idx_course_org"),
             models.Index(fields=["department"], name="idx_course_dept"),
             models.Index(fields=["course_code"], name="idx_course_code"),
+            models.Index(fields=["organization", "is_active"], name="idx_course_org_active"),
         ]
     
     def __str__(self):
@@ -453,6 +454,40 @@ class Faculty(models.Model):
 
 
 # FacultySubject removed - not in database
+
+
+class CourseOffering(models.Model):
+    """Course offerings per semester - links courses to faculty"""
+    
+    offering_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="course_offerings", db_column='org_id')
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="offerings", db_column='course_id')
+    primary_faculty = models.ForeignKey(Faculty, on_delete=models.CASCADE, related_name="course_offerings", db_column='primary_faculty_id')
+    
+    academic_year = models.CharField(max_length=10)
+    semester_type = models.CharField(max_length=20)
+    semester_number = models.IntegerField(null=True, blank=True)
+    co_faculty_ids = models.JSONField(null=True, blank=True)
+    number_of_sections = models.IntegerField(default=1)
+    total_enrolled = models.IntegerField(default=0)
+    max_capacity = models.IntegerField(null=True, blank=True)
+    offering_status = models.CharField(max_length=50, default='SCHEDULED')
+    
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = "course_offerings"
+        indexes = [
+            models.Index(fields=["organization", "semester_type", "is_active"], name="idx_offering_org_sem"),
+            models.Index(fields=["course", "primary_faculty"], name="idx_offering_course_fac"),
+            models.Index(fields=["organization", "is_active"], name="idx_offering_org_active"),
+            models.Index(fields=["academic_year", "semester_type"], name="idx_offering_semester"),
+        ]
+    
+    def __str__(self):
+        return f"{self.course.course_code} - {self.semester_type}"
 
 
 # ============================================

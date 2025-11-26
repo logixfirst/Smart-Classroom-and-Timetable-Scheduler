@@ -16,14 +16,14 @@ from models.timetable_models import Course, Room, TimeSlot, Faculty
 
 logger = logging.getLogger(__name__)
 
-# Distributed system detection
+# Distributed system detection (package only, not runtime availability)
 try:
     from celery import Celery
     CELERY_AVAILABLE = True
-    logger.info("✅ Celery detected - Distributed processing available")
+    logger.debug("Celery package detected (not verified if running)")
 except ImportError:
     CELERY_AVAILABLE = False
-    logger.info("⚠️ Celery not available - No distributed processing")
+    logger.debug("Celery package not installed")
 
 # GPU Detection and Initialization (Non-blocking)
 try:

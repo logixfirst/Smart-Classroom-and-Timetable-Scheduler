@@ -43,14 +43,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Feature 10: Celery detection (after logger is defined)
+# Feature 10: Celery detection (package only, not runtime availability)
 try:
     from celery import Celery
     CELERY_AVAILABLE = True
-    logger.info("✅ Celery available - Distributed processing enabled")
+    logger.debug("Celery package detected (not verified if running)")
 except ImportError:
     CELERY_AVAILABLE = False
-    logger.info("⚠️ Celery not available - Distributed processing disabled")
+    logger.debug("Celery package not installed")
 
 # Global hardware profile and executor
 hardware_profile: Optional[HardwareProfile] = None
@@ -223,7 +223,7 @@ class TimetableGenerationSaga:
                 elif step_name == 'stage2_cpsat_solving':
                     step_timeout = 600  # 10 minutes for CP-SAT
                 else:
-                    step_timeout = 300  # 5 minutes for other stages
+                    step_timeout = 600  # 10 minutes for data loading
                 
                 # Execute step with adaptive timeout
                 result = await asyncio.wait_for(
