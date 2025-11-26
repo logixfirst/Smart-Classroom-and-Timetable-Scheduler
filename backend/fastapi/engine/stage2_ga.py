@@ -189,8 +189,8 @@ class GeneticAlgorithmOptimizer:
             perturbed = self._perturb_solution(self.initial_solution)
             if perturbed:
                 self.population.append(perturbed)
-            # Update progress during initialization
-            if self.job_id and self.redis_client and i % 2 == 0:
+            # Update progress EVERY individual for smooth progress
+            if self.job_id and self.redis_client:
                 self._update_init_progress(i + 1, self.population_size)
         
         logger.info(f"Initialized GA population: {len(self.population)} individuals")
@@ -480,15 +480,17 @@ class GeneticAlgorithmOptimizer:
         """Run GA evolution with early stopping and caching"""
         self.initialize_population()
         self.job_id = job_id
+        self._stop_flag = False  # Add stop flag
         
         best_solution = self.initial_solution
         best_fitness = self.fitness(best_solution)
         no_improvement_count = 0
         
         for generation in range(self.generations):
-            # Check cancellation
-            if job_id and self._check_cancellation():
-                logger.info(f"GA cancelled at generation {generation}")
+            # Check cancellation or stop flag
+            if self._stop_flag or (job_id and self._check_cancellation()):
+                logger.info(f"GA stopped at generation {generation}")
+                self._cleanup_gpu()
                 return best_solution
             # FORCE GPU usage - fallback only on critical error
             if self.use_gpu:
@@ -550,18 +552,19 @@ class GeneticAlgorithmOptimizer:
             # Update progress EVERY generation for smooth progress bar
             mode = "GPU" if self.use_gpu else "CPU"
             
-            # Log every 5 generations
-            if generation % 5 == 0:
+            # Log every 3 generations (more frequent for better visibility)
+            if generation % 3 == 0:
                 cache_size = len(self.fitness_cache)
                 logger.info(f"GA Gen {generation}/{self.generations} ({mode}): Best={best_fitness:.4f}, Cache={cache_size}")
             
-            # Redis update EVERY generation (smooth progress)
-            if job_id:
+            # Redis update EVERY generation (smooth progress) - CRITICAL for stuck progress
+            if job_id and self.redis_client:
                 self._update_ga_progress_batch(job_id, generation + 1, self.generations, best_fitness)
             
-            # Check cancellation every 5 generations
-            if job_id and generation % 5 == 0 and self._check_cancellation():
+            # Check cancellation every 3 generations (more frequent)
+            if job_id and generation % 3 == 0 and self._check_cancellation():
                 logger.info(f"GA cancelled at generation {generation}")
+                self._cleanup_gpu()
                 break
         
         # Final cleanup
@@ -577,7 +580,13 @@ class GeneticAlgorithmOptimizer:
             self._update_ga_progress(job_id, self.generations, self.generations, best_fitness)
         
         logger.info(f"GA complete: Final fitness={best_fitness:.4f}")
+        self._stop_flag = True  # Set stop flag
         return best_solution
+    
+    def stop(self):
+        """Stop GA evolution immediately"""
+        self._stop_flag = True
+        logger.info("GA stop requested")
     
     def _check_cancellation(self) -> bool:
         """Check if job has been cancelled via Redis"""
@@ -667,26 +676,38 @@ class GeneticAlgorithmOptimizer:
         except:
             pass
     
-    def evolve_island_model(self, num_islands: int = 4, migration_interval: int = 5, job_id: str = None) -> Dict:
-        """RAM-safe parallel island model with ThreadPoolExecutor"""
+    def evolve_island_model(self, num_islands: int = 4, migration_interval: int = 5, job_id: str = None, use_celery: bool = False) -> Dict:
+        """RAM-safe parallel island model with ThreadPoolExecutor OR Celery (Feature 10: Distributed Celery)"""
         self.job_id = job_id
         
         if not self.use_gpu:
             logger.warning("GPU not available, falling back to standard evolve()")
             return self.evolve(job_id)
         
+        # Feature 10: Distributed Celery support
+        if use_celery and CELERY_AVAILABLE:
+            logger.info(f"✅ Distributed Island Model: {num_islands} islands (Celery workers)")
+            return self._evolve_island_celery(num_islands, migration_interval, job_id)
+        
         logger.info(f"Parallel Island Model: {num_islands} islands (thread-parallel)")
         
-        # Create islands (in-memory, lightweight)
+        # Create islands (in-memory, lightweight) with progress updates
         islands = []
+        island_pop_size = self.population_size // num_islands
         for i in range(num_islands):
-            island_pop = [self._perturb_solution(self.initial_solution) for _ in range(self.population_size // num_islands)]
+            # Update progress during island creation
+            if job_id and self.redis_client:
+                self._update_init_progress(i + 1, num_islands)
+            
+            island_pop = [self._perturb_solution(self.initial_solution) for _ in range(island_pop_size)]
             islands.append({
                 'id': i,
                 'population': island_pop,
                 'best_solution': self.initial_solution.copy(),
                 'best_fitness': -float('inf')
             })
+        
+        logger.info(f"Created {num_islands} islands with {island_pop_size} individuals each")
         
         best_solution = self.initial_solution
         best_fitness = -float('inf')
@@ -700,6 +721,11 @@ class GeneticAlgorithmOptimizer:
                 logger.info(f"Island Model cancelled at epoch {epoch}")
                 return best_solution
             
+            # Update progress at start of epoch
+            if job_id:
+                gen_equiv = epoch * migration_interval
+                self._update_ga_progress_batch(job_id, gen_equiv, self.generations, best_fitness)
+            
             # Parallel island evolution (threads share memory)
             with ThreadPoolExecutor(max_workers=num_islands) as executor:
                 futures = {
@@ -707,7 +733,8 @@ class GeneticAlgorithmOptimizer:
                     for island in islands
                 }
                 
-                # Collect results
+                # Collect results with progress updates
+                completed_islands = 0
                 for future in as_completed(futures):
                     island = futures[future]
                     try:
@@ -721,8 +748,16 @@ class GeneticAlgorithmOptimizer:
                         if island['best_fitness'] > best_fitness:
                             best_fitness = island['best_fitness']
                             best_solution = island['best_solution']
+                        
+                        # Update progress after each island completes
+                        completed_islands += 1
+                        if job_id:
+                            # Interpolate progress within epoch
+                            gen_equiv = epoch * migration_interval + (completed_islands / num_islands) * migration_interval
+                            self._update_ga_progress_batch(job_id, int(gen_equiv), self.generations, best_fitness)
                     except Exception as e:
                         logger.error(f"Island {island['id']} failed: {e}")
+                        completed_islands += 1
             
             # Ring migration (after all islands complete)
             if epoch < num_epochs - 1:
@@ -732,6 +767,7 @@ class GeneticAlgorithmOptimizer:
             
             logger.info(f"Island Epoch {epoch + 1}/{num_epochs}: Best={best_fitness:.4f}")
             
+            # Final progress update for epoch
             if job_id:
                 gen_equiv = (epoch + 1) * migration_interval
                 self._update_ga_progress_batch(job_id, gen_equiv, self.generations, best_fitness)
@@ -963,20 +999,85 @@ class GeneticAlgorithmOptimizer:
     
     def _cleanup_gpu(self):
         """Cleanup GPU resources"""
-        if TORCH_AVAILABLE:
-            if hasattr(self, 'faculty_prefs_tensor'):
-                del self.faculty_prefs_tensor
-            if hasattr(self, 'gpu_student_courses'):
-                self.gpu_student_courses.clear()
-                del self.gpu_student_courses
-            if hasattr(self, 'course_id_to_idx'):
-                del self.course_id_to_idx
-            if self.gpu_fitness_cache is not None:
-                self.gpu_fitness_cache.clear()
-                self.gpu_fitness_cache = None
-            torch.cuda.empty_cache()
-            ram_saved = len(self.fitness_cache) * 0.5  # Estimate MB saved
-            logger.info(f"GPU resources cleaned up")
+        try:
+            if TORCH_AVAILABLE:
+                if hasattr(self, 'faculty_prefs_tensor'):
+                    del self.faculty_prefs_tensor
+                if hasattr(self, 'gpu_student_courses'):
+                    self.gpu_student_courses.clear()
+                    del self.gpu_student_courses
+                if hasattr(self, 'course_id_to_idx'):
+                    del self.course_id_to_idx
+                if self.gpu_fitness_cache is not None:
+                    self.gpu_fitness_cache.clear()
+                    self.gpu_fitness_cache = None
+                torch.cuda.empty_cache()
+                logger.info(f"GPU resources cleaned up")
+        except Exception as e:
+            logger.error(f"GPU cleanup error: {e}")
+
+
+    def _evolve_island_celery(self, num_islands: int, migration_interval: int, job_id: str) -> Dict:
+        """Feature 10: Distributed island evolution using Celery workers"""
+        from engine.celery_tasks import celery_app, evolve_island_task
+        from celery import group
+        
+        if not celery_app or not evolve_island_task:
+            logger.error("❌ Celery not available, falling back to thread-parallel")
+            return self.evolve_island_model(num_islands, migration_interval, job_id, use_celery=False)
+        
+        logger.info(f"✅ Starting distributed island evolution with {num_islands} Celery workers")
+        
+        # Serialize data for Celery
+        courses_dict = [c.__dict__ for c in self.courses]
+        rooms_dict = [r.__dict__ for r in self.rooms]
+        time_slots_dict = [t.__dict__ for t in self.time_slots]
+        faculty_dict = {k: v.__dict__ for k, v in self.faculty.items()}
+        
+        best_solution = self.initial_solution
+        best_fitness = -float('inf')
+        num_epochs = self.generations // migration_interval
+        island_pop_size = self.population_size // num_islands
+        
+        for epoch in range(num_epochs):
+            if job_id and self._check_cancellation():
+                logger.info(f"Distributed island model cancelled at epoch {epoch}")
+                return best_solution
+            
+            # Dispatch islands to Celery workers
+            tasks = group(
+                evolve_island_task.s(
+                    island_id=i,
+                    courses=courses_dict,
+                    rooms=rooms_dict,
+                    time_slots=time_slots_dict,
+                    faculty=faculty_dict,
+                    initial_solution=self.initial_solution,
+                    population_size=island_pop_size,
+                    generations=migration_interval,
+                    job_id=job_id
+                )
+                for i in range(num_islands)
+            )
+            
+            # Execute in parallel across workers
+            result = tasks.apply_async()
+            island_results = result.get(timeout=300)  # 5 min timeout
+            
+            # Collect best solutions
+            for island_result in island_results:
+                if island_result['fitness'] > best_fitness:
+                    best_fitness = island_result['fitness']
+                    best_solution = island_result['solution']
+            
+            logger.info(f"Distributed Epoch {epoch + 1}/{num_epochs}: Best={best_fitness:.4f}")
+            
+            if job_id:
+                gen_equiv = (epoch + 1) * migration_interval
+                self._update_ga_progress_batch(job_id, gen_equiv, self.generations, best_fitness)
+        
+        logger.info(f"✅ Distributed island model complete: fitness={best_fitness:.4f}")
+        return best_solution
 
 
 def _evolve_island_worker(island: Dict, courses, rooms, time_slots, faculty, students, generations: int) -> Dict:

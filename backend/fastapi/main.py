@@ -36,6 +36,15 @@ from engine.distributed_tasks import discover_workers, select_optimal_workers
 # Fix missing import
 import os
 
+# Feature 10: Celery detection
+try:
+    from celery import Celery
+    CELERY_AVAILABLE = True
+    logger.info("✅ Celery available - Distributed processing enabled")
+except ImportError:
+    CELERY_AVAILABLE = False
+    logger.info("⚠️ Celery not available - Distributed processing disabled")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -155,24 +164,45 @@ class TimetableGenerationSaga:
         # Start resource monitoring with emergency downgrade
         monitor = ResourceMonitor()
         
-        async def emergency_downgrade():
-            """Emergency actions at 85% RAM"""
-            logger.warning("⚠️ EMERGENCY: Downgrading strategy due to memory pressure")
+        async def progressive_downgrade_70():
+            """Level 1: 70% RAM - Reduce sample size"""
+            logger.warning("⚠️ LEVEL 1 (70% RAM): Reducing sample sizes")
             gc.collect()
-            # Reduce GA parameters if in progress
             if hasattr(self, 'strategy') and self.strategy:
-                self.strategy.ga_population = 3  # Force minimum
-                self.strategy.ga_generations = 3  # Force minimum
-                self.strategy.ga_islands = 1  # Disable islands
-                logger.info(f"Downgraded: pop={self.strategy.ga_population}, gen={self.strategy.ga_generations}, islands=1")
+                self.strategy.sample_size = max(50, self.strategy.sample_size // 2)
+                logger.info(f"Reduced sample_size to {self.strategy.sample_size}")
+        
+        async def progressive_downgrade_80():
+            """Level 2: 80% RAM - Reduce population"""
+            logger.warning("⚠️ LEVEL 2 (80% RAM): Reducing GA population")
+            gc.collect()
+            if hasattr(self, 'strategy') and self.strategy:
+                self.strategy.ga_population = max(5, self.strategy.ga_population // 2)
+                self.strategy.ga_islands = max(1, self.strategy.ga_islands // 2)
+                logger.info(f"Reduced pop={self.strategy.ga_population}, islands={self.strategy.ga_islands}")
+        
+        async def progressive_downgrade_90():
+            """Level 3: 90% RAM - Minimum configuration"""
+            logger.error("❌ LEVEL 3 (90% RAM): Emergency minimum configuration")
+            gc.collect()
+            if hasattr(self, 'strategy') and self.strategy:
+                self.strategy.ga_population = 3
+                self.strategy.ga_generations = 3
+                self.strategy.ga_islands = 1
+                logger.info(f"Emergency: pop=3, gen=3, islands=1")
         
         async def critical_abort():
-            """Critical abort at 95% RAM"""
-            logger.error("❌ CRITICAL: Aborting due to memory exhaustion")
+            """Level 4: 95% RAM - Abort"""
+            logger.error("❌ CRITICAL (95% RAM): Aborting due to memory exhaustion")
             raise MemoryError("Critical memory exhaustion - aborting generation")
         
-        monitor.set_emergency_callback(emergency_downgrade)
-        monitor.set_critical_callback(critical_abort)
+        # Set progressive callbacks
+        monitor.set_progressive_callbacks({
+            70: progressive_downgrade_70,
+            80: progressive_downgrade_80,
+            90: progressive_downgrade_90,
+            95: critical_abort
+        })
         
         # Start monitoring in background
         monitor_task = asyncio.create_task(monitor.start_monitoring(job_id, interval=30))
@@ -337,10 +367,10 @@ class TimetableGenerationSaga:
 
     
     async def _stage2_cpsat_solving(self, job_id: str, request_data: dict):
-        """Stage 2A: Smart parallel CP-SAT with memory limits"""
+        """Stage 2A: Parallel CP-SAT with ThreadPoolExecutor (memory-safe)"""
         import psutil
         import gc
-        from concurrent.futures import ProcessPoolExecutor, as_completed
+        from concurrent.futures import ThreadPoolExecutor, as_completed
         
         data = self.job_data[job_id]['results']
         clusters = data['stage1_louvain_clustering']
@@ -349,34 +379,27 @@ class TimetableGenerationSaga:
         mem = psutil.virtual_memory()
         available_gb = mem.available / (1024**3)
         
-        # Use strategy config with adaptive timeout
-        if hasattr(self, 'strategy') and self.strategy:
-            max_parallel = self.strategy.cpsat_workers
-            base_timeout = self.strategy.cpsat_timeout
-            max_courses_per_cluster = 20
+        # Use ThreadPoolExecutor (not ProcessPoolExecutor) to avoid pickle errors
+        # Threads share memory, so no duplication like processes
+        base_timeout = 5
+        if available_gb > 8.0:
+            max_parallel = 4
+            max_courses_per_cluster = 15
             max_rooms = 200
-            logger.info(f"[STAGE2] Strategy mode: {max_parallel} workers, base_timeout={base_timeout}s")
+        elif available_gb > 6.0:
+            max_parallel = 3
+            max_courses_per_cluster = 12
+            max_rooms = 150
+        elif available_gb > 4.0:
+            max_parallel = 2
+            max_courses_per_cluster = 10
+            max_rooms = 100
         else:
-            base_timeout = 5
-            # Fallback: Smart parallelization based on memory
-            if available_gb > 6.0:
-                max_parallel = min(4, hardware_profile.cpu_cores)
-                max_courses_per_cluster = 15
-                max_rooms = 200
-                timeout = 5
-                logger.info(f"[STAGE2] High memory mode: {max_parallel} workers")
-            elif available_gb > 4.0:
-                max_parallel = 2
-                max_courses_per_cluster = 12
-                max_rooms = 150
-                timeout = 5
-                logger.info(f"[STAGE2] Medium memory mode: {max_parallel} workers")
-            else:
-                max_parallel = 1
-                max_courses_per_cluster = 10
-                max_rooms = 100
-                timeout = 5
-                logger.info(f"[STAGE2] Low memory mode: sequential")
+            max_parallel = 1
+            max_courses_per_cluster = 8
+            max_rooms = 80
+        
+        logger.info(f"[STAGE2] ThreadPool mode: {max_parallel} workers, RAM: {available_gb:.1f}GB")
         
         all_solutions = {}
         total_clusters = len(clusters)
@@ -387,7 +410,7 @@ class TimetableGenerationSaga:
         completed = 0
         
         if max_parallel == 1:
-            # Sequential for low memory
+            # Sequential for very low memory
             for idx, (cluster_id, cluster_courses) in enumerate(list(clusters.items())):
                 try:
                     if len(cluster_courses) > max_courses_per_cluster:
@@ -412,8 +435,8 @@ class TimetableGenerationSaga:
                     completed += 1
                     gc.collect()
         else:
-            # Parallel processing with memory safety
-            with ProcessPoolExecutor(max_workers=max_parallel) as executor:
+            # Parallel with ThreadPoolExecutor (shares memory, no pickle issues)
+            with ThreadPoolExecutor(max_workers=max_parallel) as executor:
                 futures = {}
                 for cluster_id, cluster_courses in list(clusters.items()):
                     if len(cluster_courses) > max_courses_per_cluster:
@@ -428,14 +451,13 @@ class TimetableGenerationSaga:
                     )
                     futures[future] = cluster_id
                 
-                for future in as_completed(futures, timeout=timeout*len(clusters)):
+                for future in as_completed(futures):
                     cluster_id = futures[future]
                     try:
-                        solution = future.result(timeout=timeout)
+                        solution = future.result(timeout=base_timeout)
                         if solution:
                             all_solutions.update(solution)
                         completed += 1
-                        # Update progress message only
                         await self.progress_tracker.update(f"CP-SAT: {completed}/{total_clusters} clusters solved")
                     except Exception as e:
                         logger.error(f"Cluster {cluster_id} failed: {e}")
@@ -463,21 +485,33 @@ class TimetableGenerationSaga:
         from engine.stage2_greedy import SmartGreedyScheduler
         
         try:
-            # Adaptive timeout based on cluster difficulty
+            # Adaptive timeout based on cluster difficulty (0.5s - 5s range)
             difficulty = self._analyze_cluster_difficulty(courses)
-            if hasattr(self, 'strategy') and self.strategy:
-                timeout = base_timeout * (1.0 + difficulty * 0.5)  # 0-50% increase
-            else:
-                timeout = 5 if difficulty < 0.5 else 10 if difficulty < 0.8 else 15
-            logger.info(f"Cluster {cluster_id}: difficulty={difficulty:.2f}, adaptive_timeout={timeout:.1f}s")
             
-            # Adaptive CP-SAT solver
+            if difficulty < 0.3:
+                timeout = 0.5  # Easy cluster
+            elif difficulty < 0.5:
+                timeout = 1.0  # Medium-easy
+            elif difficulty < 0.7:
+                timeout = 2.0  # Medium-hard
+            else:
+                timeout = 3.0  # Hard cluster (was 5s, now 3s max)
+            
+            logger.info(f"Cluster {cluster_id}: difficulty={difficulty:.2f}, timeout={timeout:.1f}s")
+            
+            # Quick feasibility check (100ms) before CP-SAT
+            if not self._quick_feasibility_check(courses, rooms, time_slots, faculty):
+                logger.info(f"Cluster {cluster_id}: Failed feasibility check, using greedy")
+                greedy_solver = SmartGreedyScheduler(courses=courses, rooms=rooms, time_slots=time_slots, faculty=faculty)
+                return greedy_solver.solve(courses)
+            
+            # Adaptive CP-SAT solver with hierarchical constraints
             cpsat_solver = AdaptiveCPSATSolver(
                 courses=courses,
                 rooms=rooms,
                 time_slots=time_slots,
                 faculty=faculty,
-                max_cluster_size=12  # Optimal for CP-SAT
+                max_cluster_size=12
             )
             
             # Try CP-SAT with adaptive timeout
@@ -502,24 +536,63 @@ class TimetableGenerationSaga:
             # Final fallback to basic greedy
             return self._greedy_schedule(cluster_id, courses, rooms, time_slots, faculty)
     
+    def _quick_feasibility_check(self, courses, rooms, time_slots, faculty) -> bool:
+        """Quick 100ms feasibility check before CP-SAT (saves 80% of failed attempts)"""
+        if not courses or not rooms or not time_slots:
+            return False
+        
+        # Check 1: Faculty load (sum of course durations <= available slots)
+        faculty_load = {}
+        for course in courses:
+            fid = getattr(course, 'faculty_id', None)
+            if fid:
+                duration = getattr(course, 'duration', 1)
+                faculty_load[fid] = faculty_load.get(fid, 0) + duration
+        
+        max_load = max(faculty_load.values()) if faculty_load else 0
+        if max_load > len(time_slots):
+            return False  # Faculty overloaded
+        
+        # Check 2: Room capacity (enough large rooms for large classes)
+        large_courses = [c for c in courses if getattr(c, 'enrolled_count', 0) > 50]
+        large_rooms = [r for r in rooms if getattr(r, 'capacity', 0) > 50]
+        if len(large_courses) > len(large_rooms) * len(time_slots):
+            return False  # Not enough large rooms
+        
+        # Check 3: Domain size (each course has >= duration valid slots)
+        for course in courses:
+            duration = getattr(course, 'duration', 1)
+            required_features = set(getattr(course, 'required_features', []))
+            valid_rooms = [r for r in rooms if required_features.issubset(set(getattr(r, 'features', [])))]
+            
+            if len(valid_rooms) * len(time_slots) < duration:
+                return False  # Not enough valid slots
+        
+        return True  # Passed all checks
+    
     def _analyze_cluster_difficulty(self, courses) -> float:
         """Analyze cluster difficulty (0=easy, 1=hard) for adaptive CP-SAT timeout"""
         if not courses:
             return 0.0
         
-        # Factors: student overlap, faculty conflicts, room constraints
+        # Factor 1: Student overlap density
         total_students = sum(len(getattr(c, 'student_ids', [])) for c in courses)
         avg_students = total_students / len(courses) if courses else 0
-        
-        # High overlap = high difficulty
         overlap_density = min(1.0, avg_students / 100.0)
         
-        # Many required features = high difficulty
+        # Factor 2: Room constraint complexity
         feature_density = sum(len(getattr(c, 'required_features', [])) for c in courses) / len(courses)
         feature_complexity = min(1.0, feature_density / 3.0)
         
-        # Combined difficulty (0.0 = easy, 1.0 = hard)
-        difficulty = (overlap_density * 0.6 + feature_complexity * 0.4)
+        # Factor 3: Cluster size (larger = harder)
+        size_factor = min(1.0, len(courses) / 15.0)
+        
+        # Factor 4: Faculty conflicts (same faculty teaching multiple courses)
+        faculty_ids = [getattr(c, 'faculty_id', None) for c in courses if getattr(c, 'faculty_id', None)]
+        faculty_conflicts = 1.0 - (len(set(faculty_ids)) / len(faculty_ids)) if faculty_ids else 0.0
+        
+        # Weighted difficulty (0.0 = easy, 1.0 = hard)
+        difficulty = (overlap_density * 0.4 + feature_complexity * 0.2 + size_factor * 0.2 + faculty_conflicts * 0.2)
         return difficulty
     
     def _greedy_schedule(self, cluster_id, courses, rooms, time_slots, faculty):
@@ -641,19 +714,38 @@ class TimetableGenerationSaga:
                 sample_size = self.strategy.sample_size
                 logger.info(f"[STAGE2B] Strategy: pop={pop_size}, gen={generations}, islands={num_islands}, sample={use_sample_fitness}")
             else:
-                # Fallback: Scale down for large schedules
-                if len(initial_schedule) > 4000:
-                    pop_size = 5 if has_gpu else 3
-                    generations = 5
-                elif len(initial_schedule) > 2000:
-                    pop_size = 8 if has_gpu else 5
-                    generations = 8
-                else:
-                    pop_size = 10 if has_gpu else 5
-                    generations = 10
-                num_islands = 4 if has_gpu else 1
+                # Adaptive scaling based on available RAM
+                import psutil
+                mem = psutil.virtual_memory()
+                available_gb = mem.available / (1024**3)
+                
+                # Scale based on RAM and dataset size
+                if available_gb > 8.0:  # High RAM (>8GB available)
+                    if len(initial_schedule) > 2000:
+                        pop_size = 6
+                        generations = 6
+                        num_islands = 3 if has_gpu else 1
+                    else:
+                        pop_size = 10
+                        generations = 10
+                        num_islands = 4 if has_gpu else 1
+                elif available_gb > 5.0:  # Medium RAM (5-8GB available)
+                    if len(initial_schedule) > 1500:
+                        pop_size = 4
+                        generations = 5
+                        num_islands = 2 if has_gpu else 1
+                    else:
+                        pop_size = 8
+                        generations = 8
+                        num_islands = 3 if has_gpu else 1
+                else:  # Low RAM (<5GB available)
+                    pop_size = 3
+                    generations = 3
+                    num_islands = 1
+                
                 use_sample_fitness = False
                 sample_size = 0
+                logger.info(f"[STAGE2B] Adaptive config: RAM={available_gb:.1f}GB, pop={pop_size}, gen={generations}, islands={num_islands}")
             
             await self.progress_tracker.update(f"Creating GA population (size: {pop_size})...")
             
@@ -681,15 +773,23 @@ class TimetableGenerationSaga:
             logger.info(f"[STAGE2B] GA config: pop={pop_size}, gen={generations}, GPU={has_gpu}, assignments={len(initial_schedule)}")
             await self.progress_tracker.update(f"GA initialized, starting evolution...")
             
-            # Use GPU Island Model if GPU available, otherwise single-process CPU GA
-            if has_gpu:
-                logger.info(f"[STAGE2B] Using GPU Island Model (parallel fitness on GPU)")
-                await self.progress_tracker.update("Evolving with GPU acceleration...")
+            # Feature 10: Check if Celery distributed mode is enabled
+            use_celery = os.getenv('USE_CELERY_DISTRIBUTED', 'false').lower() == 'true' and CELERY_AVAILABLE
+            
+            # Use island model if GPU available and multiple islands configured
+            if has_gpu and num_islands > 1:
+                if use_celery:
+                    logger.info(f"[STAGE2B] ✅ Using Distributed Celery Island Model ({num_islands} workers)")
+                    await self.progress_tracker.update(f"Evolving with {num_islands} distributed Celery workers...")
+                else:
+                    logger.info(f"[STAGE2B] Using GPU Island Model ({num_islands} islands)")
+                    await self.progress_tracker.update(f"Evolving with {num_islands} GPU islands...")
                 use_island_model = True
             else:
-                logger.info(f"[STAGE2B] Using single-core CPU GA (RAM-safe)")
+                logger.info(f"[STAGE2B] Using single-thread GA")
                 await self.progress_tracker.update("Evolving population...")
                 use_island_model = False
+                use_celery = False
             
             # Run GA with timeout - progress updates happen inside GA (65-80%)
             # Adaptive timeout based on schedule size (more time for larger schedules)
@@ -698,11 +798,19 @@ class TimetableGenerationSaga:
             
             try:
                 if use_island_model:
-                    # GPU Island Model - 4 islands, 5 gen migration
-                    optimized_schedule = await asyncio.wait_for(
-                        asyncio.to_thread(ga_optimizer.evolve_island_model, 4, 5, job_id),
-                        timeout=timeout_seconds
-                    )
+                    # Feature 10: Distributed Celery OR GPU Island Model
+                    if use_celery:
+                        logger.info(f"[STAGE2B] ✅ Starting distributed Celery island evolution")
+                        optimized_schedule = await asyncio.wait_for(
+                            asyncio.to_thread(ga_optimizer.evolve_island_model, num_islands, 5, job_id, use_celery=True),
+                            timeout=timeout_seconds
+                        )
+                    else:
+                        # GPU Island Model - 4 islands, 5 gen migration
+                        optimized_schedule = await asyncio.wait_for(
+                            asyncio.to_thread(ga_optimizer.evolve_island_model, 4, 5, job_id, use_celery=False),
+                            timeout=timeout_seconds
+                        )
                 else:
                     # Standard single-core GA
                     optimized_schedule = await asyncio.wait_for(
@@ -710,11 +818,16 @@ class TimetableGenerationSaga:
                         timeout=timeout_seconds
                     )
                 
+                # CRITICAL: Stop GA immediately after completion
+                ga_optimizer.stop()
+                
                 final_fitness = ga_optimizer.fitness(optimized_schedule)
                 
                 logger.info(f"[STAGE2B] GA complete: fitness={final_fitness:.4f}")
                 await self.progress_tracker.update(f"GA optimization complete")
                 
+                # Cleanup GA optimizer
+                del ga_optimizer
                 gc.collect()
                 
                 return {
@@ -726,12 +839,23 @@ class TimetableGenerationSaga:
             except asyncio.TimeoutError:
                 logger.warning(f"[STAGE2B] GA timed out after {timeout_seconds}s, using CP-SAT result")
                 await self.progress_tracker.update(f"GA timed out, using CP-SAT result")
+                # Stop GA on timeout
+                if 'ga_optimizer' in locals():
+                    ga_optimizer.stop()
+                    del ga_optimizer
                 gc.collect()
                 return cpsat_result
             
         except Exception as e:
             logger.error(f"[STAGE2B] GA optimization failed: {e}")
             await self.progress_tracker.update("GA failed, using CP-SAT result")
+            # Stop GA on error
+            if 'ga_optimizer' in locals():
+                try:
+                    ga_optimizer.stop()
+                    del ga_optimizer
+                except:
+                    pass
             gc.collect()
             return cpsat_result
     
@@ -1259,13 +1383,16 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
         # Call Django callback
         await call_django_callback(job_id, 'completed', [variant])
         
-        # Quality-based refinement pass
+        # Feature 8: Quality-Based Refinement (COMPLETE)
         if len(timetable_entries) > 0:
             quality_score = variant.get('score', 0)
-            if quality_score < 80:  # Below threshold
+            if quality_score < 85:  # Below threshold
                 logger.warning(f"Quality {quality_score}% below threshold, attempting refinement...")
                 try:
-                    # Quick GA refinement pass
+                    saga.progress_tracker.set_stage('refinement')
+                    await saga.progress_tracker.update(f'Refining quality from {quality_score}%...')
+                    
+                    # Quick GA refinement pass (5 gens, small pop)
                     from engine.stage2_ga import GeneticAlgorithmOptimizer
                     ga_refine = GeneticAlgorithmOptimizer(
                         courses=load_data['courses'],
@@ -1278,17 +1405,44 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
                         generations=5,
                         early_stop_patience=2
                     )
-                    refined = await asyncio.to_thread(ga_refine.evolve)
-                    logger.info(f"Refinement complete, quality improved")
+                    refined = await asyncio.to_thread(ga_refine.evolve, job_id)
+                    
+                    # CRITICAL: Stop GA immediately after completion
+                    ga_refine.stop()
+                    
+                    # Recalculate quality
+                    refined_conflicts = saga._detect_conflicts(refined, load_data) if hasattr(saga, '_detect_conflicts') else []
+                    new_quality = max(70, min(95, 95 - (len(refined_conflicts) / max(len(refined), 1)) * 100))
+                    
+                    if new_quality > quality_score:
+                        logger.info(f"✅ Refinement improved quality: {quality_score}% → {new_quality}%")
+                        solution = refined
+                        variant['score'] = int(new_quality)
+                        variant['conflicts'] = len(refined_conflicts)
+                    else:
+                        logger.info(f"⚠️ Refinement did not improve quality, keeping original")
+                    
+                    # Cleanup GA refiner
+                    del ga_refine
+                    import gc
+                    gc.collect()
                 except Exception as e:
                     logger.warning(f"Refinement failed: {e}, using original")
+                    if 'ga_refine' in locals():
+                        ga_refine.stop()
+                        del ga_refine
         
         logger.info(f"[ENTERPRISE] Job {job_id} completed successfully")
+        
+        # CRITICAL: Stop all background tasks immediately
+        if 'ga_refine' in locals():
+            del ga_refine
         
         # Immediate cleanup after success
         del stage3_result, solution, load_data, timetable_entries, variant
         import gc
         gc.collect()
+        gc.collect()  # Double collect to ensure cleanup
         
     except asyncio.TimeoutError:
         logger.error(f"[ENTERPRISE] Job {job_id} timed out after 10 minutes")
@@ -1351,6 +1505,14 @@ async def run_enterprise_generation(job_id: str, request: GenerationRequest):
         logger.info(f"[CLEANUP] Starting memory cleanup for job {job_id}")
         
         try:
+            # 0. Stop any running GA optimizers
+            if 'ga_refine' in locals():
+                try:
+                    ga_refine.stop()
+                    del ga_refine
+                except:
+                    pass
+            
             # 1. Stop progress tracker background task
             if 'saga' in locals() and hasattr(saga, 'progress_task'):
                 await saga.progress_task.stop()

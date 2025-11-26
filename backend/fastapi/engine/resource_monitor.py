@@ -10,35 +10,34 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceMonitor:
-    """Monitor system resources and trigger emergency actions"""
+    """Monitor system resources and trigger progressive emergency actions"""
     
     def __init__(self):
         self.monitoring = False
-        self.emergency_callback: Optional[Callable] = None
-        self.critical_callback: Optional[Callable] = None
+        self.progressive_callbacks: dict = {}  # threshold -> callback
+        self.triggered_thresholds: set = set()  # Track which thresholds already triggered
     
     async def start_monitoring(self, job_id: str, interval: int = 30):
-        """Start continuous monitoring"""
+        """Start continuous monitoring with progressive thresholds"""
         self.monitoring = True
-        logger.info(f"[MONITOR] Started resource monitoring for job {job_id}")
+        logger.info(f"[MONITOR] Started progressive resource monitoring for job {job_id}")
         
         while self.monitoring:
             try:
                 mem = psutil.virtual_memory()
                 
-                if mem.percent > 95:
-                    # CRITICAL: Abort
-                    logger.error(f"[MONITOR] CRITICAL memory: {mem.percent}%")
-                    if self.critical_callback:
-                        await self.critical_callback()
-                    self.monitoring = False
-                    break
-                    
-                elif mem.percent > 85:
-                    # WARNING: Emergency actions
-                    logger.warning(f"[MONITOR] Memory pressure: {mem.percent}%")
-                    if self.emergency_callback:
-                        await self.emergency_callback()
+                # Check all thresholds in descending order
+                for threshold in sorted(self.progressive_callbacks.keys(), reverse=True):
+                    if mem.percent > threshold and threshold not in self.triggered_thresholds:
+                        logger.warning(f"[MONITOR] Memory threshold {threshold}% exceeded: {mem.percent}%")
+                        callback = self.progressive_callbacks[threshold]
+                        await callback()
+                        self.triggered_thresholds.add(threshold)
+                        
+                        # If critical threshold (95%), stop monitoring
+                        if threshold >= 95:
+                            self.monitoring = False
+                            break
                 
                 await asyncio.sleep(interval)
                 
@@ -52,10 +51,15 @@ class ResourceMonitor:
         """Stop monitoring"""
         self.monitoring = False
     
+    def set_progressive_callbacks(self, callbacks: dict):
+        """Set progressive callbacks: {threshold: callback}"""
+        self.progressive_callbacks = callbacks
+        logger.info(f"[MONITOR] Progressive thresholds set: {list(callbacks.keys())}%")
+    
     def set_emergency_callback(self, callback: Callable):
-        """Set callback for 85% memory"""
-        self.emergency_callback = callback
+        """Legacy: Set callback for 85% memory"""
+        self.progressive_callbacks[85] = callback
     
     def set_critical_callback(self, callback: Callable):
-        """Set callback for 95% memory"""
-        self.critical_callback = callback
+        """Legacy: Set callback for 95% memory"""
+        self.progressive_callbacks[95] = callback
