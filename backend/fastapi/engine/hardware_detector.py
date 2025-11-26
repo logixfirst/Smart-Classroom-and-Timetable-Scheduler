@@ -223,7 +223,7 @@ class HardwareDetector:
                     memory_mb = int(parts[1].strip().split()[0])
                     gpu_info['has_nvidia'] = True
                     gpu_info['memory_gb'] = memory_mb / 1024
-                    logger.info(f"✅ NVIDIA GPU: {gpu_name} ({gpu_info['memory_gb']:.1f}GB)")
+                    logger.info(f"[GPU] NVIDIA GPU: {gpu_name} ({gpu_info['memory_gb']:.1f}GB)")
         except:
             pass
         
@@ -235,7 +235,7 @@ class HardwareDetector:
                     gpu_info['has_nvidia'] = True
                     gpu_info['memory_gb'] = torch.cuda.get_device_properties(0).total_memory / (1024**3)
                     gpu_info['cuda_version'] = torch.version.cuda
-                    logger.info(f"✅ GPU via PyTorch: {torch.cuda.get_device_name(0)}")
+                    logger.info(f"[GPU] GPU via PyTorch: {torch.cuda.get_device_name(0)}")
             except:
                 pass
         

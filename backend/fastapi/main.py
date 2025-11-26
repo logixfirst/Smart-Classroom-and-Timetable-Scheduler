@@ -209,7 +209,7 @@ class TimetableGenerationSaga:
         
         async def progressive_downgrade_70():
             """Level 1: 70% RAM - Reduce sample size"""
-            logger.warning("⚠️ LEVEL 1 (70% RAM): Reducing sample sizes")
+            logger.warning("[WARN] LEVEL 1 (70% RAM): Reducing sample sizes")
             gc.collect()
             if hasattr(self, 'strategy') and self.strategy:
                 self.strategy.sample_size = max(50, self.strategy.sample_size // 2)
@@ -217,7 +217,7 @@ class TimetableGenerationSaga:
         
         async def progressive_downgrade_80():
             """Level 2: 80% RAM - Reduce population"""
-            logger.warning("⚠️ LEVEL 2 (80% RAM): Reducing GA population")
+            logger.warning("[WARN] LEVEL 2 (80% RAM): Reducing GA population")
             gc.collect()
             if hasattr(self, 'strategy') and self.strategy:
                 self.strategy.ga_population = max(5, self.strategy.ga_population // 2)
@@ -226,7 +226,7 @@ class TimetableGenerationSaga:
         
         async def progressive_downgrade_90():
             """Level 3: 90% RAM - Minimum configuration"""
-            logger.error("❌ LEVEL 3 (90% RAM): Emergency minimum configuration")
+            logger.error("[ERROR] LEVEL 3 (90% RAM): Emergency minimum configuration")
             gc.collect()
             if hasattr(self, 'strategy') and self.strategy:
                 self.strategy.ga_population = 3
@@ -236,7 +236,7 @@ class TimetableGenerationSaga:
         
         async def critical_abort():
             """Level 4: 95% RAM - Abort"""
-            logger.error("❌ CRITICAL (95% RAM): Aborting due to memory exhaustion")
+            logger.error("[CRITICAL] (95% RAM): Aborting due to memory exhaustion")
             raise MemoryError("Critical memory exhaustion - aborting generation")
         
         # Set progressive callbacks
@@ -426,7 +426,7 @@ class TimetableGenerationSaga:
         
         self.progress_tracker.set_stage('clustering')
         
-        clusterer = LouvainClusterer(target_cluster_size=10, progress_tracker=self.progress_tracker)
+        clusterer = LouvainClusterer(target_cluster_size=10)
         clusters = await asyncio.to_thread(clusterer.cluster_courses, courses)
         
         # Check cancellation after clustering
@@ -1275,11 +1275,11 @@ class TimetableGenerationSaga:
                     json.dumps(progress_data)
                 )
                 
-                logger.info(f"[PROGRESS] ✅ Published: {job_id} -> {progress}% - {message} (ETA: {time_remaining_seconds}s)")
+                logger.info(f"[PROGRESS] Published: {job_id} -> {progress}% - {message} (ETA: {time_remaining_seconds}s)")
             else:
-                logger.error(f"[PROGRESS] ❌ Redis client not available")
+                logger.error(f"[PROGRESS] Redis client not available")
         except Exception as e:
-            logger.error(f"[PROGRESS] ❌ Failed to update Redis: {e}")
+            logger.error(f"[PROGRESS] Failed to update Redis: {e}")
             import traceback
             logger.error(traceback.format_exc())
 
@@ -1335,7 +1335,7 @@ async def lifespan(app: FastAPI):
         logger.info("[OK] Redis connection successful")
         
     except Exception as e:
-        logger.error(f"❌ Redis initialization failed: {e}")
+        logger.error(f"[ERROR] Redis initialization failed: {e}")
         app.state.redis_client = None
         redis_client_global = None
     
