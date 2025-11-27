@@ -180,17 +180,22 @@ class GeneticAlgorithmOptimizer:
         else:
             logger.info(f"GA using single-core CPU (RAM-safe mode)")
         
-        # On-demand domain computation (no pre-computation!)
-        logger.info(f"[GA] Init complete. Valid domains computed on-demand (zero pre-computation).")
+        # On-demand domain computation with per-course caching
+        self._domain_cache = {}  # Cache: course_id -> valid_pairs
+        logger.info(f"[GA] Init complete. Valid domains computed on-demand with caching.")
     
     def _get_valid_domain(self, course_id: str, session: int) -> List[Tuple]:
-        """On-demand: Compute valid (time, room) pairs for a single course session"""
+        """On-demand with caching: Compute valid (time, room) pairs per course"""
+        # Check cache first (course-level, not session-level)
+        if course_id in self._domain_cache:
+            return self._domain_cache[course_id]
+        
         # Find course
         course = next((c for c in self.courses if c.course_id == course_id), None)
         if not course:
             return []
         
-        # Compute valid pairs on-the-fly (no pre-computation!)
+        # Compute valid pairs (only once per course)
         valid_pairs = []
         for t_slot in self.time_slots:
             for room in self.rooms:
@@ -201,6 +206,8 @@ class GeneticAlgorithmOptimizer:
                         continue
                 valid_pairs.append((t_slot.slot_id, room.room_id))
         
+        # Cache for future use
+        self._domain_cache[course_id] = valid_pairs
         return valid_pairs
     
     def initialize_population(self):
