@@ -701,9 +701,14 @@ class GeneticAlgorithmOptimizer:
             self.progress_tracker.stage_items_total = self.generations
             self.progress_tracker.stage_items_done = 0
         
-        # CRITICAL: Check streaming mode BEFORE initialization
+        # SMART STRATEGY: GPU available → disable streaming (use fast GPU), no GPU → enable streaming (memory-safe CPU)
+        # Streaming mode is incompatible with GPU (GPU stores population in VRAM, streaming processes one-by-one)
+        if self.streaming_mode and self.use_gpu:
+            logger.warning(f"[GA] GPU available - disabling streaming mode (using fast GPU mode instead)")
+            self.streaming_mode = False
+        
         if self.streaming_mode:
-            logger.info(f"[GA] Streaming mode enabled (memory-safe)")
+            logger.info(f"[GA] Streaming mode enabled (memory-safe CPU-only, no GPU)")
             result = self._evolve_streaming(job_id)
             memory_manager.stop_monitoring()
             memory_manager.cleanup(level='aggressive')

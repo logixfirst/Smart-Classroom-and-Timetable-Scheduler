@@ -650,6 +650,7 @@ def get_optimal_config(profile: HardwareProfile) -> Dict:
     # CRITICAL: GPU only if VRAM >= 2GB (enough for population offloading)
     use_gpu_ga = has_gpu and gpu_vram >= 2
     
+    # SMART STRATEGY: GPU available → disable streaming (fast GPU), no GPU → enable streaming (memory-safe CPU)
     if tier == "potato":
         # ULTRA-SAFE: Streaming GA with population of 5 (only 20MB × 5 = 100MB total)
         stage2b = {
@@ -667,51 +668,85 @@ def get_optimal_config(profile: HardwareProfile) -> Dict:
             'early_stop_patience': 3,
             'use_gpu': False,  # No GPU on potato systems
             'memory_limit_gb': memory_budget_gb,
-            'streaming_mode': True,
+            'streaming_mode': True,  # Always streaming on potato
             'skip_ga': False  # Don't skip, use streaming
         }
     elif tier == "laptop":
-        # GOOGLE STYLE: Use calculated memory budget, not fixed caps
-        # CRITICAL: Cap population at 10 for streaming mode (1 individual in RAM at a time)
-        safe_population = 10 if not use_gpu_ga else max_population
-        stage2b = {
-            'algorithm': 'streaming_ga',  # Stream-based, not batch
-            'population': safe_population,
-            'generations': max_generations,
-            'islands': 1,
-            'parallel_fitness': False,
-            'parallel_mode': 'sequential',
-            'fitness_workers': 1,
-            'fitness_evaluation': 'streaming',  # Process one at a time
-            'sample_students': 50,
-            'fitness_cache': False,  # No cache to save memory
-            'early_stopping': True,
-            'early_stop_patience': 3,
-            'use_gpu': use_gpu_ga,  # Use GPU if available
-            'memory_limit_gb': memory_budget_gb,  # Pass budget to GA
-            'streaming_mode': True  # Enable streaming
-        }
+        # SMART: GPU available → full GPU mode (pop=50, no streaming), no GPU → streaming mode (pop=10)
+        if use_gpu_ga:
+            stage2b = {
+                'algorithm': 'gpu_ga',
+                'population': max_population,  # Full population in VRAM
+                'generations': max_generations,
+                'islands': 1,
+                'parallel_fitness': False,
+                'parallel_mode': 'sequential',
+                'fitness_workers': 1,
+                'fitness_evaluation': 'full',
+                'sample_students': 50,
+                'fitness_cache': False,
+                'early_stopping': True,
+                'early_stop_patience': 3,
+                'use_gpu': True,
+                'memory_limit_gb': memory_budget_gb,
+                'streaming_mode': False  # GPU mode, no streaming
+            }
+        else:
+            stage2b = {
+                'algorithm': 'streaming_ga',
+                'population': 10,  # Streaming mode, small population
+                'generations': max_generations,
+                'islands': 1,
+                'parallel_fitness': False,
+                'parallel_mode': 'sequential',
+                'fitness_workers': 1,
+                'fitness_evaluation': 'streaming',
+                'sample_students': 50,
+                'fitness_cache': False,
+                'early_stopping': True,
+                'early_stop_patience': 3,
+                'use_gpu': False,
+                'memory_limit_gb': memory_budget_gb,
+                'streaming_mode': True  # CPU streaming mode
+            }
     elif tier == "workstation":
-        # LINUX STYLE: Use memory budget, enable parallel if pressure < 60%
-        # CRITICAL: Cap population at 20 for streaming mode without GPU
-        safe_population = min(max_population, 20) if not use_gpu_ga else max_population
-        stage2b = {
-            'algorithm': 'streaming_ga',
-            'population': safe_population,
-            'generations': max_generations,
-            'islands': 1 if memory_pressure > 60 else 2,
-            'parallel_mode': 'sequential' if memory_pressure > 60 else 'thread',
-            'island_workers': 1,
-            'migration_frequency': 5,
-            'migration_rate': 0.1,
-            'fitness_evaluation': 'streaming',
-            'fitness_cache': False,
-            'early_stopping': True,
-            'use_gpu': use_gpu_ga,
-            'gpu_strategy': 'fitness_only',
-            'memory_limit_gb': memory_budget_gb,
-            'streaming_mode': True
-        }
+        # SMART: GPU available → full GPU mode (pop=50, no streaming), no GPU → streaming mode (pop=20)
+        if use_gpu_ga:
+            stage2b = {
+                'algorithm': 'gpu_ga',
+                'population': max_population,
+                'generations': max_generations,
+                'islands': 1 if memory_pressure > 60 else 2,
+                'parallel_mode': 'sequential' if memory_pressure > 60 else 'thread',
+                'island_workers': 1,
+                'migration_frequency': 5,
+                'migration_rate': 0.1,
+                'fitness_evaluation': 'full',
+                'fitness_cache': False,
+                'early_stopping': True,
+                'use_gpu': True,
+                'gpu_strategy': 'fitness_only',
+                'memory_limit_gb': memory_budget_gb,
+                'streaming_mode': False  # GPU mode, no streaming
+            }
+        else:
+            stage2b = {
+                'algorithm': 'streaming_ga',
+                'population': min(max_population, 20),
+                'generations': max_generations,
+                'islands': 1 if memory_pressure > 60 else 2,
+                'parallel_mode': 'sequential' if memory_pressure > 60 else 'thread',
+                'island_workers': 1,
+                'migration_frequency': 5,
+                'migration_rate': 0.1,
+                'fitness_evaluation': 'streaming',
+                'fitness_cache': False,
+                'early_stopping': True,
+                'use_gpu': False,
+                'gpu_strategy': 'fitness_only',
+                'memory_limit_gb': memory_budget_gb,
+                'streaming_mode': True  # CPU streaming mode
+            }
     else:  # server
         stage2b = {
             'algorithm': 'island_ga_gpu',
