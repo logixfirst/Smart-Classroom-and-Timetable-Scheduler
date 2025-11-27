@@ -211,9 +211,11 @@ class GeneticAlgorithmOptimizer:
     def _initialize_population_gpu(self):
         """GPU: Store entire population in VRAM (300MB RAM -> VRAM)"""
         import torch
+        import psutil
         
         # CRITICAL: Store population as GPU tensors, NOT Python dicts
-        logger.info(f"[GPU] Offloading population to VRAM ({self.population_size} individuals)")
+        mem_before = psutil.virtual_memory()
+        logger.info(f"[GPU] Offloading population to VRAM ({self.population_size} individuals). RAM before: {mem_before.percent:.1f}%")
         
         # Convert initial solution to tensor format
         keys_list = list(self.initial_solution.keys())
@@ -265,7 +267,13 @@ class GeneticAlgorithmOptimizer:
         self.population = []  # Empty CPU list (all data in VRAM)
         
         vram_mb = (population_tensor.numel() * 8) / (1024**2)
-        logger.info(f"[GPU] Population in VRAM: {vram_mb:.1f}MB (freed from RAM)")
+        mem_after = psutil.virtual_memory()
+        logger.info(f"[GPU] Population in VRAM: {vram_mb:.1f}MB. RAM: {mem_before.percent:.1f}% → {mem_after.percent:.1f}% (Δ{mem_after.percent - mem_before.percent:+.1f}%)")
+        
+        # CRITICAL: Force garbage collection after GPU init
+        import gc
+        gc.collect()
+        torch.cuda.empty_cache()
     
     def _initialize_population_cpu(self):
         """CPU fallback: Minimal RAM usage"""
@@ -714,14 +722,35 @@ class GeneticAlgorithmOptimizer:
             memory_manager.cleanup(level='aggressive')
             return result
         
-        # Initialize population (GPU or CPU)
+        # Initialize population (GPU or CPU) with automatic fallback
         logger.info(f"[GA] Initializing population (use_gpu={self.use_gpu}, streaming={self.streaming_mode})")
-        self.initialize_population()
         
-        # Log memory after initialization
-        import psutil
-        mem = psutil.virtual_memory()
-        logger.info(f"[GA] After init: RAM {mem.used/(1024**3):.1f}GB / {mem.total/(1024**3):.1f}GB ({mem.percent:.1f}%)")
+        try:
+            self.initialize_population()
+            
+            # Log memory after initialization
+            import psutil
+            mem = psutil.virtual_memory()
+            logger.info(f"[GA] After init: RAM {mem.used/(1024**3):.1f}GB / {mem.total/(1024**3):.1f}GB ({mem.percent:.1f}%)")
+        except Exception as init_error:
+            logger.error(f"[GA] Population init FAILED: {init_error}")
+            
+            # CRITICAL: Automatic fallback to streaming mode
+            if self.use_gpu:
+                logger.warning(f"[GA] GPU init failed, falling back to CPU streaming mode")
+                self.use_gpu = False
+                self.gpu_offload_conflicts = False
+                self.streaming_mode = True
+                self.population_size = min(self.population_size, 10)  # Reduce population for safety
+                logger.info(f"[GA] Fallback: streaming=True, pop={self.population_size}")
+                
+                # Use streaming mode instead
+                result = self._evolve_streaming(job_id)
+                memory_manager.stop_monitoring()
+                memory_manager.cleanup(level='aggressive')
+                return result
+            else:
+                raise
         
         best_solution = self.initial_solution
         best_fitness = self.fitness(best_solution)
