@@ -836,52 +836,8 @@ class TimetableGenerationSaga:
             optimal_config = get_optimal_config(hardware_profile) if hardware_profile else {}
             ga_config = optimal_config.get('stage2b_ga', {'population': 12, 'generations': 18, 'islands': 1, 'use_gpu': False, 'fitness_mode': 'full'})
             
-            # CRITICAL: Only use GPU if config explicitly allows it (checks VRAM >= 8GB)
-            if ga_config.get('use_gpu', False):
-                # GPU Tensor GA
-                from engine.gpu_tensor_ga import GPUTensorGA
-                
-                pop_size = min(ga_config['population'] * 40, 2000)
-                generations = ga_config['generations']
-                logger.info(f"[STAGE2B] GPU Tensor GA: pop={pop_size}, gen={generations}")
-                
-                logger.info(f"[STAGE2B] [OK] GPU Tensor GA: pop={pop_size}, gen={generations}")
-                
-                gpu_ga = GPUTensorGA(
-                    courses=courses,
-                    rooms=rooms,
-                    time_slots=time_slots,
-                    faculty=faculty,
-                    initial_solution=initial_schedule,
-                    population_size=pop_size,
-                    generations=generations,
-                    mutation_rate=0.15,
-                    device='cuda'
-                )
-                
-                optimized_schedule = await asyncio.to_thread(gpu_ga.evolve)
-                
-                # Calculate fitness using old GA for compatibility
-                from engine.stage2_ga import GeneticAlgorithmOptimizer
-                temp_ga = GeneticAlgorithmOptimizer(
-                    courses=courses, rooms=rooms, time_slots=time_slots,
-                    faculty=faculty, students={},
-                    initial_solution=optimized_schedule,
-                    population_size=1, generations=1
-                )
-                final_fitness = temp_ga.fitness(optimized_schedule)
-                del temp_ga
-                
-                logger.info(f"[STAGE2B] [OK] GPU GA complete: fitness={final_fitness:.4f}")
-                
-                # CRITICAL: Force GPU cleanup after GA
-                del gpu_ga
-                torch.cuda.empty_cache()
-                torch.cuda.synchronize()
-                gc.collect()
-                logger.info("[STAGE2B] [OK] GPU memory released")
-            else:
-                # CPU GA with hardware-optimal config
+            # Use stage2_ga.py which has hardware-flexible implementation (GPU/CPU)
+            # CPU GA with hardware-optimal config
                 pop = ga_config.get('population', 12)
                 gen = ga_config.get('generations', 18)
                 islands = ga_config.get('islands', 1)
@@ -910,10 +866,6 @@ class TimetableGenerationSaga:
             self.progress_tracker.mark_stage_complete()
             
             # CRITICAL: Aggressive cleanup before RL stage
-            if ga_config['use_gpu']:
-                torch.cuda.empty_cache()
-                torch.cuda.synchronize()
-            
             cleanup_stats = aggressive_cleanup()
             logger.info(f"[STAGE2B] [OK] Freed {cleanup_stats['freed_mb']:.1f}MB before RL stage")
             
@@ -930,10 +882,6 @@ class TimetableGenerationSaga:
             logger.error(traceback.format_exc())
             
             # Cleanup on error
-            if 'gpu_ga' in locals():
-                del gpu_ga
-            if ga_config.get('use_gpu', False):
-                torch.cuda.empty_cache()
             aggressive_cleanup()
             
             return cpsat_result
