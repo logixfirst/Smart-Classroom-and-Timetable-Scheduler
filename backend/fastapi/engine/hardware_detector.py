@@ -526,43 +526,28 @@ def get_hardware_profile(force_refresh: bool = False) -> HardwareProfile:
     return hardware_detector.detect_hardware(force_refresh)
 
 def get_optimal_config(profile: HardwareProfile) -> Dict:
-    """Google/Linux-style adaptive config: streaming, memory-mapped, lazy evaluation"""
+    """Google/Linux-style adaptive config with memory manager"""
+    from engine.memory_manager import memory_manager
     
     cpu_cores = profile.cpu_cores
     total_ram = profile.total_ram_gb
-    available_ram = profile.available_ram_gb
     has_gpu = profile.has_nvidia_gpu
     gpu_vram = profile.gpu_memory_gb
     
-    # LINUX KERNEL STYLE: Calculate memory pressure (0-100%)
-    import psutil
-    mem = psutil.virtual_memory()
-    memory_pressure = mem.percent
+    # Use memory manager for budget calculation
+    max_population = memory_manager.get_max_population_size()
+    memory_pressure = memory_manager.monitor.get_pressure()
+    memory_budget_gb = memory_manager.budget.budget_gb
     
-    # GOOGLE CHROME STYLE: Dynamic memory budget based on pressure
-    # Reserve 2GB for OS, use 70% of remaining for GA
-    reserved_for_os = 2.0
-    usable_ram = max(0.5, available_ram - reserved_for_os)
-    memory_budget_gb = usable_ram * 0.7  # 70% of usable RAM
+    # Adaptive reduction based on pressure
+    if memory_pressure.value == 'critical':
+        max_population = max(3, max_population // 4)
+    elif memory_pressure.value == 'high':
+        max_population = max(3, max_population // 2)
     
-    # Calculate max population based on ACTUAL memory budget
-    # Each timetable ≈ 20MB, keep total under budget
-    bytes_per_timetable = 20 * 1024 * 1024  # 20MB
-    max_population = int((memory_budget_gb * 1024 * 1024 * 1024) / bytes_per_timetable)
-    max_population = max(3, min(max_population, 50))  # Clamp 3-50
+    max_generations = min(24, max_population * 2)
     
-    # ADAPTIVE: Reduce further if memory pressure is high
-    if memory_pressure > 80:
-        max_population = max(3, max_population // 4)  # Emergency: divide by 4
-    elif memory_pressure > 70:
-        max_population = max(3, max_population // 2)  # High pressure: divide by 2
-    
-    # Calculate generations based on time budget (not memory)
-    # Target: 10-15 minutes total, GA should be 80% = 8-12 minutes
-    # Each generation ≈ 30s, so max 24 generations for 12 min
-    max_generations = min(24, max_population * 2)  # Scale with population
-    
-    logger.info(f"[MEMORY] Pressure: {memory_pressure:.1f}%, Budget: {memory_budget_gb:.1f}GB, Max pop: {max_population}, Max gen: {max_generations}")
+    logger.info(f"[MEMORY] Pressure: {memory_pressure.value}, Budget: {memory_budget_gb:.1f}GB, Max pop: {max_population}, Max gen: {max_generations}")
     
     # Determine tier based on total RAM with safety override
     if total_ram < 8:

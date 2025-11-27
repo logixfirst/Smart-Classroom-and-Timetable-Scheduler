@@ -119,11 +119,13 @@ class GeneticAlgorithmOptimizer:
         self.use_sample_fitness = use_sample_fitness
         self.sample_size = sample_size
         self.population = []
-        self.fitness_cache = {}  # CPU fitness caching
-        self.max_cache_size = 100 if TORCH_AVAILABLE else 500  # Smaller cache if GPU available
-        self.gpu_fitness_cache = None  # GPU-based cache (if available)
-        self._cache_lock = threading.Lock()  # Thread-safe cache access
-        self._gpu_lock = threading.Lock() if TORCH_AVAILABLE else None  # GPU operation lock
+        
+        # Use bounded cache to prevent memory leaks
+        from engine.memory_manager import BoundedCache
+        self.fitness_cache = BoundedCache(max_size=50)  # Fixed-size LRU cache
+        self.gpu_fitness_cache = None
+        self._cache_lock = threading.Lock()
+        self._gpu_lock = threading.Lock() if TORCH_AVAILABLE else None
         
         # Sample students for fitness if enabled
         if use_sample_fitness and students:
@@ -201,32 +203,33 @@ class GeneticAlgorithmOptimizer:
                 self.valid_domains[(course.course_id, session)] = valid_pairs
     
     def initialize_population(self):
-        """Initialize population with initial solution + perturbations"""
-        self.population = [self.initial_solution]  # No copy to save memory
+        """Initialize population - MEMORY OPTIMIZED"""
+        # CRITICAL: Only store initial solution, generate rest on-demand
+        self.population = [self.initial_solution]
         
-        # Update progress at start
-        if hasattr(self, 'progress_tracker') and self.progress_tracker:
-            self._update_init_progress(1, self.population_size)
-        
-        # MINIMAL perturbation: only change 2% of assignments to save memory
+        # MINIMAL perturbation: only change 5% of assignments
         num_keys = len(self.initial_solution)
-        num_changes = max(1, int(num_keys * 0.02))  # 2% for memory efficiency
+        num_changes = max(1, int(num_keys * 0.05))
         keys_list = list(self.initial_solution.keys())
         
-        # Add perturbed versions (reuse objects) with progress
+        # Generate perturbed versions (MINIMAL copies)
         for i in range(self.population_size - 1):
-            perturbed = self.initial_solution.copy()
-            # Fast perturbation: random changes without validation
+            # Use dict comprehension for faster copy
+            perturbed = {k: v for k, v in self.initial_solution.items()}
+            
+            # Perturb only selected keys
             for _ in range(num_changes):
                 key = random.choice(keys_list)
                 valid_pairs = self.valid_domains.get(key, [])
                 if valid_pairs:
                     perturbed[key] = random.choice(valid_pairs)
+            
             self.population.append(perturbed)
             
-            # Update progress EVERY individual for smooth progress
-            if hasattr(self, 'progress_tracker') and self.progress_tracker:
-                self._update_init_progress(i + 2, self.population_size)
+            # Force GC every 5 individuals
+            if i % 5 == 4:
+                import gc
+                gc.collect(generation=0)
         
         logger.info(f"Initialized GA population: {len(self.population)} individuals")
     
@@ -255,9 +258,10 @@ class GeneticAlgorithmOptimizer:
             if self.gpu_fitness_cache is not None and sol_key in self.gpu_fitness_cache:
                 return self.gpu_fitness_cache[sol_key]
             
-            # Check CPU cache
-            if sol_key in self.fitness_cache:
-                return self.fitness_cache[sol_key]
+            # Check CPU bounded cache
+            cached_value = self.fitness_cache.get(sol_key)
+            if cached_value is not None:
+                return cached_value
         
         # Calculate fitness (outside lock to allow parallel computation)
         if not self._is_feasible(solution):
@@ -287,20 +291,12 @@ class GeneticAlgorithmOptimizer:
         return fitness_val
     
     def _cache_fitness(self, key: int, value: float):
-        """Thread-safe cache write (GPU if available, else CPU)"""
+        """Thread-safe cache write using bounded cache"""
         with self._cache_lock:
-            # Clear CPU cache if too large (before writing)
-            if len(self.fitness_cache) >= self.max_cache_size:
-                keys_to_remove = list(self.fitness_cache.keys())[:self.max_cache_size // 2]
-                for k in keys_to_remove:
-                    del self.fitness_cache[k]
-            
             if self.gpu_fitness_cache is not None:
-                # Store in GPU cache (unlimited size in VRAM)
                 self.gpu_fitness_cache[key] = value
             else:
-                # Store in CPU cache (limited size)
-                self.fitness_cache[key] = value
+                self.fitness_cache.set(key, value)  # BoundedCache auto-evicts LRU
     
     def _is_feasible(self, solution: Dict) -> bool:
         """Check hard constraints (GPU-accelerated if available)"""
@@ -593,14 +589,27 @@ class GeneticAlgorithmOptimizer:
         return max(tournament, key=lambda x: x[1])[0]
     
     def evolve(self, job_id: str = None) -> Dict:
-        """Run GA evolution with early stopping and caching"""
-        self.job_id = job_id  # Set BEFORE initialization
-        self._stop_flag = False  # Add stop flag
+        """Run GA evolution with streaming mode and memory monitoring"""
+        from engine.memory_manager import memory_manager
+        
+        self.job_id = job_id
+        self._stop_flag = False
+        
+        # Start memory monitoring
+        memory_manager.start_monitoring()
         
         # Set total items for work-based progress
         if hasattr(self, 'progress_tracker') and self.progress_tracker:
             self.progress_tracker.stage_items_total = self.generations
             self.progress_tracker.stage_items_done = 0
+        
+        # Use streaming mode if enabled (SKIP initialize_population)
+        if self.streaming_mode:
+            logger.info(f"[GA] Streaming mode enabled (memory-safe)")
+            result = self._evolve_streaming(job_id)
+            memory_manager.stop_monitoring()
+            memory_manager.cleanup(level='aggressive')
+            return result
         
         self.initialize_population()
         
@@ -700,6 +709,7 @@ class GeneticAlgorithmOptimizer:
                 break
         
         # CRITICAL FIX: Cleanup on success path
+        from engine.memory_manager import memory_manager
         try:
             self.population.clear()
             self.fitness_cache.clear()
@@ -707,6 +717,10 @@ class GeneticAlgorithmOptimizer:
                 self.gpu_fitness_cache.clear()
             if self.use_gpu:
                 self._cleanup_gpu()
+            
+            # Stop memory monitoring and cleanup
+            memory_manager.stop_monitoring()
+            memory_manager.cleanup(level='aggressive')
             
             # Final progress update
             if hasattr(self, 'progress_tracker') and self.progress_tracker:
@@ -717,7 +731,63 @@ class GeneticAlgorithmOptimizer:
             return best_solution
         except Exception as cleanup_error:
             logger.error(f"GA cleanup error: {cleanup_error}")
+            memory_manager.stop_monitoring()
             return best_solution
+    
+    def _evolve_streaming(self, job_id: str = None) -> Dict:
+        """Streaming evolution - generates individuals on-the-fly"""
+        from engine.memory_manager import StreamingPopulation, memory_manager
+        
+        # Create streaming population
+        streaming_pop = StreamingPopulation(
+            initial_solution=self.initial_solution,
+            size=self.population_size,
+            perturbation_fn=self._perturb_solution
+        )
+        
+        best_solution = self.initial_solution
+        best_fitness = self.fitness(best_solution)
+        no_improvement_count = 0
+        
+        logger.info(f"[GA] Streaming mode: pop={self.population_size}, gen={self.generations}")
+        
+        for generation in range(self.generations):
+            if self._stop_flag or (job_id and self._check_cancellation()):
+                logger.info(f"GA stopped at generation {generation}")
+                break
+            
+            # Evaluate streaming (only 1 individual in memory at a time)
+            fitness_scores = streaming_pop.evaluate_streaming(self.fitness)
+            fitness_scores.sort(key=lambda x: x[1], reverse=True)
+            
+            # Track best
+            current_best = fitness_scores[0][1]
+            if current_best > best_fitness:
+                best_fitness = current_best
+                best_solution = fitness_scores[0][0]
+                no_improvement_count = 0
+            else:
+                no_improvement_count += 1
+            
+            # Early stopping
+            if no_improvement_count >= self.early_stop_patience:
+                logger.info(f"Early stopping at gen {generation}")
+                break
+            
+            # Cleanup every generation
+            if generation % 3 == 0:
+                memory_manager.cleanup(level='normal')
+            
+            # Log progress
+            if generation % 3 == 0:
+                logger.info(f"GA Gen {generation}/{self.generations} (STREAM): Best={best_fitness:.4f}")
+            
+            # Update progress
+            if hasattr(self, 'progress_tracker') and self.progress_tracker:
+                self._update_ga_progress_batch(generation + 1, self.generations, best_fitness)
+        
+        logger.info(f"Streaming GA complete: fitness={best_fitness:.4f}")
+        return best_solution
     
     def stop(self):
         """Stop GA evolution immediately"""
