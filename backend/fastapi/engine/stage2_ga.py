@@ -1283,13 +1283,16 @@ class GeneticAlgorithmOptimizer:
             return [(sol, self.fitness(sol)) for sol in self.population]
     
     def _gpu_batch_fitness_vram(self) -> List[Tuple[Dict, float]]:
-        """GPU: Fitness evaluation with population in VRAM (fastest)"""
+        """GPU: Fitness evaluation with population in VRAM (fastest) - STREAMING conversion"""
         import torch
+        import gc
         
         try:
-            # Convert VRAM tensors back to dicts for fitness calculation
-            population_dicts = []
+            # CRITICAL: Convert individuals ONE AT A TIME to avoid RAM exhaustion
+            fitness_results = []
+            
             for i in range(self.population_tensor.shape[0]):
+                # Convert single individual from VRAM to dict
                 individual_dict = {}
                 for j, key in enumerate(self.population_keys):
                     time_hash = self.population_tensor[i, j, 0].item()
@@ -1300,12 +1303,20 @@ class GeneticAlgorithmOptimizer:
                     room_id = self.room_hash_to_id.get(room_hash, room_hash)
                     individual_dict[key] = (time_slot, room_id)
                 
-                population_dicts.append(individual_dict)
+                # Calculate fitness for this individual
+                fitness_val = self.fitness(individual_dict)
+                
+                # Store result
+                fitness_results.append((individual_dict, fitness_val))
+                
+                # CRITICAL: Delete individual immediately to free RAM
+                del individual_dict
+                
+                # Force GC every 5 individuals
+                if i % 5 == 4:
+                    gc.collect(generation=0)
             
-            # Calculate fitness (CPU for now - full GPU fitness in production)
-            fitness_values = [self.fitness(sol) for sol in population_dicts]
-            
-            return list(zip(population_dicts, fitness_values))
+            return fitness_results
         except Exception as e:
             logger.error(f"[GPU] VRAM fitness failed: {e}, falling back to CPU")
             self.use_gpu = False
