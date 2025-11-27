@@ -218,71 +218,22 @@ class GeneticAlgorithmOptimizer:
             return self._initialize_population_cpu()
     
     def _initialize_population_gpu(self):
-        """GPU: Store entire population in VRAM (300MB RAM -> VRAM)"""
-        import torch
+        """GPU: Use CPU population, GPU only for batch fitness"""
         import psutil
         
-        # CRITICAL: Store population as GPU tensors, NOT Python dicts
         mem_before = psutil.virtual_memory()
-        logger.info(f"[GPU] Offloading population to VRAM ({self.population_size} individuals). RAM before: {mem_before.percent:.1f}%")
+        logger.info(f"[GPU] Init population in RAM (GPU for fitness). RAM: {mem_before.percent:.1f}%")
         
-        # Convert initial solution to tensor format
-        keys_list = list(self.initial_solution.keys())
-        values_list = [self.initial_solution[k] for k in keys_list]
+        # Simple: CPU population (GPU only for fitness evaluation)
+        self.population = [self.initial_solution.copy()]
+        for _ in range(self.population_size - 1):
+            self.population.append(self.initial_solution.copy())
         
-        # Store keys mapping (CPU - small) - CRITICAL for decoding
-        self.population_keys = keys_list
-        
-        # Build reverse mapping for decoding (time_hash -> time_slot, room_hash -> room_id)
-        self.time_hash_to_slot = {}
-        self.room_hash_to_id = {}
-        for time_slot, room_id in values_list:
-            self.time_hash_to_slot[hash(time_slot) % 10000] = time_slot
-            self.room_hash_to_id[hash(room_id) % 10000] = room_id
-        
-        # Store population as GPU tensor (VRAM)
-        # Each individual is a vector of assignment indices
-        num_assignments = len(keys_list)
-        population_tensor = torch.zeros((self.population_size, num_assignments, 2), device=DEVICE, dtype=torch.long)
-        
-        # First individual = initial solution
-        for i, (time_slot, room_id) in enumerate(values_list):
-            population_tensor[0, i, 0] = hash(time_slot) % 10000
-            population_tensor[0, i, 1] = hash(room_id) % 10000
-        
-        # Generate perturbed versions ON GPU (vectorized)
-        num_changes = max(1, int(num_assignments * 0.05))
-        for idx in range(1, self.population_size):
-            # Copy initial solution
-            population_tensor[idx] = population_tensor[0].clone()
-            
-            # Perturb random assignments (vectorized)
-            change_indices = torch.randint(0, num_assignments, (num_changes,), device=DEVICE)
-            for change_idx in change_indices:
-                key = keys_list[change_idx.item()]
-                valid_pairs = self._get_valid_domain(key[0], key[1])  # On-demand
-                if valid_pairs:
-                    new_pair = random.choice(valid_pairs)
-                    time_hash = hash(new_pair[0]) % 10000
-                    room_hash = hash(new_pair[1]) % 10000
-                    population_tensor[idx, change_idx, 0] = time_hash
-                    population_tensor[idx, change_idx, 1] = room_hash
-                    # Update reverse mappings
-                    self.time_hash_to_slot[time_hash] = new_pair[0]
-                    self.room_hash_to_id[room_hash] = new_pair[1]
-        
-        # Store in VRAM
-        self.population_tensor = population_tensor
-        self.population = []  # Empty CPU list (all data in VRAM)
-        
-        vram_mb = (population_tensor.numel() * 8) / (1024**2)
         mem_after = psutil.virtual_memory()
-        logger.info(f"[GPU] Population in VRAM: {vram_mb:.1f}MB. RAM: {mem_before.percent:.1f}% → {mem_after.percent:.1f}% (Δ{mem_after.percent - mem_before.percent:+.1f}%)")
+        logger.info(f"[GPU] Pop in RAM: {len(self.population)}. RAM: {mem_before.percent:.1f}% → {mem_after.percent:.1f}%")
         
-        # CRITICAL: Force garbage collection after GPU init
         import gc
         gc.collect()
-        torch.cuda.empty_cache()
     
     def _initialize_population_cpu(self):
         """CPU fallback: Minimal RAM usage"""
