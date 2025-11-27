@@ -837,30 +837,29 @@ class TimetableGenerationSaga:
             ga_config = optimal_config.get('stage2b_ga', {'population': 12, 'generations': 18, 'islands': 1, 'use_gpu': False, 'fitness_mode': 'full'})
             
             # Use stage2_ga.py which has hardware-flexible implementation (GPU/CPU)
-            # CPU GA with hardware-optimal config
-                pop = ga_config.get('population', 12)
-                gen = ga_config.get('generations', 18)
-                islands = ga_config.get('islands', 1)
-                logger.info(f"[STAGE2B] CPU GA: pop={pop}, gen={gen}, islands={islands}")
-                from engine.stage2_ga import GeneticAlgorithmOptimizer
-                
-                ga_optimizer = GeneticAlgorithmOptimizer(
-                    courses=courses, rooms=rooms, time_slots=time_slots,
-                    faculty=faculty, students={},
-                    initial_solution=initial_schedule,
-                    population_size=pop,
-                    generations=gen,
-                    use_sample_fitness=ga_config.get('fitness_mode', 'full') == 'sample_based',
-                    sample_size=ga_config.get('sample_students', 100),
-                    hardware_config=ga_config  # CRITICAL: Pass hardware config
-                )
-                ga_optimizer.progress_tracker = self.progress_tracker
-                ga_optimizer.job_id = job_id
-                
-                optimized_schedule = await asyncio.to_thread(ga_optimizer.evolve, job_id)
-                final_fitness = ga_optimizer.fitness(optimized_schedule)
-                
-                del ga_optimizer
+            pop = ga_config.get('population', 12)
+            gen = ga_config.get('generations', 18)
+            islands = ga_config.get('islands', 1)
+            logger.info(f"[STAGE2B] CPU GA: pop={pop}, gen={gen}, islands={islands}")
+            from engine.stage2_ga import GeneticAlgorithmOptimizer
+            
+            ga_optimizer = GeneticAlgorithmOptimizer(
+                courses=courses, rooms=rooms, time_slots=time_slots,
+                faculty=faculty, students={},
+                initial_solution=initial_schedule,
+                population_size=pop,
+                generations=gen,
+                use_sample_fitness=ga_config.get('fitness_mode', 'full') == 'sample_based',
+                sample_size=ga_config.get('sample_students', 100),
+                hardware_config=ga_config  # CRITICAL: Pass hardware config
+            )
+            ga_optimizer.progress_tracker = self.progress_tracker
+            ga_optimizer.job_id = job_id
+            
+            optimized_schedule = await asyncio.to_thread(ga_optimizer.evolve, job_id)
+            final_fitness = ga_optimizer.fitness(optimized_schedule)
+            
+            del ga_optimizer
             
             # Mark stage complete and AGGRESSIVE cleanup
             self.progress_tracker.mark_stage_complete()
