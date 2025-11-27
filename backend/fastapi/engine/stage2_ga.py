@@ -230,7 +230,7 @@ class GeneticAlgorithmOptimizer:
             self.population.append(self.initial_solution.copy())
         
         mem_after = psutil.virtual_memory()
-        logger.info(f"[GPU] Pop in RAM: {len(self.population)}. RAM: {mem_before.percent:.1f}% → {mem_after.percent:.1f}%")
+        logger.info(f"[GPU] Pop in RAM: {len(self.population)}. RAM: {mem_before.percent:.1f}% -> {mem_after.percent:.1f}%")
         
         import gc
         gc.collect()
@@ -738,7 +738,7 @@ class GeneticAlgorithmOptimizer:
                     logger.info(f"[GA] Gen {generation}: Calling GPU batch fitness (pop in VRAM)")
                     fitness_scores = self._gpu_batch_fitness()
                     mem_after = psutil.virtual_memory()
-                    logger.info(f"[GA] Gen {generation}: Fitness done. RAM: {mem_before.percent:.1f}% → {mem_after.percent:.1f}% (Δ{mem_after.percent - mem_before.percent:+.1f}%)")
+                    logger.info(f"[GA] Gen {generation}: Fitness done. RAM: {mem_before.percent:.1f}% -> {mem_after.percent:.1f}% (D{mem_after.percent - mem_before.percent:+.1f}%)")
                 except Exception as e:
                     logger.error(f"[ERROR] GPU fitness FAILED: {e}, falling back to CPU")
                     self.use_gpu = False
@@ -763,35 +763,9 @@ class GeneticAlgorithmOptimizer:
                 logger.info(f"Early stopping at gen {generation} (no improvement for {self.early_stop_patience} gens)")
                 break
             
-            # Population evolution (GPU or CPU)
-            if self.use_gpu:
-                # GPU: Vectorized evolution
-                elite_count = max(1, int(self.population_size * self.elitism_rate))
-                elite_indices = [i for i, _ in sorted(enumerate([f for _, f in fitness_scores]), key=lambda x: x[1], reverse=True)[:elite_count]]
-                
-                # Generate offspring indices for crossover
-                num_offspring = self.population_size - elite_count
-                parent_indices = [random.randint(0, self.population_size - 1) for _ in range(num_offspring * 2)]
-                
-                # GPU vectorized crossover
-                offspring_tensor = self._gpu_vectorized_crossover(parent_indices[:num_offspring * 2])
-                
-                # GPU vectorized mutation (apply to some offspring)
-                mutation_count = int(num_offspring * self.mutation_rate)
-                if mutation_count > 0:
-                    mutation_indices = list(range(mutation_count))
-                    offspring_tensor[:mutation_count] = self._gpu_vectorized_mutation(mutation_indices)
-                
-                # Combine elite + offspring in VRAM
-                new_population_tensor = torch.cat([
-                    self.population_tensor[elite_indices],
-                    offspring_tensor
-                ], dim=0)
-                
-                # Replace old population in VRAM
-                del self.population_tensor
-                self.population_tensor = new_population_tensor
-                torch.cuda.empty_cache()
+            # Population evolution (CPU only - no GPU tensor evolution)
+            if False:  # Disabled GPU tensor evolution
+                pass
             else:
                 # CPU: Traditional evolution
                 elite_count = max(1, int(self.population_size * self.elitism_rate))
