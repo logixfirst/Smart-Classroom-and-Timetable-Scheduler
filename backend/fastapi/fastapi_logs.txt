@@ -1,6 +1,2 @@
-# FastAPI Backend Logs - Started at 2025-11-30T02:38:01.694156
-2025-11-30 02:38:01,694 - __main__ - INFO - Logs saved to: D:\GitHub\SIH28\backend\fastapi\fastapi_logs.txt
-2025-11-30 02:38:01,737 - __main__ - INFO - Starting Enterprise FastAPI Timetable Service...
-2025-11-30 02:38:01,936 - __main__ - INFO - [OK] Redis connection successful
-2025-11-30 02:38:02,018 - __main__ - INFO - Memory cleanup completed
-2025-11-30 02:51:24,185 - __main__ - INFO - [CANCEL] Cancellation flag set for job 7bc4b520-2475-469f-8c03-867a542cef14
+# FastAPI Backend Logs - Started at 2025-11-30T03:46:55.845395
+2025-11-30 03:46:55,845 - __main__ - INFO - Logs saved to: D:\GitHub\SIH28\backend\fastapi\fastapi_logs.txt

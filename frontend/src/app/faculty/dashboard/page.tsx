@@ -61,10 +61,9 @@ export default function FacultyDashboard() {
 
   const loadMySubjects = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
       const response = await fetch('http://localhost:8000/api/attendance/faculty/my-classes/', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         }
       })

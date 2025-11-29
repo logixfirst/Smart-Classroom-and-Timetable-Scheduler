@@ -63,10 +63,9 @@ export default function FacultyAttendancePage() {
 
   const loadMyClasses = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
       const response = await fetch('http://localhost:8000/api/attendance/faculty/my-classes/', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -86,10 +85,9 @@ export default function FacultyAttendancePage() {
 
   const loadPendingSessions = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
       const response = await fetch('http://localhost:8000/api/attendance/sessions/pending/', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -105,10 +103,9 @@ export default function FacultyAttendancePage() {
 
   const loadClassReport = async (subjectId: string) => {
     try {
-      const token = localStorage.getItem('auth_token')
       const response = await fetch(`http://localhost:8000/api/attendance/faculty/class-report/${subjectId}/`, {
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -145,7 +142,6 @@ export default function FacultyAttendancePage() {
     if (!selectedSession) return
 
     try {
-      const token = localStorage.getItem('auth_token')
       const attendanceArray = Object.entries(attendanceData).map(([studentId, status]) => ({
         student_id: studentId,
         status,
@@ -154,8 +150,8 @@ export default function FacultyAttendancePage() {
 
       const response = await fetch(`http://localhost:8000/api/attendance/sessions/${selectedSession.id}/mark-attendance/`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ attendance_data: attendanceArray })
@@ -178,15 +174,12 @@ export default function FacultyAttendancePage() {
     if (!importFile || !selectedSession) return
 
     try {
-      const token = localStorage.getItem('auth_token')
       const formData = new FormData()
       formData.append('file', importFile)
 
       const response = await fetch(`http://localhost:8000/api/attendance/sessions/${selectedSession.id}/import-attendance/`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Token ${token}`
-        },
+        credentials: 'include',
         body: formData
       })
 

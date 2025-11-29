@@ -162,27 +162,33 @@ class SubjectAttendanceSummarySerializer(serializers.Serializer):
 
 class AttendanceAuditLogSerializer(serializers.ModelSerializer):
     changed_by_name = serializers.SerializerMethodField()
-    student_name = serializers.CharField(source="record.student.name", read_only=True)
+    student_details = serializers.SerializerMethodField()
     session_details = serializers.SerializerMethodField()
+    timestamp = serializers.DateTimeField(source="changed_at", read_only=True)
 
     class Meta:
         model = AttendanceAuditLog
-        fields = "__all__"
+        fields = ["audit_id", "record_id", "session_details", "student_details", "action", 
+                  "old_status", "new_status", "changed_by_name", "reason", "timestamp", "ip_address"]
 
     def get_changed_by_name(self, obj):
         if obj.changed_by:
-            if hasattr(obj.changed_by, "faculty"):
-                return obj.changed_by.faculty.faculty_name
-            return obj.changed_by.username
+            return f"{obj.changed_by.first_name} {obj.changed_by.last_name}" if obj.changed_by.first_name else obj.changed_by.username
         return "System"
 
+    def get_student_details(self, obj):
+        try:
+            student = obj.record.student
+            return f"{student.first_name} {student.last_name} ({student.roll_number})"
+        except:
+            return "Unknown"
+
     def get_session_details(self, obj):
-        session = obj.record.session
-        return {
-            "subject": session.subject.subject_name,
-            "date": session.date,
-            "time": f"{session.start_time} - {session.end_time}",
-        }
+        try:
+            session = obj.record.session
+            return f"{session.subject.course_name} - {session.date}"
+        except:
+            return "Unknown"
 
 
 class AttendanceAlertSerializer(serializers.ModelSerializer):

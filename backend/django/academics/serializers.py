@@ -212,21 +212,17 @@ class SchoolSerializer(serializers.ModelSerializer):
 
 class RoomSerializer(serializers.ModelSerializer):
     """Serializer for Room model (rooms table)"""
-    building = serializers.SerializerMethodField()
-    department = DepartmentSerializer(read_only=True)
-    
-    def get_building(self, obj):
-        if obj.building:
-            return {
-                "building_id": str(obj.building.building_id),
-                "building_code": obj.building.building_code,
-                "building_name": obj.building.building_name,
-            }
-        return None
+    building_name = serializers.CharField(source="building.building_name", read_only=True, allow_null=True)
+    department_name = serializers.CharField(source="department.dept_name", read_only=True, allow_null=True)
     
     class Meta:
         model = Room
-        exclude = ["features", "specialized_software"]
+        fields = [
+            "room_id", "room_code", "room_number", "room_name", "room_type",
+            "seating_capacity", "exam_capacity", "floor_number",
+            "building", "building_name", "department", "department_name",
+            "is_active", "room_status", "created_at", "updated_at"
+        ]
 
 # Alias for backward compatibility
 ClassroomSerializer = RoomSerializer

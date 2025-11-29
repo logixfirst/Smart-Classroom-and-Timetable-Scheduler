@@ -50,16 +50,6 @@ class UserViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet):
 
     queryset = (
         User.objects.select_related("organization")
-        .only(
-            "id",
-            "username",
-            "email",
-            "role",
-            "first_name",
-            "last_name",
-            "is_active",
-            "organization",
-        )
         .order_by("id")
     )
     serializer_class = UserSerializer
@@ -85,10 +75,10 @@ class UserViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet):
 
 
 class DepartmentViewSet(SmartCachedViewSet):
-    queryset = Department.objects.only("department_id", "department_name", "organization_id").all()
+    queryset = Department.objects.all()
     serializer_class = DepartmentSerializer
     filter_backends = [filters.SearchFilter]
-    search_fields = ["department_name", "department_id"]
+    search_fields = ["dept_name", "dept_code"]
     cache_timeout = 900  # 15 minutes
 
 
@@ -97,10 +87,6 @@ class ProgramViewSet(SmartCachedViewSet):
 
     queryset = (
         Program.objects.select_related("department", "organization")
-        .only(
-            "program_id", "program_code", "program_name", "duration_years",
-            "department__department_id", "department__department_name"
-        )
         .order_by("program_code")
     )
     serializer_class = ProgramSerializer
@@ -118,10 +104,7 @@ class CourseViewSet(SmartCachedViewSet):
     """Course ViewSet (courses table)"""
     queryset = (
         Course.objects.select_related("organization", "department")
-        .only(
-            "course_id", "course_code", "course_name", "credits", "course_type",
-            "department__dept_id", "department__dept_name"
-        )
+        .defer("room_features_required", "corequisite_course_ids")  # Skip JSONFields
         .order_by("course_code")
     )
     serializer_class = CourseSerializer
@@ -142,11 +125,6 @@ class FacultyViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet)
 
     queryset = (
         Faculty.objects.select_related("department", "organization")
-        .only(
-            "id", "faculty_code", "employee_id", "faculty_name", "designation",
-            "specialization", "max_workload_per_week", "status", "email", "phone",
-            "department__department_id", "department__department_name"
-        )
         .order_by("faculty_code")
     )
     serializer_class = FacultySerializer
@@ -202,23 +180,13 @@ class StudentViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet)
     ]
 
     def get_queryset(self):
-        try:
-            # Optimized: only fetch needed fields + select_related for joins
-            return (
-                Student.objects.select_related(
-                    "department", "program", "organization"
-                )
-                .only(
-                    "id", "roll_number", "first_name", "last_name", "email", "phone",
-                    "current_year", "current_semester", "electives",
-                    "department__department_id", "department__department_name",
-                    "program__program_id", "program__program_name"
-                )
-                .order_by("roll_number")
+        # Optimized: select_related for joins to prevent N+1 queries
+        return (
+            Student.objects.select_related(
+                "department", "program", "organization"
             )
-        except Exception as e:
-            # Fallback to basic queryset if relations fail
-            return Student.objects.all().order_by("roll_number")
+            .order_by("roll_number")
+        )
 
     @action(detail=True, methods=["get"])
     def attendance(self, request, pk=None):
@@ -249,11 +217,6 @@ class BatchViewSet(SmartCachedViewSet):
     """Batch ViewSet"""
     queryset = (
         Batch.objects.select_related("organization", "program", "department")
-        .only(
-            "id", "batch_code", "batch_name", "year_of_admission", "current_semester",
-            "program__program_id", "program__program_name",
-            "department__department_id", "department__department_name"
-        )
         .order_by("batch_code")
     )
     serializer_class = BatchSerializer
@@ -267,12 +230,7 @@ class RoomViewSet(SmartCachedViewSet):
     """Room ViewSet (rooms table)"""
     queryset = (
         Room.objects.select_related("organization", "building", "department")
-        .only(
-            "id", "room_code", "room_name", "room_number", "room_type",
-            "seating_capacity", "is_available",
-            "building__building_code", "building__building_name",
-            "department__department_id", "department__department_name"
-        )
+        .defer("features", "specialized_software")  # Skip JSONFields with bad data
         .order_by("room_code")
     )
     serializer_class = RoomSerializer
@@ -299,7 +257,6 @@ class BuildingViewSet(SmartCachedViewSet):
     """Building ViewSet"""
     queryset = (
         Building.objects.select_related("organization")
-        .only("id", "building_code", "building_name", "total_floors")
         .order_by("building_code")
     )
     serializer_class = BuildingSerializer

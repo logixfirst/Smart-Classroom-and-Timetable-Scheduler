@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import DashboardLayout from '@/components/dashboard-layout'
 import Pagination from '@/components/Pagination'
 import { useToast } from '@/components/Toast'
 
@@ -80,10 +79,9 @@ export default function AdminAttendancePage() {
 
   const loadOverview = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
       const response = await fetch('http://localhost:8000/api/attendance/admin/overview/', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -102,10 +100,9 @@ export default function AdminAttendancePage() {
 
   const loadAuditLogs = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
       const response = await fetch(`http://localhost:8000/api/attendance/admin/audit-logs/?page=${currentPage}`, {
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -124,10 +121,9 @@ export default function AdminAttendancePage() {
 
   const loadAlerts = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
       const response = await fetch('http://localhost:8000/api/attendance/alerts/?page_size=20', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -148,11 +144,10 @@ export default function AdminAttendancePage() {
     }
 
     try {
-      const token = localStorage.getItem('auth_token')
       const response = await fetch('http://localhost:8000/api/attendance/admin/override/', {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -178,11 +173,10 @@ export default function AdminAttendancePage() {
 
   const acknowledgeAlert = async (alertId: number) => {
     try {
-      const token = localStorage.getItem('auth_token')
       await fetch(`http://localhost:8000/api/attendance/alerts/${alertId}/acknowledge/`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -224,34 +218,31 @@ export default function AdminAttendancePage() {
 
   if (loading) {
     return (
-      <DashboardLayout role="admin">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="loading-spinner w-8 h-8 mx-auto mb-4"></div>
-            <p className="text-gray-600 dark:text-gray-400">Loading attendance data...</p>
-          </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="loading-spinner w-8 h-8 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading attendance data...</p>
         </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
   if (!overview) {
     return (
-      <DashboardLayout role="admin">
-        <div className="text-center py-12">
-          <p className="text-gray-600 dark:text-gray-400">No attendance data available</p>
-        </div>
-      </DashboardLayout>
+      <div className="text-center py-12">
+        <p className="text-gray-600 dark:text-gray-400">No attendance data available</p>
+      </div>
     )
   }
 
   return (
-    <DashboardLayout role="admin">
+    <>
       <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Monitor and manage university-wide attendance
-          </p>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Attendance Management</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Monitor and manage university-wide attendance</p>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
           <button
             onClick={() => window.open('http://localhost:8000/api/attendance/admin/generate-report/?type=daily', '_blank')}
             className="btn-primary"
@@ -559,6 +550,6 @@ export default function AdminAttendancePage() {
           </div>
         </div>
       )}
-    </DashboardLayout>
+    </>
   )
 }

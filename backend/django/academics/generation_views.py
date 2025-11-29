@@ -39,17 +39,24 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        """Filter jobs based on user role and status"""
-        queryset = GenerationJob.objects.all().order_by('-created_at')
+        """Filter jobs based on user role and status - OPTIMIZED"""
+        queryset = (
+            GenerationJob.objects
+            .select_related('organization')
+            .only(
+                'id', 'status', 'progress', 'created_at', 'updated_at',
+                'organization__org_id', 'organization__org_name'
+            )
+        )
         
         # Filter by status if provided
         status_filter = self.request.query_params.get('status')
         if status_filter:
-            # Handle comma-separated statuses
             statuses = [s.strip() for s in status_filter.split(',')]
             queryset = queryset.filter(status__in=statuses)
         
-        return queryset
+        # Limit to last 100 jobs and order by created_at
+        return queryset.order_by('-created_at')[:100]
 
     @action(detail=False, methods=["post"], url_path="generate")
     def generate_timetable(self, request):

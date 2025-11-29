@@ -62,10 +62,9 @@ export default function StudentAttendancePage() {
 
   const loadAttendanceData = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
       const response = await fetch('http://localhost:8000/api/attendance/students/my-attendance/', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -86,10 +85,9 @@ export default function StudentAttendancePage() {
 
   const loadAlerts = async () => {
     try {
-      const token = localStorage.getItem('auth_token')
       const response = await fetch('http://localhost:8000/api/attendance/alerts/unread/', {
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -105,11 +103,10 @@ export default function StudentAttendancePage() {
 
   const acknowledgeAlert = async (alertId: number) => {
     try {
-      const token = localStorage.getItem('auth_token')
       await fetch(`http://localhost:8000/api/attendance/alerts/${alertId}/acknowledge/`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Authorization': `Token ${token}`,
           'Content-Type': 'application/json'
         }
       })
