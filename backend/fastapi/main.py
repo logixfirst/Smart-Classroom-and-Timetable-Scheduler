@@ -320,7 +320,8 @@ class TimetableGenerationSaga:
         if hardware_profile.has_nvidia_gpu:
             logger.info(f"[HARDWARE] GPU: {hardware_profile.gpu_memory_gb:.1f}GB VRAM")
         
-        # Hardware info logged (background task handles progress)
+        # Start progress updates during data loading (0-5%)
+        await self._update_progress(job_id, 0, "Loading data: Starting...")
         
         client = DjangoAPIClient()
         try:
@@ -329,21 +330,29 @@ class TimetableGenerationSaga:
             
             # Load data in parallel (optimized for hardware)
             if hardware_profile.cpu_cores >= 4:
+                await self._update_progress(job_id, 1, "Loading data: Fetching courses, faculty, rooms...")
                 courses_task = client.fetch_courses(org_id, semester)
                 faculty_task = client.fetch_faculty(org_id)
                 rooms_task = client.fetch_rooms(org_id)
                 time_slots_task = client.fetch_time_slots(org_id)
                 students_task = client.fetch_students(org_id)
                 
+                await self._update_progress(job_id, 2, "Loading data: Parallel fetch in progress...")
                 courses, faculty, rooms, time_slots, students = await asyncio.gather(
                     courses_task, faculty_task, rooms_task, time_slots_task, students_task
                 )
+                await self._update_progress(job_id, 4, "Loading data: Validating...")
             else:
                 # Sequential loading for low-end hardware
+                await self._update_progress(job_id, 1, "Loading data: Fetching courses...")
                 courses = await client.fetch_courses(org_id, semester)
+                await self._update_progress(job_id, 2, "Loading data: Fetching faculty...")
                 faculty = await client.fetch_faculty(org_id)
+                await self._update_progress(job_id, 3, "Loading data: Fetching rooms...")
                 rooms = await client.fetch_rooms(org_id)
+                await self._update_progress(job_id, 4, "Loading data: Fetching time slots...")
                 time_slots = await client.fetch_time_slots(org_id)
+                await self._update_progress(job_id, 4, "Loading data: Fetching students...")
                 students = await client.fetch_students(org_id)
             
             # Validate data
@@ -371,6 +380,8 @@ class TimetableGenerationSaga:
                 logger.info(f"[DATA] Course enrollments: min={min(enrollments)}, max={max(enrollments)}, avg={sum(enrollments)/len(enrollments):.1f}")
                 large_courses = sum(1 for e in enrollments if e > 60)
                 logger.info(f"[DATA] Large courses (>60 students): {large_courses}/{len(courses)}")
+            
+            await self._update_progress(job_id, 5, "Loading data: Complete")
             
             return {
                 'courses': courses,
@@ -700,7 +711,7 @@ class TimetableGenerationSaga:
     def _solve_cluster_safe(self, cluster_id, courses, rooms, time_slots, faculty, total_clusters=None, completed=0):
         """Solve single cluster with progressive relaxation: CP-SAT → Smart Greedy → Basic Greedy"""
         from engine.stage2_cpsat import AdaptiveCPSATSolver
-        from engine.stage2_greedy import SmartGreedyScheduler
+
         
         global redis_client_global
         
@@ -726,24 +737,15 @@ class TimetableGenerationSaga:
                 logger.info(f"Cluster {cluster_id}: CP-SAT succeeded with {len(solution)} assignments")
                 return solution
             
-            # Fallback 1: Smart greedy with constraint awareness
-            logger.info(f"Cluster {cluster_id}: CP-SAT failed, trying smart greedy")
-            try:
-                greedy_solver = SmartGreedyScheduler(
-                    courses=courses,
-                    rooms=rooms,
-                    time_slots=time_slots,
-                    faculty=faculty
-                )
-                solution = greedy_solver.solve(courses)
-                if solution and len(solution) > 0:
-                    logger.info(f"Cluster {cluster_id}: Smart greedy succeeded with {len(solution)} assignments")
-                    return solution
-            except Exception as e:
-                logger.warning(f"Cluster {cluster_id}: Smart greedy failed: {e}")
+            # Fallback: Use greedy scheduler built into CP-SAT
+            logger.info(f"Cluster {cluster_id}: CP-SAT failed, using greedy fallback")
+            solution = cpsat_solver.greedy_fallback(courses)
+            if solution and len(solution) > 0:
+                logger.info(f"Cluster {cluster_id}: Greedy fallback succeeded with {len(solution)} assignments")
+                return solution
             
-            # Fallback 2: Basic greedy (always returns something)
-            logger.info(f"Cluster {cluster_id}: Using basic greedy fallback")
+            # Final fallback
+            logger.warning(f"Cluster {cluster_id}: All methods failed, using basic greedy")
             return self._greedy_schedule(cluster_id, courses, rooms, time_slots, faculty)
             
         except Exception as e:

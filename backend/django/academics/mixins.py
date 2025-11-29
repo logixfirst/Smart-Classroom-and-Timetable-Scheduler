@@ -10,8 +10,16 @@ from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 
 logger = logging.getLogger(__name__)
+
+
+class FastPagination(PageNumberPagination):
+    """Enterprise pagination with configurable page size"""
+    page_size = 25
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 
 class SmartCachedViewSet(viewsets.ModelViewSet):
@@ -29,6 +37,7 @@ class SmartCachedViewSet(viewsets.ModelViewSet):
     cache_timeout = CacheService.TTL_MEDIUM  # 5 minutes default
     cache_list_timeout = CacheService.TTL_MEDIUM
     cache_detail_timeout = CacheService.TTL_LONG  # 1 hour for detail views
+    pagination_class = FastPagination
 
     def get_list_cached(self, request, *args, **kwargs):
         """

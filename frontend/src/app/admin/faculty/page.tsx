@@ -42,14 +42,18 @@ export default function FacultyManagePage() {
   const [selectedFaculty, setSelectedFaculty] = useState<Faculty | null>(null)
   const [isDeleting, setIsDeleting] = useState<number | null>(null)
 
+  // Debounced search
   useEffect(() => {
-    fetchFaculty()
-  }, [currentPage])
+    const timer = setTimeout(() => {
+      setCurrentPage(1)
+      fetchFaculty()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
   useEffect(() => {
-    setCurrentPage(1)
     fetchFaculty()
-  }, [itemsPerPage])
+  }, [currentPage, itemsPerPage])
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -68,7 +72,7 @@ export default function FacultyManagePage() {
 
     setError(null)
     try {
-      const response = await apiClient.getFaculty(currentPage)
+      const response = await apiClient.getFaculty(currentPage, itemsPerPage, searchTerm)
       if (response.error) {
         setError(response.error)
       } else if (response.data) {
@@ -169,13 +173,11 @@ export default function FacultyManagePage() {
     }
   }
 
+  // Client-side filtering for department (search is server-side)
   const filteredFaculty = faculty.filter(member => {
-    const matchesSearch =
-      member.faculty_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.faculty_id?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesDepartment =
       !selectedDepartment || member.department?.department_name === selectedDepartment
-    return matchesSearch && matchesDepartment
+    return matchesDepartment
   })
 
   const departments = [...new Set(faculty.map(f => f.department?.department_name).filter(Boolean))].filter(Boolean)

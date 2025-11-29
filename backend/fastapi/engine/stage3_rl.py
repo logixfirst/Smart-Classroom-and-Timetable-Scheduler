@@ -1080,18 +1080,20 @@ def resolve_conflicts_globally(conflicts: List[Dict], clusters: Dict, timetable_
                     affected_students.add(student_id)
         
         # Find all courses these students are enrolled in (cross-cluster)
-        expanded_course_set = set(cluster_courses)
+        expanded_course_set = list(cluster_courses)
+        expanded_course_ids = set(c.course_id for c in cluster_courses)
         for student in affected_students:
             for course in timetable_data['courses']:
-                if student in getattr(course, 'student_ids', []):
-                    expanded_course_set.add(course)
+                if student in getattr(course, 'student_ids', []) and course.course_id not in expanded_course_ids:
+                    expanded_course_set.append(course)
+                    expanded_course_ids.add(course.course_id)
         
         logger.info(f"[GLOBAL] Super-cluster: {len(cluster_courses)} -> {len(expanded_course_set)} courses")
         
         # Step 5: Re-solve super-cluster with CP-SAT (has full student visibility)
         try:
             cpsat_solver = AdaptiveCPSATSolver(
-                courses=list(expanded_course_set),
+                courses=expanded_course_set,
                 rooms=timetable_data['rooms'],
                 time_slots=timetable_data['time_slots'],
                 faculty=timetable_data['faculty'],

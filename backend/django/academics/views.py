@@ -85,7 +85,7 @@ class UserViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet):
 
 
 class DepartmentViewSet(SmartCachedViewSet):
-    queryset = Department.objects.all()
+    queryset = Department.objects.only("department_id", "department_name", "organization_id").all()
     serializer_class = DepartmentSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ["department_name", "department_id"]
@@ -95,7 +95,14 @@ class DepartmentViewSet(SmartCachedViewSet):
 class ProgramViewSet(SmartCachedViewSet):
     """ViewSet for Program model (formerly Course)"""
 
-    queryset = Program.objects.select_related("department", "organization").all().order_by("program_code")
+    queryset = (
+        Program.objects.select_related("department", "organization")
+        .only(
+            "program_id", "program_code", "program_name", "duration_years",
+            "department__department_id", "department__department_name"
+        )
+        .order_by("program_code")
+    )
     serializer_class = ProgramSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["program_name", "program_code"]
@@ -109,7 +116,14 @@ CourseViewSet = ProgramViewSet
 
 class CourseViewSet(SmartCachedViewSet):
     """Course ViewSet (courses table)"""
-    queryset = Course.objects.select_related("organization", "department").all().order_by("course_code")
+    queryset = (
+        Course.objects.select_related("organization", "department")
+        .only(
+            "course_id", "course_code", "course_name", "credits", "course_type",
+            "department__dept_id", "department__dept_name"
+        )
+        .order_by("course_code")
+    )
     serializer_class = CourseSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["course_name", "course_code"]
@@ -128,7 +142,11 @@ class FacultyViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet)
 
     queryset = (
         Faculty.objects.select_related("department", "organization")
-        .all()
+        .only(
+            "id", "faculty_code", "employee_id", "faculty_name", "designation",
+            "specialization", "max_workload_per_week", "status", "email", "phone",
+            "department__department_id", "department__department_name"
+        )
         .order_by("faculty_code")
     )
     serializer_class = FacultySerializer
@@ -185,11 +203,17 @@ class StudentViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet)
 
     def get_queryset(self):
         try:
+            # Optimized: only fetch needed fields + select_related for joins
             return (
                 Student.objects.select_related(
                     "department", "program", "organization"
                 )
-                .all()
+                .only(
+                    "id", "roll_number", "first_name", "last_name", "email", "phone",
+                    "current_year", "current_semester", "electives",
+                    "department__department_id", "department__department_name",
+                    "program__program_id", "program__program_name"
+                )
                 .order_by("roll_number")
             )
         except Exception as e:
@@ -223,7 +247,15 @@ class StudentViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet)
 
 class BatchViewSet(SmartCachedViewSet):
     """Batch ViewSet"""
-    queryset = Batch.objects.select_related("organization", "program", "department").all().order_by("batch_code")
+    queryset = (
+        Batch.objects.select_related("organization", "program", "department")
+        .only(
+            "id", "batch_code", "batch_name", "year_of_admission", "current_semester",
+            "program__program_id", "program__program_name",
+            "department__department_id", "department__department_name"
+        )
+        .order_by("batch_code")
+    )
     serializer_class = BatchSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["batch_name", "batch_code"]
@@ -233,7 +265,16 @@ class BatchViewSet(SmartCachedViewSet):
 
 class RoomViewSet(SmartCachedViewSet):
     """Room ViewSet (rooms table)"""
-    queryset = Room.objects.select_related("organization", "building", "department").defer("features", "specialized_software").all().order_by("room_code")
+    queryset = (
+        Room.objects.select_related("organization", "building", "department")
+        .only(
+            "id", "room_code", "room_name", "room_number", "room_type",
+            "seating_capacity", "is_available",
+            "building__building_code", "building__building_name",
+            "department__department_id", "department__department_name"
+        )
+        .order_by("room_code")
+    )
     serializer_class = RoomSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["room_code", "room_name", "room_number"]
@@ -256,7 +297,11 @@ class LabViewSet(SmartCachedViewSet):
 
 class BuildingViewSet(SmartCachedViewSet):
     """Building ViewSet"""
-    queryset = Building.objects.select_related("organization").all().order_by("building_code")
+    queryset = (
+        Building.objects.select_related("organization")
+        .only("id", "building_code", "building_name", "total_floors")
+        .order_by("building_code")
+    )
     serializer_class = BuildingSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["building_code", "building_name"]

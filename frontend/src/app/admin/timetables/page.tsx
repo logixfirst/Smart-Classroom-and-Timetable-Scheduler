@@ -5,8 +5,6 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import {
-  fetchTimetableWorkflows,
-  transformWorkflowsToListItems,
   fetchFacultyAvailability,
   updateFacultyAvailability,
 } from '@/lib/api/timetable'
@@ -27,6 +25,8 @@ export default function AdminTimetablesPage() {
   const [runningJobs, setRunningJobs] = useState<RunningJob[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
 
   const { user } = useAuth()
   const router = useRouter()
@@ -34,15 +34,12 @@ export default function AdminTimetablesPage() {
 
   useEffect(() => {
     loadTimetableData()
+  }, [currentPage])
+  
+  useEffect(() => {
     loadRunningJobs()
-    
-    // Don't load faculty on initial render - only load when user scrolls to faculty section
-    // This is Google/Microsoft pattern for fast page loads
-    
-    const interval = setInterval(loadRunningJobs, 3000)
-    return () => {
-      clearInterval(interval)
-    }
+    const interval = setInterval(loadRunningJobs, 5000)
+    return () => clearInterval(interval)
   }, [])
   
   // Lazy load faculty when faculty section becomes visible
@@ -69,15 +66,37 @@ export default function AdminTimetablesPage() {
       setLoading(true)
       setError(null)
 
-      // Fetch generation jobs (no filters to avoid backend errors)
-      const workflows = await fetchTimetableWorkflows({})
+      // Fast load: Paginated with minimal data
+      const response = await fetch(
+        `${API_BASE}/generation-jobs/?page=${currentPage}&page_size=20`,
+        { credentials: 'include' }
+      )
+      
+      if (!response.ok) {
+        setTimetables([])
+        return
+      }
 
-      const listItems = transformWorkflowsToListItems(workflows)
+      const data = await response.json()
+      const jobs = data.results || []
+      setTotalCount(data.count || 0)
+      
+      // Transform to list items (minimal processing)
+      const listItems = jobs.map((job: any) => ({
+        id: job.job_id || job.id,
+        department: job.department?.department_name || 'N/A',
+        batch: job.batch?.batch_name || null,
+        semester: job.semester || 1,
+        academic_year: job.academic_year || '2024-25',
+        status: job.status || 'draft',
+        lastUpdated: new Date(job.updated_at || job.created_at).toLocaleDateString(),
+        conflicts: job.conflicts_count || 0,
+        score: job.quality_score || null
+      }))
+      
       setTimetables(listItems)
     } catch (err) {
       console.error('Failed to load timetables:', err)
-      // Don't show error - just show empty state
-      // This is more user-friendly for new installations
       setTimetables([])
     } finally {
       setLoading(false)
@@ -86,9 +105,9 @@ export default function AdminTimetablesPage() {
 
   const loadFacultyData = async () => {
     try {
-      // Enterprise optimization: Only fetch 20 faculty initially, load more on demand
+      // Only fetch 10 faculty initially
       const response = await fetch(
-        `${API_BASE}/faculty/?organization=${user?.organization}&page=1&page_size=20`,
+        `${API_BASE}/faculty/?page=1&page_size=10`,
         { credentials: 'include' }
       )
       if (!response.ok) {
@@ -97,73 +116,52 @@ export default function AdminTimetablesPage() {
       }
       const data = await response.json()
       const faculty = (data.results || []).map((f: any) => ({
-        id: f.faculty_id,
-        name: `${f.first_name} ${f.last_name}`.trim(),
-        available: f.is_active
-      }))
+        id: f.faculty_code || f.faculty_id || f.id,
+        name: f.faculty_name || `${f.first_name || ''} ${f.last_name || ''}`.trim() || 'Unknown',
+        available: f.status === 'active' || f.is_active
+      })).filter(f => f.name !== 'Unknown')
       setFacultyAvailability(faculty)
     } catch (err) {
-      console.error('Failed to load faculty:', err)
       setFacultyAvailability([])
     }
   }
 
   const loadRunningJobs = async () => {
     try {
-      const response = await fetch(`${API_BASE}/generation-jobs/?status=running,queued`, {
-        credentials: 'include',
-      })
-      if (!response.ok) return
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 3000)
       
-      const data = await response.json()
-      const jobs = Array.isArray(data) ? data : (data.results || [])
-      
-      // Filter out cancelled/completed jobs immediately
-      const activeJobs = jobs.filter((job: any) => 
-        job.status === 'running' || job.status === 'queued'
+      const response = await fetch(
+        `${API_BASE}/generation-jobs/?status=running&page=1&page_size=5`,
+        { credentials: 'include', signal: controller.signal }
       )
+      clearTimeout(timeoutId)
       
-      if (activeJobs.length === 0) {
+      if (!response.ok) {
         setRunningJobs([])
         return
       }
       
-      const jobsWithProgress = await Promise.all(
-        activeJobs.map(async (job: any) => {
-          try {
-            const controller = new AbortController()
-            const timeoutId = setTimeout(() => controller.abort(), 2000)
-            
-            const progressRes = await fetch(`${API_BASE}/progress/${job.id}/`, {
-              credentials: 'include',
-              signal: controller.signal,
-            })
-            clearTimeout(timeoutId)
-            
-            if (progressRes.ok) {
-              const progressData = await progressRes.json()
-              return {
-                job_id: job.id,
-                progress: progressData.progress || 0,
-                status: progressData.status || job.status,
-                message: progressData.message || 'Processing...',
-                time_remaining_seconds: progressData.time_remaining_seconds,
-              }
-            }
-          } catch (e) {
-            // Silently handle network errors
-          }
-          return null
-        })
-      )
+      const data = await response.json()
+      const jobs = (data.results || []).filter((job: any) => job.status === 'running')
       
-      // Filter out null results and non-active jobs
-      const validJobs = jobsWithProgress.filter(j => 
-        j && (j.status === 'running' || j.status === 'queued')
-      )
-      setRunningJobs(validJobs)
+      if (jobs.length === 0) {
+        setRunningJobs([])
+        return
+      }
+      
+      // Simplified: Use job data directly without extra progress calls
+      const runningJobs = jobs.map((job: any) => ({
+        job_id: job.job_id || job.id,
+        progress: job.progress || 0,
+        status: job.status,
+        message: job.current_stage || 'Processing...',
+        time_remaining_seconds: null
+      }))
+      
+      setRunningJobs(runningJobs)
     } catch (err) {
-      // Silently handle errors
+      setRunningJobs([])
     }
   }
 
@@ -586,6 +584,29 @@ export default function AdminTimetablesPage() {
             </div>
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalCount > 20 && (
+          <div className="flex justify-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1 || loading}
+              className="btn-secondary px-4 py-2 disabled:opacity-50"
+            >
+              ← Previous
+            </button>
+            <span className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
+              Page {currentPage} of {Math.ceil(totalCount / 20)}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => p + 1)}
+              disabled={currentPage >= Math.ceil(totalCount / 20) || loading}
+              className="btn-secondary px-4 py-2 disabled:opacity-50"
+            >
+              Next →
+            </button>
+          </div>
+        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">

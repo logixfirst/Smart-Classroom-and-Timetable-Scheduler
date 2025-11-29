@@ -7,6 +7,7 @@ import apiClient from '@/lib/api'
 import { subjectSchema, type SubjectInput } from '@/lib/validations'
 import { FormField, SelectField } from '@/components/FormFields'
 import { useToast } from '@/components/Toast'
+import Pagination from '@/components/Pagination'
 
 interface Course {
   course_id: string
@@ -49,22 +50,26 @@ export default function SubjectsPage() {
     },
   })
 
-  useEffect(() => {
-    loadSubjects()
-  }, [])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [itemsPerPage, setItemsPerPage] = useState(25)
 
+  // Debounced search
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchTerm) {
-        loadSubjects(true)
-      }
+    const timer = setTimeout(() => {
+      setCurrentPage(1)
+      loadSubjects()
     }, 500)
-
-    return () => clearTimeout(timeoutId)
+    return () => clearTimeout(timer)
   }, [searchTerm])
 
-  const loadSubjects = async (isRefresh = false) => {
-    if (isRefresh) {
+  useEffect(() => {
+    loadSubjects()
+  }, [currentPage, itemsPerPage])
+
+  const loadSubjects = async () => {
+    if (currentPage > 1) {
       setIsTableLoading(true)
     } else {
       setIsLoading(true)
@@ -72,31 +77,22 @@ export default function SubjectsPage() {
     setError(null)
 
     try {
-      const response = await apiClient.getCourses()
+      const response = await apiClient.getCourses(currentPage, itemsPerPage, searchTerm)
       if (response.error) {
         setError(response.error)
       } else if (response.data) {
-        let courseData = Array.isArray(response.data) ? response.data : response.data.results || []
-
-        if (searchTerm) {
-          courseData = courseData.filter(
-            (course: Course) =>
-              course.course_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              course.course_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              course.department?.dept_name?.toLowerCase().includes(searchTerm.toLowerCase())
-          )
+        const data = response.data
+        setCourses(data.results || data)
+        setTotalCount(data.count || 0)
+        if (data.count) {
+          setTotalPages(Math.ceil(data.count / itemsPerPage))
         }
-
-        setCourses(courseData)
       }
     } catch (err) {
       setError('Failed to load courses')
     } finally {
-      if (isRefresh) {
-        setIsTableLoading(false)
-      } else {
-        setIsLoading(false)
-      }
+      setIsTableLoading(false)
+      setIsLoading(false)
     }
   }
 
@@ -178,7 +174,7 @@ export default function SubjectsPage() {
       {/* Search Bar */}
       <div className="card">
         <div className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
             <div className="flex-1">
               <input
                 type="text"
@@ -188,6 +184,7 @@ export default function SubjectsPage() {
                 className="input-primary w-full"
               />
             </div>
+            <p className="text-sm text-gray-600">Total: {totalCount} courses</p>
           </div>
         </div>
       </div>
@@ -345,6 +342,21 @@ export default function SubjectsPage() {
             </tbody>
           </table>
         </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={setItemsPerPage}
+              showItemsPerPage={true}
+            />
+          </div>
         )}
       </div>
     </div>

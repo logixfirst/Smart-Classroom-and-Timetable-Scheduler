@@ -115,8 +115,13 @@ class ApiClient {
   }
 
   // Users
-  async getUsers(page = 1) {
-    return this.request<any>(`/users/?page=${page}`);
+  async getUsers(page = 1, pageSize = 25, search = '') {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      ...(search && { search })
+    });
+    return this.request<any>(`/users/?${params}`);
   }
 
   async getUser(id: string) {
@@ -144,8 +149,13 @@ class ApiClient {
   }
 
   // Departments
-  async getDepartments() {
-    return this.request<any>('/departments/');
+  async getDepartments(page = 1, pageSize = 25, search = '') {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      ...(search && { search })
+    });
+    return this.request<any>(`/departments/?${params}`);
   }
 
   async getDepartment(id: string) {
@@ -153,8 +163,13 @@ class ApiClient {
   }
 
   // Courses
-  async getCourses() {
-    return this.request<any>('/courses/');
+  async getCourses(page = 1, pageSize = 25, search = '') {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      ...(search && { search })
+    });
+    return this.request<any>(`/courses/?${params}`);
   }
 
   async getCourse(id: string) {
@@ -171,8 +186,13 @@ class ApiClient {
   }
 
   // Faculty
-  async getFaculty(page = 1) {
-    return this.request<any>(`/faculty/?page=${page}`);
+  async getFaculty(page = 1, pageSize = 25, search = '') {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      ...(search && { search })
+    });
+    return this.request<any>(`/faculty/?${params}`);
   }
 
   async getFacultyMember(id: string) {
@@ -200,8 +220,13 @@ class ApiClient {
   }
 
   // Students
-  async getStudents(page = 1) {
-    return this.request<any>(`/students/?page=${page}`);
+  async getStudents(page = 1, pageSize = 25, search = '') {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      ...(search && { search })
+    });
+    return this.request<any>(`/students/?${params}`);
   }
 
   async getStudent(id: string) {
@@ -229,8 +254,13 @@ class ApiClient {
   }
 
   // Rooms (renamed from Classrooms)
-  async getRooms() {
-    return this.request<any>('/rooms/');
+  async getRooms(page = 1, pageSize = 25, search = '') {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      ...(search && { search })
+    });
+    return this.request<any>(`/rooms/?${params}`);
   }
 
   async getRoom(id: string) {
@@ -258,15 +288,20 @@ class ApiClient {
   }
 
   // Backward compatibility aliases
-  async getClassrooms() { return this.getRooms(); }
+  async getClassrooms(page = 1, pageSize = 25, search = '') { return this.getRooms(page, pageSize, search); }
   async getClassroom(id: string) { return this.getRoom(id); }
   async createClassroom(data: any) { return this.createRoom(data); }
   async updateClassroom(id: string, data: any) { return this.updateRoom(id, data); }
   async deleteClassroom(id: string) { return this.deleteRoom(id); }
 
   // Labs
-  async getLabs() {
-    return this.request<any>('/labs/');
+  async getLabs(page = 1, pageSize = 25, search = '') {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      ...(search && { search })
+    });
+    return this.request<any>(`/labs/?${params}`);
   }
 
   async getLab(id: string) {
@@ -294,8 +329,13 @@ class ApiClient {
   }
 
   // Timetables
-  async getTimetables() {
-    return this.request<any>('/timetables/');
+  async getTimetables(page = 1, pageSize = 25, search = '') {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      ...(search && { search })
+    });
+    return this.request<any>(`/timetables/?${params}`);
   }
 
   async getTimetable(id: string) {
@@ -340,8 +380,12 @@ class ApiClient {
     });
   }
 
-  async getGenerationJobs() {
-    return this.request<any>('/generation-jobs/');
+  async getGenerationJobs(page = 1, pageSize = 25) {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString()
+    });
+    return this.request<any>(`/generation-jobs/?${params}`);
   }
 
   async getGenerationJob(jobId: string) {

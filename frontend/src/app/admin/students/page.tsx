@@ -49,16 +49,19 @@ export default function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [isDeleting, setIsDeleting] = useState<number | null>(null)
 
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCurrentPage(1)
+      fetchStudents()
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
   // Run on first load + pagination
   useEffect(() => {
     fetchStudents()
-  }, [currentPage])
-
-  // Run when items-per-page changes
-  useEffect(() => {
-    setCurrentPage(1)
-    fetchStudents()
-  }, [itemsPerPage])
+  }, [currentPage, itemsPerPage])
 
   const fetchStudents = async () => {
     if (currentPage > 1) setIsTableLoading(true)
@@ -67,7 +70,7 @@ export default function StudentsPage() {
     setError(null)
 
     try {
-      const response = await apiClient.getStudents(currentPage)
+      const response = await apiClient.getStudents(currentPage, itemsPerPage, searchTerm)
 
       if (response.error) {
         setError(response.error)
@@ -155,18 +158,15 @@ export default function StudentsPage() {
     }
   }
 
+  // Client-side filtering for department/year (search is server-side)
   const filteredStudents = students.filter(student => {
-    const matchesSearch =
-      student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      student.student_id.toLowerCase().includes(searchTerm.toLowerCase())
-
     const matchesDepartment =
       !selectedDepartment || student.department?.department_name === selectedDepartment
 
     const matchesYear =
       !selectedYear || student.year.toString() === selectedYear
 
-    return matchesSearch && matchesDepartment && matchesYear
+    return matchesDepartment && matchesYear
   })
 
   const departments = [...new Set(students.map(s => s.department?.department_name).filter(Boolean))]

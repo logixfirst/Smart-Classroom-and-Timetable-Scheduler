@@ -17,12 +17,12 @@ interface StageInfo {
 }
 
 const STAGES: StageInfo[] = [
-  { name: 'Loading Data', icon: 'Loading Data', range: [0, 5], color: '#8B5CF6' },
-  { name: 'Clustering', icon: 'Clustering', range: [5, 15], color: '#EC4899' },
-  { name: 'CP-SAT Solving', icon: 'CP-SAT', range: [15, 60], color: '#3B82F6' },
-  { name: 'GA Optimization', icon: 'GA', range: [60, 85], color: '#10B981' },
-  { name: 'RL Refinement', icon: 'RL', range: [85, 95], color: '#F59E0B' },
-  { name: 'Finalizing', icon: 'Finalizing', range: [95, 100], color: '#06B6D4' },
+  { name: 'Initializing', icon: 'INIT', range: [0, 5], color: '#8B5CF6' },
+  { name: 'Analyzing', icon: 'SCAN', range: [5, 15], color: '#EC4899' },
+  { name: 'Scheduling', icon: 'PLAN', range: [15, 60], color: '#3B82F6' },
+  { name: 'Optimizing', icon: 'TUNE', range: [60, 85], color: '#10B981' },
+  { name: 'Refining', icon: 'FIX', range: [85, 95], color: '#F59E0B' },
+  { name: 'Complete', icon: 'DONE', range: [95, 100], color: '#06B6D4' },
 ]
 
 export default function TimetableProgressTracker({ jobId, onComplete, onCancel }: ProgressTrackerProps) {
@@ -42,6 +42,7 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
   const [error, setError] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const router = useRouter()
 
   const API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000/api'
@@ -50,6 +51,22 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
 
   useEffect(() => {
     let pollInterval: NodeJS.Timeout | null = null
+
+    // Enterprise session keep-alive: Ping Django every 2 minutes to prevent timeout
+    const keepSessionAlive = async () => {
+      try {
+        await fetch(`${API_BASE.replace('/api', '')}/health/`, {
+          method: 'GET',
+          credentials: 'include',
+        })
+      } catch (err) {
+        console.debug('Session keep-alive ping failed (non-critical):', err)
+      }
+    }
+
+    // Start keep-alive immediately and every 2 minutes
+    keepSessionAlive()
+    keepAliveIntervalRef.current = setInterval(keepSessionAlive, 120000) // 2 minutes
 
     const pollProgress = async () => {
       try {
@@ -115,6 +132,7 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
 
     return () => {
       if (pollInterval) clearInterval(pollInterval)
+      if (keepAliveIntervalRef.current) clearInterval(keepAliveIntervalRef.current)
     }
   }, [jobId, onComplete])
 
@@ -156,7 +174,20 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
     return STAGES.find(stage => progress >= stage.range[0] && progress < stage.range[1]) || STAGES[STAGES.length - 1]
   }
 
+  // Transform technical backend messages to user-friendly text
+  const getUserFriendlyPhase = (backendPhase: string) => {
+    const lower = backendPhase.toLowerCase()
+    if (lower.includes('loading') || lower.includes('fetching')) return 'Preparing system resources...'
+    if (lower.includes('clustering') || lower.includes('louvain')) return 'Grouping related courses...'
+    if (lower.includes('cp-sat') || lower.includes('cpsat')) return 'Assigning classes to time slots...'
+    if (lower.includes('ga') || lower.includes('genetic')) return 'Improving schedule quality...'
+    if (lower.includes('rl') || lower.includes('conflict')) return 'Resolving scheduling conflicts...'
+    if (lower.includes('finaliz')) return 'Preparing final timetable...'
+    return backendPhase
+  }
+
   const currentStage = getCurrentStage()
+  const displayPhase = getUserFriendlyPhase(phase)
 
   // Format time remaining
   const formatTime = (seconds: number) => {
@@ -212,8 +243,10 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
                   <div className="flex items-center gap-3">
                     <div className="text-xl sm:text-2xl font-bold bg-white/20 px-3 py-1 rounded animate-pulse">{currentStage.icon}</div>
                     <div>
-                      <h3 className="text-xl sm:text-2xl font-bold">Generating Timetable</h3>
-                      <p className="text-blue-100 text-xs sm:text-sm">{currentStage.name}</p>
+                      <h3 className="text-xl sm:text-2xl font-bold">
+                        {progress < 5 ? 'Initializing System' : progress < 15 ? 'Analyzing Courses' : progress < 60 ? 'Scheduling Classes' : progress < 85 ? 'Optimizing Schedule' : progress < 95 ? 'Resolving Conflicts' : 'Finalizing Timetable'}
+                      </h3>
+                      <p className="text-blue-100 text-xs sm:text-sm">{displayPhase}</p>
                     </div>
                   </div>
                   <div className="text-center sm:text-right">
@@ -229,7 +262,7 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
               {/* Main Progress Bar */}
               <div className="space-y-2">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-sm">
-                  <span className="font-medium text-[#2C2C2C] dark:text-[#FFFFFF]">{phase}</span>
+                  <span className="font-medium text-[#2C2C2C] dark:text-[#FFFFFF]">{displayPhase}</span>
                   {timeRemaining && timeRemaining > 0 && (
                     <span className="text-[#606060] dark:text-[#aaaaaa] flex items-center gap-2 text-xs sm:text-sm">
                       <span className="font-mono">TIME:</span>
@@ -243,7 +276,9 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
                     className="h-full transition-all duration-500 ease-out relative"
                     style={{ 
                       width: `${progress}%`,
-                      background: `linear-gradient(90deg, ${currentStage.color} 0%, ${currentStage.color}dd 100%)`
+                      background: `linear-gradient(90deg, ${currentStage.color} 0%, ${currentStage.color}dd 100%)`,
+                      borderRadius: progress < 100 ? '9999px 9999px 9999px 9999px' : '9999px',
+                      boxShadow: `0 0 10px ${currentStage.color}40`
                     }}
                   >
                     {/* Shimmer Effect */}
@@ -251,7 +286,8 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
                       className="absolute inset-0 w-full"
                       style={{
                         background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                        animation: 'shimmer-progress 2s infinite'
+                        animation: 'shimmer-progress 2s infinite',
+                        borderRadius: 'inherit'
                       }}
                     />
                   </div>
