@@ -435,10 +435,17 @@ export default function AdminTimetablesPage() {
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
                       {semesterTimetables
                         .sort((a, b) => (a.department || '').localeCompare(b.department || ''))
-                        .map(timetable => (
+                        .map(timetable => {
+                          // Check if this job is currently running
+                          const isRunning = runningJobs.some(job => job.job_id === timetable.id)
+                          const targetUrl = isRunning 
+                            ? `/admin/timetables/status/${timetable.id}`
+                            : `/admin/timetables/${timetable.id}/review`
+                          
+                          return (
                           <Link
                             key={timetable.id}
-                            href={`/admin/timetables/${timetable.id}/review`}
+                            href={targetUrl}
                             className="block p-3 sm:p-4 bg-white dark:bg-[#1E1E1E] border border-[#E0E0E0] dark:border-[#2A2A2A] rounded-lg hover:border-[#2196F3] dark:hover:border-[#2196F3] transition-colors"
                           >
                             <div className="flex items-start justify-between mb-3">
@@ -451,11 +458,11 @@ export default function AdminTimetablesPage() {
                                 </p>
                               </div>
                               <span
-                                className={`px-2 py-1 text-xs font-medium flex-shrink-0 ml-2 rounded ${getStatusColor(
+                                className={`px-2 py-1 text-xs font-medium flex-shrink-0 ml-2 rounded ${isRunning ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' : getStatusColor(
                                   timetable.status
                                 )}`}
                               >
-                                {getStatusIcon(timetable.status)} {timetable.status.charAt(0).toUpperCase() + timetable.status.slice(1)}
+                                {isRunning ? '🔄 Running' : `${getStatusIcon(timetable.status)} ${timetable.status.charAt(0).toUpperCase() + timetable.status.slice(1)}`}
                               </span>
                             </div>
 
@@ -492,11 +499,12 @@ export default function AdminTimetablesPage() {
 
                             <div className="mt-3 pt-3 border-t border-[#e5e5e5] dark:border-[#3d3d3d]">
                               <span className="text-xs text-[#065fd4] font-medium group-hover:text-[#0856c1] transition-colors duration-200">
-                                👁️ View Details →
+                                {isRunning ? '⏱️ View Progress →' : '👁️ View Details →'}
                               </span>
                             </div>
                           </Link>
-                        ))}
+                        )})
+                      }
                     </div>
                   </div>
                 )

@@ -20,6 +20,8 @@ class LouvainClusterer:
     def __init__(self, target_cluster_size: int = 10, edge_threshold: float = None):
         self.target_cluster_size = target_cluster_size
         self.progress_tracker = None  # Set externally for progress updates
+        self.job_id = None
+        self.redis_client = None
         # Adaptive edge threshold based on RAM
         if edge_threshold is None:
             import psutil
@@ -44,23 +46,43 @@ class LouvainClusterer:
         """
         # Build constraint graph (with progress update)
         logger.info(f"[STAGE1] Building constraint graph for {len(courses)} courses...")
+        self._update_progress("Building constraint graph...")
         G = self._build_constraint_graph(courses)
         
         # Run Louvain clustering (with progress update)
         logger.info(f"[STAGE1] Running Louvain community detection...")
+        self._update_progress("Running Louvain detection...")
         partition = self._run_louvain(G)
         
         # Optimize cluster sizes (with progress update)
         logger.info(f"[STAGE1] Optimizing cluster sizes...")
+        self._update_progress("Optimizing cluster sizes...")
         final_clusters = self._optimize_cluster_sizes(partition, courses)
         
         logger.info(f"[STAGE1] Louvain clustering: {len(final_clusters)} clusters from {len(courses)} courses")
         return final_clusters
     
+    def _update_progress(self, message: str):
+        """Update progress via Redis for real-time updates"""
+        try:
+            if self.redis_client and self.job_id:
+                import json
+                from datetime import datetime, timezone
+                progress_data = {
+                    'job_id': self.job_id,
+                    'stage': 'clustering',
+                    'message': message,
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                }
+                self.redis_client.publish(f"progress:{self.job_id}", json.dumps(progress_data))
+                logger.info(f"[LOUVAIN] {message}")
+        except Exception as e:
+            logger.debug(f"Progress update failed: {e}")
+    
     def _build_constraint_graph(self, courses: List[Course]) -> nx.Graph:
         """Build weighted constraint graph with parallel edge computation"""
         import multiprocessing
-        from concurrent.futures import ProcessPoolExecutor
+        from concurrent.futures import ThreadPoolExecutor
         
         G = nx.Graph()
         
@@ -68,7 +90,7 @@ class LouvainClusterer:
         for course in courses:
             G.add_node(course.course_id)
         
-        # Parallel edge computation
+        # Parallel edge computation (ThreadPoolExecutor to avoid pickle issues)
         num_workers = min(multiprocessing.cpu_count(), 8)
         logger.info(f"Building constraint graph for {len(courses)} courses with {num_workers} workers...")
         
@@ -76,15 +98,14 @@ class LouvainClusterer:
         chunk_size = max(1, len(courses) // num_workers)
         chunks = [(i, min(i + chunk_size, len(courses))) for i in range(0, len(courses), chunk_size)]
         
-        # Parallel edge computation with progress tracking
-        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        # Parallel edge computation with ThreadPoolExecutor (shares memory, no pickle)
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
             futures = [
                 executor.submit(self._compute_edges_for_chunk, courses, start, end)
                 for start, end in chunks
             ]
             
             edges_added = 0
-            completed_chunks = 0
             for future in futures:
                 edges = future.result()
                 G.add_weighted_edges_from(edges)

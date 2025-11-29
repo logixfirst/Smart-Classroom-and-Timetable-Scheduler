@@ -13,21 +13,21 @@ try:
             torch.cuda.synchronize()  # Quick sync check
             DEVICE = torch.device('cuda')
             logger = logging.getLogger(__name__)
-            logger.info(f"[OK] RL using GPU: {torch.cuda.get_device_name(0)}")
-        except RuntimeError:
+            logger.info(f"[GPU] RL using GPU: {torch.cuda.get_device_name(0)} ({torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB)")
+        except RuntimeError as e:
             TORCH_AVAILABLE = False
             DEVICE = torch.device('cpu')
             logger = logging.getLogger(__name__)
-            logger.warning("[WARN] GPU busy - RL using CPU")
+            logger.warning(f"[GPU] GPU busy or error: {e} - RL using CPU")
     else:
         DEVICE = torch.device('cpu')
         logger = logging.getLogger(__name__)
-        logger.info("[WARN] RL using CPU (GPU not available)")
-except ImportError:
+        logger.info("[GPU] CUDA not available - RL using CPU (this is normal if PyTorch CPU-only is installed)")
+except ImportError as e:
     TORCH_AVAILABLE = False
     DEVICE = None
     logger = logging.getLogger(__name__)
-    logger.info("[WARN] RL using CPU (PyTorch not installed)")
+    logger.info(f"[GPU] PyTorch not installed: {e} - RL using CPU")
 
 from models.timetable_models import Course, Room, TimeSlot, Faculty
 
@@ -337,26 +337,29 @@ class ContextAwareRLAgent:
             self.q_table[(state, action)] = new_q
     
     def compute_hybrid_reward(self, state, action, next_state, conflicts):
-        """Thread-safe fast reward with lazy context quality"""
+        """Thread-safe fast reward with AGGRESSIVE conflict penalty"""
         
-        # Phase 1: Fast conflict check (always run)
-        conflict_reward = -100 * conflicts
+        # Phase 1: AGGRESSIVE conflict penalty (prioritize conflict resolution)
+        if conflicts > 0:
+            # Exponential penalty: 1 conflict = -1000, 2 = -2000, etc.
+            conflict_reward = -1000 * conflicts
+            # No quality bonus if conflicts exist
+            return conflict_reward
         
-        # Phase 2: Quality bonus (lazy - only for valid states)
-        quality_reward = 0
-        if conflicts == 0:  # Only check quality if no conflicts
-            with self._cache_lock:
-                if action not in self.context_cache:
-                    # Clear cache if too large (before adding)
-                    if len(self.context_cache) >= self.max_cache_size:
-                        self.context_cache.clear()
-                    self.context_cache[action] = self.build_local_context(action)
-                
-                local_context = self.context_cache[action]
+        # Phase 2: Quality bonus ONLY if zero conflicts
+        with self._cache_lock:
+            if action not in self.context_cache:
+                # Clear cache if too large (before adding)
+                if len(self.context_cache) >= self.max_cache_size:
+                    self.context_cache.clear()
+                self.context_cache[action] = self.build_local_context(action)
             
-            quality_reward = self.evaluate_quality(next_state, local_context)
+            local_context = self.context_cache[action]
         
-        return conflict_reward + 0.3 * quality_reward
+        quality_reward = self.evaluate_quality(next_state, local_context)
+        
+        # Reduced quality weight (conflict resolution is priority)
+        return 0.1 * quality_reward
     
     def build_local_context(self, action, faculty_id=None, time_slot_id=None):
         """Build minimal context with behavioral data if available"""
@@ -822,9 +825,8 @@ def _update_rl_progress(progress_tracker, current_episode: int, total_episodes: 
         # Use work-based progress (sync method, no async calls)
         progress_tracker.update_work_progress(current_episode)
         
-        # Log every 10 episodes
-        if current_episode % 10 == 0:
-            logger.info(f'RL Episode {current_episode}/{total_episodes}: {resolved}/{total_conflicts} conflicts resolved')
+        # Log EVERY batch for smooth progress (not just every 10)
+        logger.info(f'[RL] Episode {current_episode}/{total_episodes}: {resolved}/{total_conflicts} conflicts resolved ({current_episode/total_episodes*100:.1f}%)')
     except Exception as e:
         logger.debug(f"Failed to update RL progress: {e}")
 
@@ -919,11 +921,13 @@ def resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, rl_agent=None,
                 except Exception as e:
                     logger.debug(f"Conflict resolution failed: {e}")
         
-        # Periodic cleanup and progress update (EVERY batch for smooth progress)
+        # Progress update EVERY batch for smooth progress
+        if progress_tracker:
+            _update_rl_progress(progress_tracker, episode, max_episodes, rl_agent.conflicts_resolved, initial_conflicts)
+        
+        # Periodic cleanup
         if episode % batch_size == 0:
             rl_agent.context_cache.clear()
-            if progress_tracker:
-                _update_rl_progress(progress_tracker, episode, max_episodes, rl_agent.conflicts_resolved, initial_conflicts)
     
     # Final cleanup
     rl_agent.q_table.clear()

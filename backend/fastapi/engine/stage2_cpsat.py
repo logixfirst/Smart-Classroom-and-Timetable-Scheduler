@@ -26,16 +26,27 @@ class AdaptiveCPSATSolver:
             "student_priority": "ALL",
             "faculty_conflicts": True,
             "room_capacity": True,
-            "timeout": 60,  # Increased from 2s to 60s
-            "max_constraints": 50000  # Increased from 3000
+            "timeout": 60,
+            "max_constraints": 50000,
+            "student_limit": 200
         },
         {
-            "name": "Quick Solve",
+            "name": "Hierarchical Solve",
             "student_priority": "CRITICAL",
             "faculty_conflicts": True,
             "room_capacity": True,
-            "timeout": 30,  # Increased from 1s to 30s
-            "max_constraints": 10000  # Increased from 1000
+            "timeout": 30,
+            "max_constraints": 10000,
+            "student_limit": 50
+        },
+        {
+            "name": "Minimal Solve",
+            "student_priority": "CRITICAL",
+            "faculty_conflicts": True,
+            "room_capacity": True,
+            "timeout": 10,
+            "max_constraints": 1000,
+            "student_limit": 10
         }
     ]
     
@@ -47,7 +58,10 @@ class AdaptiveCPSATSolver:
         faculty: Dict[str, Faculty],
         max_cluster_size: int = 50,  # Increased from 12 to 50
         job_id: str = None,
-        redis_client = None
+        redis_client = None,
+        cluster_id: int = None,
+        total_clusters: int = None,
+        completed_clusters: int = 0
     ):
         self.courses = courses
         self.rooms = rooms
@@ -56,12 +70,31 @@ class AdaptiveCPSATSolver:
         self.max_cluster_size = max_cluster_size
         self.job_id = job_id
         self.redis_client = redis_client
+        self.cluster_id = cluster_id
+        self.total_clusters = total_clusters
+        self.completed_clusters = completed_clusters
         
         # Auto-detect CPU cores for parallel solving
         import multiprocessing
         self.num_workers = min(8, multiprocessing.cpu_count())
         logger.info(f"[CP-SAT] Using {self.num_workers} CPU cores for parallel solving")
         
+    def _update_progress(self, message: str):
+        """Send progress update via Redis"""
+        try:
+            if self.redis_client and self.job_id and self.cluster_id is not None:
+                import json
+                from datetime import datetime, timezone
+                progress_data = {
+                    'job_id': self.job_id,
+                    'stage': 'cpsat',
+                    'message': f"Cluster {self.completed_clusters + 1}/{self.total_clusters}: {message}",
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                }
+                self.redis_client.publish(f"progress:{self.job_id}", json.dumps(progress_data))
+        except Exception as e:
+            logger.debug(f"Progress update failed: {e}")
+    
     def solve_cluster(self, cluster: List[Course], timeout: float = None) -> Optional[Dict]:
         """
         Ultra-fast cluster solving with aggressive shortcuts + cancellation support
@@ -69,6 +102,7 @@ class AdaptiveCPSATSolver:
         logger.info(f"\n{'='*80}")
         logger.info(f"[CP-SAT DEBUG] Starting cluster with {len(cluster)} courses")
         logger.info(f"[CP-SAT DEBUG] Available: {len(self.rooms)} rooms, {len(self.time_slots)} time slots")
+        self._update_progress(f"Starting ({len(cluster)} courses)")
         
         # Check cancellation before starting
         if self._check_cancellation():
@@ -82,22 +116,25 @@ class AdaptiveCPSATSolver:
         
         # SHORTCUT 2: Ultra-fast feasibility (< 50ms)
         logger.info(f"[CP-SAT DEBUG] Running feasibility check...")
+        self._update_progress("Checking feasibility")
         if not self._ultra_fast_feasibility(cluster):
             logger.warning(f"[CP-SAT DEBUG] [ERROR] Failed feasibility check")
             return None
         logger.info(f"[CP-SAT DEBUG] [OK] Passed feasibility check")
         
-        # SHORTCUT 3: Try only 2 strategies (not 3)
-        for idx, strategy in enumerate(self.STRATEGIES[:2]):
+        # Try all 3 strategies with progressive relaxation
+        for idx, strategy in enumerate(self.STRATEGIES):
             # Check cancellation between strategies
             if self._check_cancellation():
                 logger.info(f"[CP-SAT DEBUG] [ERROR] Job cancelled during strategy {idx+1}")
                 return None
             
             logger.info(f"[CP-SAT DEBUG] Trying strategy {idx+1}/2: {strategy['name']}")
+            self._update_progress(f"Trying {strategy['name']}")
             solution = self._try_cpsat_with_strategy(cluster, strategy)
             if solution:
                 logger.info(f"[CP-SAT DEBUG] [OK] Strategy {strategy['name']} succeeded with {len(solution)} assignments")
+                self._update_progress(f"Completed ({len(solution)} assignments)")
                 return solution
             logger.warning(f"[CP-SAT DEBUG] [ERROR] Strategy {strategy['name']} failed")
         

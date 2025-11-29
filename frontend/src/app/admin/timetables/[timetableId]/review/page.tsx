@@ -126,9 +126,34 @@ export default function TimetableReviewPage() {
 
   useEffect(() => {
     if (workflowId) {
-      loadWorkflowData()
+      checkJobStatusAndLoad()
     }
   }, [workflowId])
+
+  const checkJobStatusAndLoad = async () => {
+    try {
+      // First check if this job is still running
+      const jobRes = await authenticatedFetch(
+        `${API_BASE}/generation-jobs/${workflowId}/`,
+        { credentials: 'include' }
+      )
+      
+      if (jobRes.ok) {
+        const jobData = await jobRes.json()
+        // If job is running or queued, redirect to status page
+        if (jobData.status === 'running' || jobData.status === 'queued') {
+          router.push(`/admin/timetables/status/${workflowId}`)
+          return
+        }
+      }
+      
+      // Job is completed/failed/cancelled, load workflow data
+      loadWorkflowData()
+    } catch (err) {
+      // If job check fails, try loading workflow anyway
+      loadWorkflowData()
+    }
+  }
 
   const loadWorkflowData = async () => {
     try {

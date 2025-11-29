@@ -147,11 +147,34 @@ class GeneticAlgorithmOptimizer:
             if self.use_sample_fitness:
                 self.sample_size = hardware_config.get('sample_students', 50)
             logger.info(f"Hardware config applied: use_gpu={self.use_gpu}, pop={self.population_size}, gen={self.generations}, sample_fitness={self.use_sample_fitness}")
+        
+        # Log fitness mode based on initial solution size
+        if initial_solution:
+            sol_size = len(initial_solution)
+            if sol_size > 2000:
+                logger.info(f"[GA] Using ULTRA-FAST fitness mode ({sol_size} assignments > 2000): 3 metrics, no feasibility")
+            elif sol_size > 1500:
+                logger.info(f"[GA] Using FAST fitness mode ({sol_size} assignments > 1500): 5 metrics, no feasibility")
+            else:
+                logger.info(f"[GA] Using FULL fitness mode ({sol_size} assignments): 7 metrics with feasibility")
         else:
             # Fallback: auto-detect
             self.use_gpu = TORCH_AVAILABLE and DEVICE is not None
             self.gpu_offload_conflicts = self.use_gpu and gpu_offload_conflicts
             logger.warning("No hardware config provided, using auto-detection")
+        
+        # GPU VRAM check before initialization
+        if self.use_gpu:
+            try:
+                import torch
+                gpu_vram_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                if gpu_vram_gb < 6.0:
+                    logger.warning(f"[GPU] VRAM too low ({gpu_vram_gb:.1f}GB < 6GB), using CPU")
+                    self.use_gpu = False
+                    self.gpu_offload_conflicts = False
+                    self.streaming_mode = True
+            except Exception as e:
+                logger.warning(f"[GPU] VRAM check failed: {e}")
         
         if self.use_gpu:
             try:
@@ -275,7 +298,7 @@ class GeneticAlgorithmOptimizer:
         return perturbed
     
     def fitness(self, solution: Dict) -> float:
-        """Calculate fitness with thread-safe GPU-accelerated caching + ALL soft constraints"""
+        """Calculate fitness with thread-safe GPU-accelerated caching + simplified for large schedules"""
         # Cache key (use hash for memory efficiency)
         sol_key = hash(tuple(sorted(solution.items())))
         
@@ -286,19 +309,26 @@ class GeneticAlgorithmOptimizer:
                 return cached_value
         
         # Calculate fitness (outside lock to allow parallel computation)
-        if not self._is_feasible(solution):
-            fitness_val = -1000 * self._count_violations(solution)
+        # OPTIMIZATION: Skip feasibility check for large schedules (too expensive)
+        if len(solution) > 2000:
+            # ULTRA-FAST: Only 3 metrics, no feasibility check
+            sc1 = self._faculty_preference_satisfaction(solution) * 0.40
+            sc3 = self._room_utilization(solution) * 0.30
+            sc_dept = self._department_matching(solution) * 0.30
+            fitness_val = sc1 + sc3 + sc_dept
+        elif len(solution) > 1500:
+            # FAST: 5 metrics, no feasibility check
+            sc1 = self._faculty_preference_satisfaction(solution) * 0.25
+            sc3 = self._room_utilization(solution) * 0.20
+            sc4 = self._workload_balance(solution) * 0.20
+            sc5 = self._peak_spreading(solution) * 0.15
+            sc_dept = self._department_matching(solution) * 0.20
+            fitness_val = sc1 + sc3 + sc4 + sc5 + sc_dept
         else:
-            # FAST fitness: skip expensive compactness for large schedules
-            if len(solution) > 1500:
-                sc1 = self._faculty_preference_satisfaction(solution) * 0.25
-                sc3 = self._room_utilization(solution) * 0.20
-                sc4 = self._workload_balance(solution) * 0.20
-                sc5 = self._peak_spreading(solution) * 0.15
-                sc_dept = self._department_matching(solution) * 0.20
-                fitness_val = sc1 + sc3 + sc4 + sc5 + sc_dept
+            # FULL: All metrics with feasibility check
+            if not self._is_feasible(solution):
+                fitness_val = -1000 * self._count_violations(solution)
             else:
-                # Full fitness for smaller schedules (all 6 soft constraints)
                 sc1 = self._faculty_preference_satisfaction(solution) * 0.20
                 sc2 = self._schedule_compactness(solution) * 0.20
                 sc3 = self._room_utilization(solution) * 0.15

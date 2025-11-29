@@ -411,6 +411,8 @@ class TimetableGenerationSaga:
         # Pass progress tracker to clusterer for real-time updates
         clusterer = LouvainClusterer(target_cluster_size=10)
         clusterer.progress_tracker = self.progress_tracker
+        clusterer.job_id = job_id
+        clusterer.redis_client = redis_client_global
         clusters = await asyncio.to_thread(clusterer.cluster_courses, courses)
         
         # Check cancellation after clustering
@@ -493,11 +495,16 @@ class TimetableGenerationSaga:
                     if len(cluster_courses) > max_courses_per_cluster:
                         cluster_courses = cluster_courses[:max_courses_per_cluster]
                     
+                    # Store job_id for CP-SAT progress updates
+                    self.current_job_id = job_id
+                    
                     solution = self._solve_cluster_safe(
                         cluster_id, cluster_courses,
                         data['load_data']['rooms'][:max_rooms],
                         data['load_data']['time_slots'],
-                        data['load_data']['faculty']
+                        data['load_data']['faculty'],
+                        total_clusters=total_clusters,
+                        completed=completed
                     )
                     
                     if solution:
@@ -505,7 +512,7 @@ class TimetableGenerationSaga:
                     
                     completed += 1
                     self.progress_tracker.update_work_progress(completed)
-                    logger.info(f"[CP-SAT] Cluster {completed}/{total_clusters} completed")
+                    logger.info(f"[CP-SAT] Sequential: Cluster {completed}/{total_clusters} completed ({completed/total_clusters*100:.1f}%)")
                     gc.collect()
                 except Exception as e:
                     logger.error(f"Cluster {cluster_id} failed: {e}")
@@ -517,7 +524,10 @@ class TimetableGenerationSaga:
             # Parallel with ThreadPoolExecutor (shares memory, no pickle issues)
             with ThreadPoolExecutor(max_workers=max_parallel) as executor:
                 futures = {}
-                for cluster_id, cluster_courses in list(clusters.items()):
+                # Store job_id for CP-SAT progress updates
+                self.current_job_id = job_id
+                
+                for idx, (cluster_id, cluster_courses) in enumerate(list(clusters.items())):
                     if len(cluster_courses) > max_courses_per_cluster:
                         cluster_courses = cluster_courses[:max_courses_per_cluster]
                     
@@ -526,7 +536,9 @@ class TimetableGenerationSaga:
                         cluster_id, cluster_courses,
                         data['load_data']['rooms'][:max_rooms],
                         data['load_data']['time_slots'],
-                        data['load_data']['faculty']
+                        data['load_data']['faculty'],
+                        total_clusters,
+                        idx  # Pass current index as completed count
                     )
                     futures[future] = cluster_id
                 
@@ -546,12 +558,12 @@ class TimetableGenerationSaga:
                             all_solutions.update(solution)
                         completed += 1
                         self.progress_tracker.update_work_progress(completed)
-                        logger.info(f"[CP-SAT] Cluster {completed}/{total_clusters} completed")
+                        logger.info(f"[CP-SAT] Parallel: Cluster {completed}/{total_clusters} completed ({completed/total_clusters*100:.1f}%)")
                     except Exception as e:
                         logger.error(f"Cluster {cluster_id} failed: {e}")
                         completed += 1
                         self.progress_tracker.update_work_progress(completed)
-                        logger.info(f"[CP-SAT] Cluster {completed}/{total_clusters} failed")
+                        logger.info(f"[CP-SAT] Parallel: Cluster {completed}/{total_clusters} failed ({completed/total_clusters*100:.1f}%)")
                 
                 gc.collect()
         
@@ -611,61 +623,58 @@ class TimetableGenerationSaga:
             'cpsat_scheduled': len(all_solutions)
         }
     
-    def _solve_cluster_safe(self, cluster_id, courses, rooms, time_slots, faculty):
-        """Solve single cluster with adaptive CP-SAT + Greedy hybrid"""
+    def _solve_cluster_safe(self, cluster_id, courses, rooms, time_slots, faculty, total_clusters=None, completed=0):
+        """Solve single cluster with progressive relaxation: CP-SAT → Smart Greedy → Basic Greedy"""
         from engine.stage2_cpsat import AdaptiveCPSATSolver
         from engine.stage2_greedy import SmartGreedyScheduler
         
+        global redis_client_global
+        
         try:
-            # Adaptive timeout based on cluster difficulty (0.5s - 5s range)
-            difficulty = self._analyze_cluster_difficulty(courses)
-            
-            if difficulty < 0.3:
-                timeout = 0.5  # Easy cluster
-            elif difficulty < 0.5:
-                timeout = 1.0  # Medium-easy
-            elif difficulty < 0.7:
-                timeout = 2.0  # Medium-hard
-            else:
-                timeout = 3.0  # Hard cluster (was 5s, now 3s max)
-            
-            logger.info(f"Cluster {cluster_id}: difficulty={difficulty:.2f}, timeout={timeout:.1f}s")
-            
-            # Quick feasibility check (100ms) before CP-SAT
-            if not self._quick_feasibility_check(courses, rooms, time_slots, faculty):
-                logger.info(f"Cluster {cluster_id}: Failed feasibility check, using greedy")
-                greedy_solver = SmartGreedyScheduler(courses=courses, rooms=rooms, time_slots=time_slots, faculty=faculty)
-                return greedy_solver.solve(courses)
-            
-            # Adaptive CP-SAT solver with hierarchical constraints
+            # Adaptive CP-SAT solver with 3-level progressive relaxation
             cpsat_solver = AdaptiveCPSATSolver(
                 courses=courses,
                 rooms=rooms,
                 time_slots=time_slots,
                 faculty=faculty,
-                max_cluster_size=50  # Increased from 12
+                max_cluster_size=50,
+                job_id=getattr(self, 'current_job_id', None),
+                redis_client=redis_client_global,
+                cluster_id=cluster_id,
+                total_clusters=total_clusters,
+                completed_clusters=completed
             )
             
-            # Try CP-SAT with adaptive timeout
-            solution = cpsat_solver.solve_cluster(courses, timeout=timeout)
+            # Try CP-SAT (will try 3 strategies internally)
+            solution = cpsat_solver.solve_cluster(courses)
             
-            if solution:
+            if solution and len(solution) > 0:
                 logger.info(f"Cluster {cluster_id}: CP-SAT succeeded with {len(solution)} assignments")
                 return solution
             
-            # Fallback to smart greedy
-            logger.info(f"Cluster {cluster_id}: CP-SAT failed, using smart greedy")
-            greedy_solver = SmartGreedyScheduler(
-                courses=courses,
-                rooms=rooms,
-                time_slots=time_slots,
-                faculty=faculty
-            )
-            return greedy_solver.solve(courses)
+            # Fallback 1: Smart greedy with constraint awareness
+            logger.info(f"Cluster {cluster_id}: CP-SAT failed, trying smart greedy")
+            try:
+                greedy_solver = SmartGreedyScheduler(
+                    courses=courses,
+                    rooms=rooms,
+                    time_slots=time_slots,
+                    faculty=faculty
+                )
+                solution = greedy_solver.solve(courses)
+                if solution and len(solution) > 0:
+                    logger.info(f"Cluster {cluster_id}: Smart greedy succeeded with {len(solution)} assignments")
+                    return solution
+            except Exception as e:
+                logger.warning(f"Cluster {cluster_id}: Smart greedy failed: {e}")
+            
+            # Fallback 2: Basic greedy (always returns something)
+            logger.info(f"Cluster {cluster_id}: Using basic greedy fallback")
+            return self._greedy_schedule(cluster_id, courses, rooms, time_slots, faculty)
             
         except Exception as e:
             logger.error(f"Cluster {cluster_id} error: {e}")
-            # Final fallback to basic greedy
+            # Final fallback to basic greedy (guaranteed to return something)
             return self._greedy_schedule(cluster_id, courses, rooms, time_slots, faculty)
     
     def _quick_feasibility_check(self, courses, rooms, time_slots, faculty) -> bool:
@@ -968,8 +977,8 @@ class TimetableGenerationSaga:
             
             logger.info(f"[STAGE3] Config: algorithm={algorithm}, iterations={max_iter}, conflicts={len(conflicts)}")
             
-            # RL training with direct call
-            resolved_schedule = await asyncio.to_thread(resolver.resolve, schedule)
+            # RL training with direct call (FIXED: use resolve_conflicts method)
+            resolved_schedule = await asyncio.to_thread(resolver.resolve_conflicts, schedule, job_id)
             
             # Verify resolution
             remaining_conflicts = self._detect_conflicts(resolved_schedule, load_data)
@@ -1056,7 +1065,18 @@ class TimetableGenerationSaga:
                 else:
                     student_schedule[key] = course_id
         
-        logger.info(f"[CONFLICTS] Found {len(conflicts)} total conflicts")
+        # Analyze conflict distribution
+        conflict_types = {'faculty': 0, 'room': 0, 'student': 0}
+        for c in conflicts:
+            conflict_types[c['type'].split('_')[0]] += 1
+        
+        logger.info(f"[CONFLICTS] Found {len(conflicts)} total conflicts: Faculty={conflict_types['faculty']}, Room={conflict_types['room']}, Student={conflict_types['student']}")
+        
+        # If too many student conflicts, likely cross-cluster issue
+        if conflict_types['student'] > len(conflicts) * 0.8:
+            logger.warning(f"[CONFLICTS] {conflict_types['student']/len(conflicts)*100:.0f}% are student conflicts - likely cross-cluster scheduling issue")
+            logger.warning(f"[CONFLICTS] This happens when students are enrolled in courses across multiple clusters")
+        
         return conflicts
     
     async def _compensate(self, job_id: str):
@@ -1839,12 +1859,14 @@ async def generate_variants_enterprise(request: GenerationRequest):
     try:
         job_id = request.job_id or f"enterprise_{int(datetime.now(timezone.utc).timestamp())}"
         
+        # Detect hardware BEFORE setting initial ETA
+        if not hardware_profile:
+            hardware_profile = get_hardware_profile(force_refresh=False)
+        
         # Calculate estimated time from hardware config
-        estimated_time_seconds = 300  # Default 5 minutes
-        if hardware_profile:
-            optimal_config = get_optimal_config(hardware_profile)
-            estimated_time_seconds = optimal_config['expected_time_minutes'] * 60
-            logger.info(f"Estimated time: {optimal_config['expected_time_minutes']} min ({optimal_config['tier']} tier)")
+        optimal_config = get_optimal_config(hardware_profile)
+        estimated_time_seconds = optimal_config['expected_time_minutes'] * 60
+        logger.info(f"Estimated time: {optimal_config['expected_time_minutes']} min ({optimal_config['tier']} tier)")
         
         # Initialize progress and start time
         if redis_client_global:
