@@ -1071,9 +1071,13 @@ def _resolve_cluster_conflicts_with_rl(courses: List, conflicts: List[Dict],
         if not course:
             return []
         
-        # NEP 2020: Get department-specific time slots for this course
+        # NEP 2020: Get department-specific time slots for this course (with fallback)
         course_dept_id = getattr(course, 'dept_id', None)
-        dept_slots = [t for t in time_slots if t.department_id == course_dept_id] if course_dept_id else time_slots
+        if course_dept_id:
+            filtered = [t for t in time_slots if t.department_id == course_dept_id]
+            dept_slots = filtered if filtered else time_slots
+        else:
+            dept_slots = time_slots
         
         feasible = []
         # NEP 2020: Try all department-specific time slots

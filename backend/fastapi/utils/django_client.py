@@ -109,9 +109,9 @@ class DjangoAPIClient:
                 SELECT working_days, slots_per_day, start_time, end_time,
                        slot_duration_minutes, lunch_break_enabled, 
                        lunch_break_start, lunch_break_end
-                FROM timetable_config
-                WHERE org_id = %s AND is_active = true
-                ORDER BY created_at DESC
+                FROM timetable_configurations
+                WHERE org_id = %s
+                ORDER BY last_used_at DESC
                 LIMIT 1
             """, (org_id,))
             

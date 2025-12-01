@@ -22,29 +22,20 @@ class AdaptiveCPSATSolver:
     
     STRATEGIES = [
         {
-            "name": "Full Solve with All Constraints",
-            "student_priority": "ALL",
-            "faculty_conflicts": True,
-            "room_capacity": True,
-            "timeout": 120,  # Increased from 60s - be more patient
-            "max_constraints": 50000,
-            "student_limit": 2000  # Increased from 200
-        },
-        {
-            "name": "Relaxed Student Constraints",
+            "name": "Fast Solve with Priority Students",
             "student_priority": "CRITICAL",  # Only critical students (5+ courses)
             "faculty_conflicts": True,
             "room_capacity": True,
-            "timeout": 90,  # Increased from 30s
+            "timeout": 15,  # Fast timeout for speed
             "max_constraints": 10000,
-            "student_limit": 500  # Increased from 50
+            "student_limit": 500
         },
         {
             "name": "Faculty + Room Only",
-            "student_priority": None,  # No student constraints
+            "student_priority": None,  # No student constraints for speed
             "faculty_conflicts": True,
             "room_capacity": True,
-            "timeout": 60,
+            "timeout": 10,
             "max_constraints": 5000,
             "student_limit": 0
         },
@@ -53,7 +44,7 @@ class AdaptiveCPSATSolver:
             "student_priority": None,
             "faculty_conflicts": True,  # Only faculty conflicts
             "room_capacity": False,  # Relax room capacity
-            "timeout": 30,
+            "timeout": 5,
             "max_constraints": 1000,
             "student_limit": 0
         }
@@ -169,9 +160,18 @@ class AdaptiveCPSATSolver:
             students = len(course.student_ids)
             duration = course.duration
             
-            # NEP 2020: Get department-specific time slots
+            # NEP 2020: Get department-specific time slots (with fallback)
             course_dept_id = getattr(course, 'dept_id', None)
-            dept_slots = [t for t in self.time_slots if t.department_id == course_dept_id] if course_dept_id else self.time_slots
+            
+            # Use cached lookup if available
+            if hasattr(self, '_dept_slots_cache') and course_dept_id:
+                dept_slots = self._dept_slots_cache.get(course_dept_id, self.time_slots)
+            elif course_dept_id:
+                # Filter and fallback if empty
+                filtered = [t for t in self.time_slots if t.department_id == course_dept_id]
+                dept_slots = filtered if filtered else self.time_slots
+            else:
+                dept_slots = self.time_slots
             
             logger.debug(f"Course {idx+1}: {students} students, duration={duration}, dept={course_dept_id}, slots={len(dept_slots)}")
             
@@ -185,7 +185,7 @@ class AdaptiveCPSATSolver:
             logger.debug(f"Course {idx+1}: found {available} valid slots (needs {duration})")
             # Relax the check - if we have at least 50% of needed slots, continue
             if available < duration * 0.5:
-                logger.warning(f"[CP-SAT FEASIBILITY] [ERROR] Course {idx+1} insufficient slots: {available} < {duration * 0.5}")
+                logger.warning(f"[CP-SAT FEASIBILITY] [ERROR] Course {idx+1} insufficient slots: {available} < {duration * 0.5} (dept_id={course_dept_id}, dept_slots={len(dept_slots)}, total_slots={len(self.time_slots)})")
                 return False
         
         # Quick faculty overload check (per department)
@@ -247,9 +247,18 @@ class AdaptiveCPSATSolver:
         """Count valid (time, room) pairs for a course (NEP 2020 constraints only)"""
         count = 0
         
-        # NEP 2020: Filter time slots by course department
+        # NEP 2020: Filter time slots by course department (with fallback)
         course_dept_id = getattr(course, 'dept_id', None)
-        dept_slots = [t for t in self.time_slots if t.department_id == course_dept_id] if course_dept_id else self.time_slots
+        
+        # Use cached lookup if available
+        if hasattr(self, '_dept_slots_cache') and course_dept_id:
+            dept_slots = self._dept_slots_cache.get(course_dept_id, self.time_slots)
+        elif course_dept_id:
+            # Filter and fallback if empty
+            filtered = [t for t in self.time_slots if t.department_id == course_dept_id]
+            dept_slots = filtered if filtered else self.time_slots
+        else:
+            dept_slots = self.time_slots
         
         for t_slot in dept_slots:
             for room in self.rooms:
@@ -421,28 +430,35 @@ class AdaptiveCPSATSolver:
         Pre-filter valid (time, room) pairs
         Reduces search space by 70-80%
         NEP 2020: Uses department-specific time slots
+        OPTIMIZED: Caches room features and department slots
         """
-        logger.debug(f"Computing valid domains for {len(cluster)} courses")
         valid_domains = {}
-        total_valid_pairs = 0
         
-        # Pre-compute room features for faster lookup
-        room_features = {r.room_id: set(getattr(r, 'features', [])) for r in self.rooms}
+        # OPTIMIZATION: Cache room features (computed once for all clusters)
+        if not hasattr(self, '_room_features_cache'):
+            self._room_features_cache = {r.room_id: set(getattr(r, 'features', [])) for r in self.rooms}
+        room_features = self._room_features_cache
+        
+        # OPTIMIZATION: Cache department slots lookup
+        if not hasattr(self, '_dept_slots_cache'):
+            self._dept_slots_cache = {}
+            for t_slot in self.time_slots:
+                dept_id = t_slot.department_id
+                if dept_id not in self._dept_slots_cache:
+                    self._dept_slots_cache[dept_id] = []
+                self._dept_slots_cache[dept_id].append(t_slot)
         
         for course_idx, course in enumerate(cluster):
             course_features = set(getattr(course, 'required_features', []))
             student_count = len(course.student_ids)
             faculty_avail = None
             
-            # NEP 2020: Get department-specific time slots
+            # NEP 2020: Get department-specific time slots (from cache)
             course_dept_id = getattr(course, 'dept_id', None)
-            dept_slots = [t for t in self.time_slots if t.department_id == course_dept_id] if course_dept_id else self.time_slots
-            
-            logger.debug(f"[CP-SAT DOMAINS] Course {course_idx+1}/{len(cluster)}: {student_count} students, dept={course_dept_id}, slots={len(dept_slots)}")
+            dept_slots = self._dept_slots_cache.get(course_dept_id, self.time_slots) if course_dept_id else self.time_slots
             
             if course.faculty_id in self.faculty:
                 faculty_avail = set(getattr(self.faculty[course.faculty_id], 'available_slots', []))
-                logger.debug(f"[CP-SAT DOMAINS]   Faculty slots: {len(faculty_avail) if faculty_avail else 'all'}")
             
             for session in range(course.duration):
                 valid_pairs = []

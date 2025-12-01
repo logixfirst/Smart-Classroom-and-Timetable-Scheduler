@@ -219,9 +219,13 @@ class GeneticAlgorithmOptimizer:
         if not course:
             return []
         
-        # NEP 2020: Get department-specific time slots
+        # NEP 2020: Get department-specific time slots (with fallback)
         course_dept_id = getattr(course, 'dept_id', None)
-        dept_slots = [t for t in self.time_slots if t.department_id == course_dept_id] if course_dept_id else self.time_slots
+        if course_dept_id:
+            filtered = [t for t in self.time_slots if t.department_id == course_dept_id]
+            dept_slots = filtered if filtered else self.time_slots
+        else:
+            dept_slots = self.time_slots
         
         # Compute valid pairs (only once per course)
         valid_pairs = []

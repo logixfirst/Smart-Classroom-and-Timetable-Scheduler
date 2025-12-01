@@ -17,12 +17,12 @@ interface StageInfo {
 }
 
 const STAGES: StageInfo[] = [
-  { name: 'Loading Data', icon: 'Loading Data', range: [0, 5], color: '#8B5CF6' },
-  { name: 'Clustering', icon: 'Clustering', range: [5, 15], color: '#EC4899' },
-  { name: 'CP-SAT Solving', icon: 'CP-SAT', range: [15, 60], color: '#3B82F6' },
-  { name: 'GA Optimization', icon: 'GA', range: [60, 85], color: '#10B981' },
-  { name: 'RL Refinement', icon: 'RL', range: [85, 95], color: '#F59E0B' },
-  { name: 'Finalizing', icon: 'Finalizing', range: [95, 100], color: '#06B6D4' },
+  { name: 'Loading Data', icon: '📚', range: [0, 5], color: '#FF0000' },
+  { name: 'Assigning Courses', icon: '🎯', range: [5, 10], color: '#FF4500' },
+  { name: 'Scheduling Classes', icon: '📅', range: [10, 60], color: '#FFA500' },
+  { name: 'Optimizing Schedule', icon: '⚡', range: [60, 85], color: '#FFD700' },
+  { name: 'Resolving Conflicts', icon: '🔧', range: [85, 95], color: '#9ACD32' },
+  { name: 'Finalizing Timetable', icon: '✅', range: [95, 100], color: '#00A651' },
 ]
 
 export default function TimetableProgressTracker({ jobId, onComplete, onCancel }: ProgressTrackerProps) {
@@ -34,10 +34,10 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
   }
 
   const cachedState = getCachedState()
-  const [progress, setProgress] = useState(cachedState?.progress || 0)
+  const [progress, setProgress] = useState(cachedState?.progress ?? 0)
   const [status, setStatus] = useState(cachedState?.status || 'loading')
-  const [phase, setPhase] = useState(cachedState?.phase || 'Loading status...')
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(cachedState?.timeRemaining || null)
+  const [phase, setPhase] = useState(cachedState?.phase || 'Initializing...')
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(cachedState?.timeRemaining ?? 720)
   const [cancelling, setCancelling] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
@@ -50,6 +50,8 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
 
   useEffect(() => {
     let pollInterval: NodeJS.Timeout | null = null
+    let retryCount = 0
+    const MAX_RETRIES = 5
 
     const pollProgress = async () => {
       try {
@@ -58,10 +60,11 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
         })
 
         if (res.ok) {
+          retryCount = 0 // Reset retry count on success
           const data = await res.json()
-          const newProgress = data.progress || 1  // Show at least 1%
+          const newProgress = data.progress || 0
           const newStatus = data.status || 'running'
-          const newPhase = data.stage || data.message || 'Initializing...'
+          const newPhase = data.stage || data.message || 'Processing...'
           const newTimeRemaining = data.time_remaining_seconds || null
 
           setProgress(newProgress)
@@ -101,18 +104,29 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
               localStorage.removeItem(`progress_${jobId}`)
             }
           }
+        } else if (res.status === 404 && retryCount < MAX_RETRIES) {
+          // Job not found yet (race condition) - retry with exponential backoff
+          retryCount++
+          console.log(`Job not found yet (attempt ${retryCount}/${MAX_RETRIES}), retrying...`)
+          setPhase('Initializing generation...')
+          setStatus('initializing')
+          return // Don't set error yet
+        } else if (res.status === 404) {
+          // After max retries, show error
+          setError('Job not found. Please try again.')
         }
       } catch (err) {
         console.error('Failed to poll progress:', err)
-        // Don't set error state on network failures - keep showing last known state
+        if (retryCount < MAX_RETRIES) {
+          retryCount++
+          setPhase('Connecting to server...')
+        }
       }
     }
 
-    // Fetch immediately on mount to avoid showing stale "queued" state
+    // Poll immediately, then every 1 second for real-time updates
     pollProgress()
-    
-    // Then start polling every 2 seconds
-    pollInterval = setInterval(pollProgress, 2000)
+    pollInterval = setInterval(pollProgress, 1000)
 
     return () => {
       if (pollInterval) clearInterval(pollInterval)
@@ -158,6 +172,17 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
   }
 
   const currentStage = getCurrentStage()
+  const currentStageIndex = STAGES.findIndex(s => s.name === currentStage.name)
+
+  // Get progress color based on percentage (red to green gradient)
+  const getProgressColor = (prog: number) => {
+    if (prog < 20) return '#FF0000' // Red
+    if (prog < 40) return '#FF4500' // Orange-Red
+    if (prog < 60) return '#FFA500' // Orange
+    if (prog < 80) return '#FFD700' // Yellow
+    if (prog < 95) return '#9ACD32' // Yellow-Green
+    return '#00A651' // Green
+  }
 
   // Format time remaining
   const formatTime = (seconds: number) => {
@@ -167,176 +192,178 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-      <style jsx global>{`
-        @keyframes shimmer-progress {
+    <div className="w-full max-w-5xl mx-auto p-4">
+      <style jsx>{`
+        @keyframes shimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
         }
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 20px rgba(33, 150, 243, 0.4); }
-          50% { box-shadow: 0 0 30px rgba(33, 150, 243, 0.6); }
+        @keyframes pulse-ring {
+          0% { transform: scale(1); opacity: 0.5; }
+          50% { transform: scale(1.15); opacity: 0.2; }
+          100% { transform: scale(1); opacity: 0.5; }
         }
-        @keyframes float-subtle {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-5px); }
+        @keyframes slide-up {
+          from { opacity: 0; transform: translateY(15px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
 
-      <div className="card overflow-hidden">
-        {error ? (
-          <div className="p-6 sm:p-8 text-center space-y-6">
-            <div className="text-4xl sm:text-6xl font-bold text-red-600 dark:text-red-400 animate-bounce">ERROR</div>
-            <h3 className="card-title text-red-600 dark:text-red-400">Generation Failed</h3>
-            <div className="bg-[#fce8e6] dark:bg-[#ff4444]/20 border-l-4 border-[#d93025] dark:border-[#f28b82] p-4 rounded-r-lg">
-              <p className="text-sm text-[#d93025] dark:text-[#f28b82]">{error}</p>
+      {error ? (
+        <div className="card">
+          <div className="p-6 sm:p-8 text-center space-y-6 animate-[slide-up_0.4s_ease-out]">
+            <div className="w-16 h-16 mx-auto rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+              <svg className="w-10 h-10 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </div>
-            <button
-              onClick={() => router.push('/admin/timetables')}
-              className="btn-primary"
-            >
+            <div>
+              <h3 className="text-xl font-semibold text-[#2C2C2C] dark:text-[#FFFFFF] mb-2">Generation Failed</h3>
+              <p className="text-sm text-[#606060] dark:text-[#aaaaaa]">{error}</p>
+            </div>
+            <button onClick={() => router.push('/admin/timetables')} className="btn-primary">
               Back to Timetables
             </button>
           </div>
-        ) : (
-          <>
-            {/* Header Section */}
-            <div className="bg-gradient-to-r from-[#2196F3] via-[#1976D2] to-[#1565C0] p-6 sm:p-8 text-white relative overflow-hidden">
-              <div className="absolute inset-0 opacity-10">
-                <div className="absolute inset-0" style={{
-                  backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(255,255,255,0.3) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(255,255,255,0.3) 0%, transparent 50%)',
-                  animation: 'float-subtle 6s ease-in-out infinite'
-                }} />
-              </div>
-              <div className="relative z-10">
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="text-xl sm:text-2xl font-bold bg-white/20 px-3 py-1 rounded animate-pulse">{currentStage.icon}</div>
-                    <div>
-                      <h3 className="text-xl sm:text-2xl font-bold">Generating Timetable</h3>
-                      <p className="text-blue-100 text-xs sm:text-sm">{currentStage.name}</p>
-                    </div>
-                  </div>
-                  <div className="text-center sm:text-right">
-                    <div className="text-4xl sm:text-5xl font-bold">{progress}%</div>
-                    <div className="text-blue-100 text-xs">Complete</div>
-                  </div>
+        </div>
+      ) : (
+        <div className="card">
+          {/* Header Section */}
+          <div className="flex items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-xl bg-[#2196F3]/10 dark:bg-[#2196F3]/20 flex items-center justify-center text-2xl">
+                  {currentStage.icon}
                 </div>
-              </div>
-            </div>
-
-            {/* Progress Bar Section */}
-            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-              {/* Main Progress Bar */}
-              <div className="space-y-2">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-sm">
-                  <span className="font-medium text-[#2C2C2C] dark:text-[#FFFFFF]">{phase}</span>
-                  {timeRemaining && timeRemaining > 0 && (
-                    <span className="text-[#606060] dark:text-[#aaaaaa] flex items-center gap-2 text-xs sm:text-sm">
-                      <span className="font-mono">TIME:</span>
-                      {formatTime(timeRemaining)} remaining
-                    </span>
-                  )}
-                </div>
-                
-                <div className="relative h-3 bg-[#E0E0E0] dark:bg-[#404040] rounded-full overflow-hidden">
-                  <div
-                    className="h-full transition-all duration-500 ease-out relative"
-                    style={{ 
-                      width: `${progress}%`,
-                      background: `linear-gradient(90deg, ${currentStage.color} 0%, ${currentStage.color}dd 100%)`
-                    }}
-                  >
-                    {/* Shimmer Effect */}
-                    <div
-                      className="absolute inset-0 w-full"
-                      style={{
-                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)',
-                        animation: 'shimmer-progress 2s infinite'
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Stage Timeline */}
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-2">
-                {STAGES.map((stage, idx) => {
-                  const isActive = progress >= stage.range[0] && progress < stage.range[1]
-                  const isCompleted = progress >= stage.range[1]
-                  
-                  return (
-                    <div key={idx} className="text-center">
-                      <div className={`mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold transition-all duration-300 ${
-                        isActive ? 'scale-110 sm:scale-125' : isCompleted ? 'scale-100' : 'scale-90 opacity-50'
-                      }`} style={{
-                        background: isCompleted || isActive ? stage.color : '#E0E0E0',
-                        color: isCompleted || isActive ? '#FFFFFF' : '#606060',
-                        boxShadow: isActive ? `0 0 20px ${stage.color}40` : 'none'
-                      }}>
-                        {isCompleted ? 'OK' : stage.icon}
-                      </div>
-                      <div className={`mt-2 text-xs font-medium transition-all ${
-                        isActive ? 'text-[#2C2C2C] dark:text-[#FFFFFF]' : 'text-[#606060] dark:text-[#aaaaaa]'
-                      }`}>
-                        {stage.name}
-                      </div>
-                      <div className="text-xs text-[#606060] dark:text-[#aaaaaa] hidden sm:block">
-                        {stage.range[0]}-{stage.range[1]}%
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Stats Cards */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-4">
-                <div className="bg-[#e8f0fe] dark:bg-[#065fd4]/20 p-3 sm:p-4 rounded-lg border border-[#1967d2]/20 dark:border-[#8ab4f8]/20">
-                  <div className="text-xl sm:text-2xl font-bold text-[#1967d2] dark:text-[#8ab4f8]">{progress}%</div>
-                  <div className="text-xs text-[#1967d2] dark:text-[#8ab4f8] font-medium">Progress</div>
-                </div>
-                <div className="bg-[#fef7e0] dark:bg-[#f9ab00]/20 p-3 sm:p-4 rounded-lg border border-[#b06000]/20 dark:border-[#fdd663]/20">
-                  <div className="text-xl sm:text-2xl font-bold text-[#b06000] dark:text-[#fdd663]">
-                    {STAGES.findIndex(s => s.name === currentStage.name) + 1}/{STAGES.length}
-                  </div>
-                  <div className="text-xs text-[#b06000] dark:text-[#fdd663] font-medium">Stage</div>
-                </div>
-                <div className="bg-[#e6f4ea] dark:bg-[#00ba7c]/20 p-3 sm:p-4 rounded-lg border border-[#137333]/20 dark:border-[#81c995]/20">
-                  <div className="text-xl sm:text-2xl font-bold text-[#137333] dark:text-[#81c995]">
-                    {timeRemaining ? formatTime(timeRemaining) : '--'}
-                  </div>
-                  <div className="text-xs text-[#137333] dark:text-[#81c995] font-medium">ETA</div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 pt-2">
-                <button
-                  onClick={() => router.push('/admin/timetables')}
-                  className="btn-secondary"
-                >
-                  ← Back to Timetables
-                </button>
-                
-                {status !== 'completed' && status !== 'failed' && status !== 'cancelled' && (
-                  <button
-                    onClick={handleCancel}
-                    disabled={cancelling}
-                    className="btn-danger"
-                  >
-                    {cancelling ? (
-                      <span className="flex items-center gap-2 justify-center">
-                        <div className="loading-spinner w-4 h-4"></div>
-                        Cancelling...
-                      </span>
-                    ) : 'X Cancel Generation'}
-                  </button>
+                {status === 'running' && (
+                  <div className="absolute inset-0 rounded-xl border-2 border-[#2196F3] animate-[pulse-ring_2s_ease-in-out_infinite]"></div>
                 )}
               </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[#2C2C2C] dark:text-[#FFFFFF]">
+                  Generating Timetable
+                </h2>
+                <p className="text-sm text-[#606060] dark:text-[#aaaaaa]">{currentStage.name}</p>
+              </div>
             </div>
-          </>
-        )}
-      </div>
+            <div className="text-right">
+              <div className="text-4xl font-bold text-[#2196F3]">{progress}%</div>
+              {timeRemaining && timeRemaining > 0 && (
+                <div className="text-xs text-[#606060] dark:text-[#aaaaaa] font-medium mt-1">
+                  {formatTime(timeRemaining)} remaining
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="mb-6">
+            <div className="relative h-2 bg-[#F5F5F5] dark:bg-[#2C2C2C] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300 ease-out relative"
+                style={{
+                  width: `${progress}%`,
+                  backgroundColor: getProgressColor(progress)
+                }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-[shimmer_2s_infinite]" />
+              </div>
+            </div>
+          </div>
+
+          {/* Horizontal Stage Timeline */}
+          <div className="mb-6">
+            <div className="flex items-start justify-between gap-2">
+              {STAGES.map((stage, idx) => {
+                const isActive = progress >= stage.range[0] && progress < stage.range[1]
+                const isCompleted = progress >= stage.range[1]
+                
+                return (
+                  <div key={idx} className="flex flex-col items-center flex-1 relative">
+                    {/* Connecting Line */}
+                    {idx < STAGES.length - 1 && (
+                      <div className="absolute top-5 left-1/2 w-full h-0.5 -z-10 transition-colors duration-300" style={{
+                        backgroundColor: isCompleted ? '#00A651' : '#E0E0E0'
+                      }} />
+                    )}
+                    
+                    {/* Stage Circle */}
+                    <div className="relative mb-2">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 ${
+                        isActive ? 'scale-110 shadow-md' : ''
+                      }`} style={{
+                        backgroundColor: isCompleted ? '#00A651' : isActive ? stage.color : '#E0E0E0',
+                        color: isCompleted || isActive ? '#FFFFFF' : '#606060'
+                      }}>
+                        {isCompleted ? (
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          stage.icon
+                        )}
+                      </div>
+                      {isActive && (
+                        <div className="absolute inset-0 rounded-full animate-[pulse-ring_2s_ease-in-out_infinite]" style={{
+                          border: `2px solid ${stage.color}`,
+                          opacity: 0.6
+                        }} />
+                      )}
+                    </div>
+                    
+                    {/* Stage Name */}
+                    <div className={`text-xs text-center font-medium transition-all ${
+                      isActive ? 'text-[#2C2C2C] dark:text-[#FFFFFF]' : 
+                      isCompleted ? 'text-[#606060] dark:text-[#aaaaaa]' :
+                      'text-[#aaaaaa] dark:text-[#606060]'
+                    }`}>
+                      {stage.name}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-between gap-3 pt-4 border-t border-[#E0E0E0] dark:border-[#2C2C2C]">
+            <button
+              onClick={() => router.push('/admin/timetables')}
+              className="btn-secondary"
+            >
+              <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back
+            </button>
+            
+            {status !== 'completed' && status !== 'failed' && status !== 'cancelled' && (
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="btn-danger"
+              >
+                {cancelling ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Cancelling...
+                  </span>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Cancel
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
