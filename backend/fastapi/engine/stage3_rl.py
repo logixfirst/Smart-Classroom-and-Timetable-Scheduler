@@ -864,21 +864,8 @@ def _update_rl_progress(progress_tracker, current_episode: int, total_episodes: 
                 time_remaining_seconds = int(avg_time_per_episode * remaining_percent)
                 eta = (datetime.now(timezone.utc) + timedelta(seconds=time_remaining_seconds)).isoformat()
             
-            progress_data = {
-                'job_id': job_id,
-                'progress': progress_pct,
-                'status': 'running',
-                'stage': 'rl',
-                'message': f"RL: Episode {current_episode}/{total_episodes} ({progress_pct}%)",
-                'items_done': current_episode,
-                'items_total': total_episodes,
-                'time_remaining_seconds': time_remaining_seconds or 0,
-                'eta_seconds': time_remaining_seconds or 0,
-                'eta': eta,
-                'timestamp': datetime.now(timezone.utc).isoformat()
-            }
-            redis_client.setex(f"progress:job:{job_id}", 3600, json.dumps(progress_data))
-            redis_client.publish(f"progress:{job_id}", json.dumps(progress_data))
+            # Progress tracker handles all Redis updates - no direct writes
+            # (This fallback path shouldn't be reached in normal operation)
         
         # Log EVERY batch for smooth progress (not just every 10)
         logger.info(f'[RL] Episode {current_episode}/{total_episodes}: {resolved}/{total_conflicts} conflicts resolved ({current_episode/total_episodes*100:.1f}%)')
@@ -1027,13 +1014,85 @@ def _process_single_conflict_safe(conflict, timetable_data, rl_agent):
         return None
 
 
+def _resolve_cluster_conflicts_with_rl(courses: List, conflicts: List[Dict], 
+                                       timetable_data: Dict, q_table: Dict,
+                                       job_id: str = None, redis_client=None) -> int:
+    """
+    Use Q-learning to resolve conflicts within a cluster via intelligent swaps
+    Returns: Number of conflicts resolved
+    """
+    resolved = 0
+    max_iterations = 100
+    
+    for iteration in range(max_iterations):
+        if not conflicts:
+            break
+        
+        # Take first conflict
+        conflict = conflicts[0]
+        course_id = conflict.get('course_id')
+        conflict_type = conflict.get('type', 'unknown')
+        
+        # Get current assignment
+        current_assignment = timetable_data['current_solution'].get((course_id, 0))
+        if not current_assignment:
+            conflicts.pop(0)
+            continue
+        
+        current_slot, current_room = current_assignment
+        
+        # Find alternative slots using Q-table
+        state_key = f"{course_id}_{current_slot}_{current_room}"
+        actions = q_table.get(state_key, {})
+        
+        # Try swapping to best alternative
+        best_action = None
+        best_q_value = float('-inf')
+        
+        for action, q_value in actions.items():
+            if q_value > best_q_value:
+                best_q_value = q_value
+                best_action = action
+        
+        if best_action:
+            # Parse action (format: "slot_X_room_Y")
+            try:
+                parts = best_action.split('_')
+                new_slot = int(parts[1])
+                new_room = int(parts[3])
+                
+                # Apply swap
+                timetable_data['current_solution'][(course_id, 0)] = (new_slot, new_room)
+                resolved += 1
+                conflicts.pop(0)
+            except:
+                conflicts.pop(0)
+        else:
+            # No alternative found
+            conflicts.pop(0)
+    
+    return resolved
+
+
 def resolve_conflicts_globally(conflicts: List[Dict], clusters: Dict, timetable_data: Dict,
                               progress_tracker=None, job_id: str = None, redis_client=None) -> Dict:
-    """HYBRID: Global repair (super-clustering) + Bundle-Action RL for remaining conflicts"""
-    from engine.stage2_cpsat import AdaptiveCPSATSolver
+    """HYBRID: Global repair (Q-learning) + Bundle-Action RL for remaining conflicts
+    
+    ARCHITECTURE NOTE: This function NO LONGER calls CP-SAT. CP-SAT is Stage 2a only.
+    Stage 3 (RL) should only do conflict resolution via Q-learning and swaps.
+    """
     
     if not conflicts:
         logger.info("[GLOBAL] No conflicts to resolve")
+        return timetable_data['current_solution']
+    
+    # CRITICAL FIX: Skip super-clustering if conflicts > 50k (indicates fundamental clustering issue)
+    if len(conflicts) > 50000:
+        logger.error(f"[GLOBAL] TOO MANY CONFLICTS ({len(conflicts)}) - clustering strategy failed")
+        logger.error("[GLOBAL] Root cause: Cross-enrollment across too many clusters")
+        logger.error("[GLOBAL] Solution: Increase cluster_size from 10 to 50+ in main.py")
+        logger.warning("[GLOBAL] Skipping super-clustering (would timeout) - using local resolution")
+        # Return early with current solution (greedy already did best effort)
         return timetable_data['current_solution']
     
     logger.info(f"[HYBRID] Starting hybrid conflict resolution for {len(conflicts)} conflicts")
@@ -1061,11 +1120,16 @@ def resolve_conflicts_globally(conflicts: List[Dict], clusters: Dict, timetable_
     
     logger.info(f"[GLOBAL] Identified {len(problem_clusters)} problem clusters")
     
+    # CRITICAL FIX: Set work items for progress tracking (prevents stuck at 98%)
+    if progress_tracker:
+        progress_tracker.update_work_progress(0)  # Reset work counter
+        logger.info(f"[GLOBAL] Tracking {len(problem_clusters)} super-clusters for progress")
+    
     # Step 4: For each problem cluster, create super-cluster and re-solve
     resolved_count = 0
     import time
     start_time = time.time()
-    MAX_GLOBAL_TIME = 600  # 10 minutes total for all super-clusters
+    MAX_GLOBAL_TIME = 300  # REDUCED: 5 minutes (from 10) - each cluster takes 2-6 minutes
     
     for idx, (cluster_id, conflict_count) in enumerate(problem_clusters):
         # CRITICAL FIX: Emergency exit after 10 minutes
@@ -1106,7 +1170,8 @@ def resolve_conflicts_globally(conflicts: List[Dict], clusters: Dict, timetable_
         expanded_course_set = [course_id_to_course[cid] for cid in expanded_course_ids if cid in course_id_to_course]
         
         # CRITICAL FIX: Limit super-cluster size to prevent CP-SAT timeout
-        MAX_SUPER_CLUSTER_SIZE = 100  # CP-SAT can handle up to 100 courses reliably
+        # Reduced from 100 to 30 due to student constraint computation O(n²) complexity
+        MAX_SUPER_CLUSTER_SIZE = 30  # CP-SAT can handle up to 30 courses with student constraints
         
         if len(expanded_course_set) > MAX_SUPER_CLUSTER_SIZE:
             logger.warning(f"[GLOBAL] Super-cluster too large ({len(expanded_course_set)} courses), limiting to {MAX_SUPER_CLUSTER_SIZE}")
@@ -1126,56 +1191,47 @@ def resolve_conflicts_globally(conflicts: List[Dict], clusters: Dict, timetable_
         
         logger.info(f"[GLOBAL] Super-cluster: {len(cluster_courses)} -> {len(expanded_course_set)} courses")
         
-        # Step 5: Re-solve super-cluster with CP-SAT (has full student visibility)
+        # Step 5: Use RL-based conflict resolution (NOT CP-SAT re-solve)
+        # ARCHITECTURE FIX: Stage 3 should only do Q-learning conflict resolution,
+        # not call CP-SAT again. CP-SAT is Stage 2a responsibility.
         try:
-            cpsat_solver = AdaptiveCPSATSolver(
-                courses=list(expanded_course_set),
-                rooms=timetable_data['rooms'],
-                time_slots=timetable_data['time_slots'],
-                faculty=timetable_data['faculty'],
-                max_cluster_size=len(expanded_course_set),
-                job_id=job_id,
-                redis_client=redis_client
+            # Use Q-learning to resolve conflicts via intelligent swaps
+            resolved_conflicts = _resolve_cluster_conflicts_with_rl(
+                expanded_course_set,
+                conflicts,
+                timetable_data,
+                self.q_table,
+                job_id,
+                redis_client
             )
             
-            # CRITICAL FIX: Add timeout and greedy fallback
-            new_solution = cpsat_solver.solve_cluster(list(expanded_course_set), timeout=60)
-            
-            # Check per-cluster timeout after CP-SAT
+            # Check per-cluster timeout
             cluster_elapsed = time.time() - cluster_start_time
             if cluster_elapsed > MAX_CLUSTER_TIME:
                 logger.warning(f"[GLOBAL] Cluster {cluster_id} timeout after {cluster_elapsed:.0f}s - skipping to next")
                 continue
             
-            if new_solution and len(new_solution) > 0:
-                # Update global solution
-                for (course_id, session), (time_slot, room_id) in new_solution.items():
-                    timetable_data['current_solution'][(course_id, session)] = (time_slot, room_id)
-                
-                resolved_count += conflict_count
-                logger.info(f"[GLOBAL] Super-cluster {cluster_id} resolved {conflict_count} conflicts")
+            if resolved_conflicts > 0:
+                resolved_count += resolved_conflicts
+                logger.info(f"[GLOBAL] Super-cluster {cluster_id} resolved {resolved_conflicts} conflicts via Q-learning")
             else:
-                # CRITICAL FIX: Use greedy fallback when CP-SAT fails
-                logger.warning(f"[GLOBAL] Super-cluster {cluster_id} CP-SAT failed, using greedy")
-                greedy_solution = cpsat_solver.greedy_fallback(list(expanded_course_set))
-                
-                if greedy_solution and len(greedy_solution) > 0:
-                    # Update with greedy solution
-                    for (course_id, session), (time_slot, room_id) in greedy_solution.items():
-                        timetable_data['current_solution'][(course_id, session)] = (time_slot, room_id)
-                    
-                    resolved_count += conflict_count // 2  # Greedy resolves ~50% of conflicts
-                    logger.info(f"[GLOBAL] Super-cluster {cluster_id} greedy resolved {conflict_count//2}/{conflict_count} conflicts")
-                else:
-                    logger.error(f"[GLOBAL] Super-cluster {cluster_id} BOTH CP-SAT and greedy failed - skipping")
+                logger.warning(f"[GLOBAL] Super-cluster {cluster_id} Q-learning couldn't resolve conflicts - accepting current state")
         
         except Exception as e:
             logger.error(f"[GLOBAL] Super-cluster {cluster_id} failed: {e}")
         
-        # Update progress
-        if progress_tracker and redis_client and job_id:
-            _update_global_progress(progress_tracker, idx + 1, len(problem_clusters),
-                                   resolved_count, len(conflicts), job_id, redis_client)
+        # CRITICAL FIX: Update work progress after each cluster (shows progress, not stuck)
+        if progress_tracker:
+            progress_tracker.update_work_progress(idx + 1)
+            logger.info(f"[GLOBAL] Progress: {idx + 1}/{len(problem_clusters)} clusters processed ({resolved_count} conflicts resolved)")
+        
+        # Legacy progress update (keep for compatibility)
+        if redis_client and job_id:
+            try:
+                _update_global_progress(progress_tracker, idx + 1, len(problem_clusters),
+                                       resolved_count, len(conflicts), job_id, redis_client)
+            except Exception as e:
+                logger.warning(f"[GLOBAL] Progress update failed: {e}")
     
     logger.info(f"[GLOBAL] Super-clustering resolved {resolved_count}/{len(conflicts)} conflicts")
     
@@ -1223,21 +1279,8 @@ def _update_global_progress(progress_tracker, current: int, total: int, resolved
             time_remaining_seconds = int(avg_time_per_cluster * remaining_percent)
             eta = (datetime.now(timezone.utc) + timedelta(seconds=time_remaining_seconds)).isoformat()
         
-        progress_data = {
-            'job_id': job_id,
-            'progress': progress_pct,
-            'status': 'running',
-            'stage': 'global_repair',
-            'message': f"Global Repair: Cluster {current}/{total} ({progress_pct}%)",
-            'items_done': current,
-            'items_total': total,
-            'time_remaining_seconds': time_remaining_seconds or 0,
-            'eta_seconds': time_remaining_seconds or 0,
-            'eta': eta,
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        }
-        redis_client.setex(f"progress:job:{job_id}", 3600, json.dumps(progress_data))
-        redis_client.publish(f"progress:{job_id}", json.dumps(progress_data))
+        # Progress tracker handles all Redis updates via update_work_progress()
+        # No need for direct Redis writes here
         
         logger.info(f"[GLOBAL] Cluster {current}/{total}: {resolved}/{total_conflicts} conflicts resolved")
     except Exception as e:

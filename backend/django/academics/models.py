@@ -849,6 +849,10 @@ class GenerationJob(models.Model):
     progress = models.IntegerField(
         default=0, validators=[MinValueValidator(0), MaxValueValidator(100)]
     )
+    # PERFORMANCE: Cached fields from timetable_data for fast list queries
+    academic_year = models.CharField(max_length=20, null=True, blank=True, db_index=True)
+    semester = models.IntegerField(null=True, blank=True, db_index=True)
+    
     timetable_data = models.JSONField(null=True, blank=True)
 
     class Meta:
@@ -858,6 +862,7 @@ class GenerationJob(models.Model):
             models.Index(fields=["-created_at"], name="idx_job_created"),
             models.Index(fields=["status", "-created_at"], name="idx_job_status_created"),
             models.Index(fields=["organization", "-created_at"], name="idx_job_org_created"),
+            models.Index(fields=["academic_year", "semester"], name="idx_job_year_sem"),
         ]
 
 

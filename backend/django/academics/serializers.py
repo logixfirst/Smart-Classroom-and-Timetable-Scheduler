@@ -256,27 +256,8 @@ class GenerationJobListSerializer(serializers.ModelSerializer):
         source="organization.org_name", read_only=True
     )
     
-    # Extract metadata from timetable_data JSON without loading full data
-    academic_year = serializers.SerializerMethodField()
-    semester = serializers.SerializerMethodField()
+    # PERFORMANCE: Use cached model fields instead of loading timetable_data JSON
     job_id = serializers.CharField(source='id', read_only=True)
-
-    def get_academic_year(self, obj):
-        """Extract academic_year from timetable_data"""
-        if obj.timetable_data and isinstance(obj.timetable_data, dict):
-            return obj.timetable_data.get('academic_year', 'N/A')
-        return 'N/A'
-    
-    def get_semester(self, obj):
-        """Extract semester from timetable_data"""
-        if obj.timetable_data and isinstance(obj.timetable_data, dict):
-            semester = obj.timetable_data.get('semester')
-            # Handle both string ('odd', 'even') and int (1, 2) formats
-            if semester:
-                if isinstance(semester, str):
-                    return 1 if semester.lower() == 'odd' else 2
-                return semester
-        return 1
 
     class Meta:
         model = GenerationJob

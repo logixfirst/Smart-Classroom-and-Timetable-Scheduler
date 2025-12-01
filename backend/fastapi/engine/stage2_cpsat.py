@@ -22,31 +22,40 @@ class AdaptiveCPSATSolver:
     
     STRATEGIES = [
         {
-            "name": "Full Solve",
+            "name": "Full Solve with All Constraints",
             "student_priority": "ALL",
             "faculty_conflicts": True,
             "room_capacity": True,
-            "timeout": 60,
+            "timeout": 120,  # Increased from 60s - be more patient
             "max_constraints": 50000,
-            "student_limit": 200
+            "student_limit": 2000  # Increased from 200
         },
         {
-            "name": "Hierarchical Solve",
-            "student_priority": "CRITICAL",
+            "name": "Relaxed Student Constraints",
+            "student_priority": "CRITICAL",  # Only critical students (5+ courses)
             "faculty_conflicts": True,
             "room_capacity": True,
-            "timeout": 30,
+            "timeout": 90,  # Increased from 30s
             "max_constraints": 10000,
-            "student_limit": 50
+            "student_limit": 500  # Increased from 50
         },
         {
-            "name": "Minimal Solve",
-            "student_priority": "CRITICAL",
+            "name": "Faculty + Room Only",
+            "student_priority": None,  # No student constraints
             "faculty_conflicts": True,
             "room_capacity": True,
-            "timeout": 10,
+            "timeout": 60,
+            "max_constraints": 5000,
+            "student_limit": 0
+        },
+        {
+            "name": "Minimal Hard Constraints Only",
+            "student_priority": None,
+            "faculty_conflicts": True,  # Only faculty conflicts
+            "room_capacity": False,  # Relax room capacity
+            "timeout": 30,
             "max_constraints": 1000,
-            "student_limit": 10
+            "student_limit": 0
         }
     ]
     
@@ -122,14 +131,14 @@ class AdaptiveCPSATSolver:
             return None
         logger.info(f"[CP-SAT DEBUG] [OK] Passed feasibility check")
         
-        # Try all 3 strategies with progressive relaxation
+        # Try all 4 strategies with progressive relaxation
         for idx, strategy in enumerate(self.STRATEGIES):
             # Check cancellation between strategies
             if self._check_cancellation():
                 logger.info(f"[CP-SAT DEBUG] [ERROR] Job cancelled during strategy {idx+1}")
                 return None
             
-            logger.info(f"[CP-SAT DEBUG] Trying strategy {idx+1}/2: {strategy['name']}")
+            logger.info(f"[CP-SAT DEBUG] Trying strategy {idx+1}/{len(self.STRATEGIES)}: {strategy['name']}")
             self._update_progress(f"Trying {strategy['name']}")
             solution = self._try_cpsat_with_strategy(cluster, strategy)
             if solution:
@@ -327,11 +336,13 @@ class AdaptiveCPSATSolver:
         if strategy['room_capacity']:
             self._add_room_constraints(model, variables, cluster)
         
-        # Student constraints (hierarchical)
-        if strategy['student_priority']:
+        # Student constraints (hierarchical) - skip if None
+        if strategy.get('student_priority'):
             self._add_hierarchical_student_constraints(
                 model, variables, cluster, strategy['student_priority']
             )
+        else:
+            logger.info(f"[CP-SAT] Skipping student constraints for {strategy['name']}")
         
         # HC8: Faculty workload limits
         self._add_workload_constraints(model, variables, cluster)
@@ -521,14 +532,38 @@ class AdaptiveCPSATSolver:
                     model.Add(sum(faculty_vars) <= max_load)
     
     def _add_hierarchical_student_constraints(self, model, variables, cluster, priority: str):
-        """CORRECTED: ALL students MUST get constraints (no limit)"""
+        """CORRECTED: ALL students MUST get constraints (with safety limits for large clusters)"""
+        import time
+        start_time = time.time()
+        MAX_CONSTRAINT_TIME = 30  # Maximum 30 seconds for constraint computation
+        
         student_groups = self._group_students_by_conflicts(cluster)
         
         if priority == "ALL":
             # CRITICAL: No constraint limit - add ALL student conflicts
             all_students = student_groups["CRITICAL"] + student_groups["HIGH"] + student_groups["LOW"]
             
-            for student_id in all_students:
+            # Safety limit: If too many students, prioritize critical ones
+            MAX_STUDENTS = 2000  # Reasonable limit for constraint computation
+            if len(all_students) > MAX_STUDENTS:
+                logger.warning(f"[CP-SAT] Too many students ({len(all_students)}), limiting to {MAX_STUDENTS} most critical")
+                # Prioritize by course count
+                student_priority = sorted(
+                    all_students,
+                    key=lambda s: sum(1 for c in cluster if s in c.student_ids),
+                    reverse=True
+                )
+                all_students = student_priority[:MAX_STUDENTS]
+            
+            constraint_count = 0
+            for idx, student_id in enumerate(all_students):
+                # Timeout check every 100 students
+                if idx % 100 == 0:
+                    elapsed = time.time() - start_time
+                    if elapsed > MAX_CONSTRAINT_TIME:
+                        logger.warning(f"[CP-SAT] Constraint computation timeout after {elapsed:.1f}s, added {constraint_count} constraints for {idx}/{len(all_students)} students")
+                        break
+                
                 courses_list = [c for c in cluster if student_id in c.student_ids]
                 
                 # For each time slot, student can take at most 1 course
@@ -542,8 +577,10 @@ class AdaptiveCPSATSolver:
                     ]
                     if student_vars:
                         model.Add(sum(student_vars) <= 1)
+                        constraint_count += 1
             
-            logger.info(f"Added {len(all_students)} student constraints (NO LIMIT - all students protected)")
+            elapsed = time.time() - start_time
+            logger.info(f"Added {constraint_count} student constraints for {len(all_students)} students in {elapsed:.1f}s")
         
         elif priority == "CRITICAL":
             # Only critical students (5+ courses) - for speed

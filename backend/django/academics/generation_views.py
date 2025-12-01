@@ -195,6 +195,9 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 organization=org,
                 status="running",  # Set to running immediately
                 progress=0,
+                # PERFORMANCE: Store in indexed fields for fast queries
+                academic_year=academic_year,
+                semester=1 if semester == 'odd' else 2,  # Normalize to int
                 timetable_data={
                     'academic_year': academic_year,
                     'semester': semester,

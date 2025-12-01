@@ -44,15 +44,27 @@ class LouvainClusterer:
         Cluster courses using Louvain community detection
         Returns: Dictionary mapping cluster_id -> list of courses
         """
+        # Check cancellation at start
+        if self._check_cancellation():
+            raise InterruptedError("Job cancelled by user during clustering")
+        
         # Build constraint graph (with progress update)
         logger.info(f"[STAGE1] Building constraint graph for {len(courses)} courses...")
         self._update_progress("Building constraint graph...")
         G = self._build_constraint_graph(courses)
         
+        # Check cancellation after graph building
+        if self._check_cancellation():
+            raise InterruptedError("Job cancelled by user during clustering")
+        
         # Run Louvain clustering (with progress update)
         logger.info(f"[STAGE1] Running Louvain community detection...")
         self._update_progress("Running Louvain detection...")
         partition = self._run_louvain(G)
+        
+        # Check cancellation after Louvain
+        if self._check_cancellation():
+            raise InterruptedError("Job cancelled by user during clustering")
         
         # Optimize cluster sizes (with progress update)
         logger.info(f"[STAGE1] Optimizing cluster sizes...")
@@ -61,6 +73,18 @@ class LouvainClusterer:
         
         logger.info(f"[STAGE1] Louvain clustering: {len(final_clusters)} clusters from {len(courses)} courses")
         return final_clusters
+    
+    def _check_cancellation(self) -> bool:
+        """Check if job has been cancelled via Redis"""
+        try:
+            if self.redis_client and self.job_id:
+                cancel_flag = self.redis_client.get(f"cancel:job:{self.job_id}")
+                if cancel_flag is not None and cancel_flag:
+                    logger.info(f"[STAGE1] Cancellation detected for job {self.job_id}")
+                    return True
+        except Exception as e:
+            logger.debug(f"[STAGE1] Cancellation check failed: {e}")
+        return False
     
     def _update_progress(self, message: str):
         """Update progress via Redis for real-time updates"""
@@ -128,10 +152,14 @@ class LouvainClusterer:
         return edges
     
     def _compute_constraint_weight(self, course_i: Course, course_j: Course) -> float:
-        """CORRECTED: Student overlap based on SMALLER class (prevents splitting conflicting pairs)"""
+        """
+        NEP 2020 FIX: Lighter clustering for interdisciplinary education
+        Instead of forcing shared-student courses into same cluster,
+        use softer weights that allow CP-SAT to handle cross-cluster conflicts
+        """
         weight = 0.0
         
-        # CRITICAL FIX: Use overlap relative to SMALLER class (most affected)
+        # Student overlap - REDUCED for interdisciplinary education
         students_i = set(getattr(course_i, 'student_ids', []))
         students_j = set(getattr(course_j, 'student_ids', []))
         
@@ -139,34 +167,34 @@ class LouvainClusterer:
             shared = len(students_i & students_j)
             
             if shared > 0:
-                # Use smaller class size as denominator (most impacted class)
+                # Use smaller class size as denominator
                 min_size = min(len(students_i), len(students_j))
                 student_overlap_ratio = shared / min_size  # 0.0 to 1.0
                 
-                # AGGRESSIVE: 100x base weight + bonus for large overlaps
-                weight += 100.0 * student_overlap_ratio
+                # REDUCED: 10x base weight (was 100x) - softer clustering
+                weight += 10.0 * student_overlap_ratio
                 
-                # BONUS: If >10 students share courses, add extra weight
-                if shared >= 10:
-                    weight += 50.0
-                
-                # BONUS: If >50% of smaller class overlaps, MUST cluster together
-                if student_overlap_ratio > 0.5:
-                    weight += 100.0
+                # Only cluster together if VERY high overlap (>80% of class)
+                # This handles lab sections, not interdisciplinary electives
+                if student_overlap_ratio > 0.8:
+                    weight += 20.0
         
-        # Faculty sharing (secondary)
+        # Faculty sharing (now PRIMARY for NEP 2020)
+        # Courses by same faculty should be in same cluster (easier to schedule)
         if getattr(course_i, 'faculty_id', None) == getattr(course_j, 'faculty_id', None):
-            weight += 10.0
+            weight += 50.0
         
-        # Department affinity (tertiary)
+        # Department affinity (secondary)
+        # Same department courses likely have similar constraints
         if getattr(course_i, 'department_id', None) == getattr(course_j, 'department_id', None):
-            weight += 5.0
+            weight += 15.0
         
-        # Room competition (lowest)
+        # Room features (tertiary)
+        # Courses needing same special rooms should cluster together
         features_i = set(getattr(course_i, 'required_features', []))
         features_j = set(getattr(course_j, 'required_features', []))
         if features_i and features_j and features_i & features_j:
-            weight += 3.0
+            weight += 8.0
         
         return weight
     
@@ -207,8 +235,8 @@ class LouvainClusterer:
     
     def _optimize_cluster_sizes(self, partition: Dict, courses: List[Course]) -> Dict[int, List[Course]]:
         """
-        Optimize cluster sizes for CP-SAT feasibility
-        Target: 10-12 courses per cluster
+        NEP 2020 FIX: Optimize cluster sizes for interdisciplinary education
+        Target: Larger clusters (15-20 courses) to reduce cross-cluster conflicts
         """
         # Group courses by cluster (use course_id lookup dict for speed)
         course_map = {c.course_id: c for c in courses}
@@ -224,37 +252,44 @@ class LouvainClusterer:
         # Clear course_map to free memory
         del course_map
         
-        # Optimize sizes
+        # Optimize sizes - LARGER clusters for interdisciplinary
         final_clusters = {}
         final_id = 0
         small_clusters = []
         
+        # Target: 15-20 courses per cluster (reduces cross-cluster conflicts)
+        MAX_CLUSTER_SIZE = 25
+        MIN_CLUSTER_SIZE = 8
+        MERGE_SIZE = 12
+        
         for cluster_courses in raw_clusters.values():
-            if len(cluster_courses) > 12:
-                # Split large clusters
-                for i in range(0, len(cluster_courses), self.target_cluster_size):
-                    final_clusters[final_id] = cluster_courses[i:i+self.target_cluster_size]
-                    final_id += 1
-            elif len(cluster_courses) < 5:
+            if len(cluster_courses) > MAX_CLUSTER_SIZE:
+                # Split very large clusters into 15-20 course chunks
+                for i in range(0, len(cluster_courses), 18):
+                    chunk = cluster_courses[i:i+18]
+                    if len(chunk) >= MIN_CLUSTER_SIZE or i + 18 >= len(cluster_courses):
+                        final_clusters[final_id] = chunk
+                        final_id += 1
+            elif len(cluster_courses) < MIN_CLUSTER_SIZE:
                 # Collect small clusters for merging
                 small_clusters.extend(cluster_courses)
             else:
-                # Keep medium-sized clusters
+                # Keep medium-sized clusters (8-25 courses)
                 final_clusters[final_id] = cluster_courses
                 final_id += 1
         
         # Clear raw_clusters to free memory
         raw_clusters.clear()
         
-        # Merge small clusters
+        # Merge small clusters into ~12 course groups
         if small_clusters:
-            for i in range(0, len(small_clusters), 8):
-                final_clusters[final_id] = small_clusters[i:i+8]
+            for i in range(0, len(small_clusters), MERGE_SIZE):
+                final_clusters[final_id] = small_clusters[i:i+MERGE_SIZE]
                 final_id += 1
         
         # Log cluster size distribution
         sizes = [len(cluster) for cluster in final_clusters.values()]
         avg_size = sum(sizes) / len(sizes) if sizes else 0
-        logger.info(f"Cluster sizes: min={min(sizes) if sizes else 0}, max={max(sizes) if sizes else 0}, avg={avg_size:.1f}")
+        logger.info(f"[NEP 2020] Cluster sizes: min={min(sizes) if sizes else 0}, max={max(sizes) if sizes else 0}, avg={avg_size:.1f}, total={len(final_clusters)}")
         
         return final_clusters

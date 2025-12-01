@@ -30,17 +30,27 @@ class EnterpriseProgressTracker:
         self.last_progress = 0.0
         self._progress_lock = asyncio.Lock()  # Thread-safe progress updates
         
-        # Stage configuration with REALISTIC weights based on actual execution times
+        # User-friendly stage names (hide technical details)
+        self.stage_display_names = {
+            'load_data': 'Loading courses and students',
+            'clustering': 'Analyzing course groups',
+            'cpsat': 'Creating initial schedule',
+            'ga': 'Optimizing quality',
+            'rl': 'Resolving conflicts',
+            'finalize': 'Finalizing timetable'
+        }
+        
+        # Stage configuration with ABSOLUTE cumulative progress boundaries
         # Total time: ~10-12 minutes = 600-720s
         # Observed: load=5s, cluster=10s, cpsat=180s, ga=300s, rl=180s, final=5s
-        # Progress ranges aligned with actual stage durations
+        # Each stage has start_progress, end_progress, and expected_time
         self.stage_config = {
-            'load_data': {'weight': 5, 'expected_time': 5},       # 0% → 5%
-            'clustering': {'weight': 5, 'expected_time': 10},     # 5% → 10%
-            'cpsat': {'weight': 50, 'expected_time': 180},        # 10% → 60%
-            'ga': {'weight': 25, 'expected_time': 300},           # 60% → 85%
-            'rl': {'weight': 10, 'expected_time': 180},           # 85% → 95%
-            'finalize': {'weight': 5, 'expected_time': 5}         # 95% → 100%
+            'load_data': {'start': 0, 'end': 5, 'expected_time': 5},       # 0% → 5%
+            'clustering': {'start': 5, 'end': 10, 'expected_time': 10},    # 5% → 10%
+            'cpsat': {'start': 10, 'end': 60, 'expected_time': 180},       # 10% → 60%
+            'ga': {'start': 60, 'end': 85, 'expected_time': 300},          # 60% → 85%
+            'rl': {'start': 85, 'end': 95, 'expected_time': 180},          # 85% → 95%
+            'finalize': {'start': 95, 'end': 100, 'expected_time': 5}      # 95% → 100%
         }
         
         # Current stage tracking
@@ -52,13 +62,36 @@ class EnterpriseProgressTracker:
         self.stage_items_total = 0
         self.stage_items_done = 0
         
-        logger.info(f"[PROGRESS] Time-based virtual progress tracker initialized for {job_id}")
+        # Initialize ETA tracking variables
+        self._smoothed_eta = estimated_total_seconds
+        self._last_eta_update = self.start_time
+        self._last_eta_value = estimated_total_seconds
+        self._last_update_time = self.start_time
+        
+        logger.info(f"[PROGRESS] Time-based virtual progress tracker initialized for {job_id} (ETA: {estimated_total_seconds}s)")
     
     def set_stage(self, stage_name: str, total_items: int = 0):
-        """Set current stage with optional work tracking - SMOOTH TRANSITION"""
+        """Set current stage with absolute boundaries - SMOOTH TRANSITION"""
         if stage_name in self.stage_config:
-            # NEVER jump - always use current progress as start
-            self.stage_start_progress = self.last_progress
+            stage_info = self.stage_config[stage_name]
+            
+            # Use absolute stage boundaries for consistency
+            stage_start = stage_info['start']
+            stage_end = stage_info['end']
+            
+            # SMOOTH TRANSITION: If we're already past the stage start, continue from current
+            # Otherwise, smoothly move to stage start
+            if self.last_progress >= stage_start:
+                # Already at or past stage start - use current progress
+                self.stage_start_progress = self.last_progress
+            else:
+                # Need to reach stage start - use absolute start
+                self.stage_start_progress = stage_start
+                # Don't jump backward, ensure we're at stage start
+                if self.last_progress < stage_start:
+                    self.last_progress = stage_start
+            
+            self.stage_end_progress = stage_end
             self.current_stage = stage_name
             self.stage_start_time = time.time()
             
@@ -66,7 +99,9 @@ class EnterpriseProgressTracker:
             self.stage_items_total = total_items
             self.stage_items_done = 0
             
-            logger.info(f"[PROGRESS] Stage: {stage_name} (start: {self.last_progress:.1f}%, items: {total_items})")
+            # Get user-friendly name for logging
+            display_name = self.stage_display_names.get(stage_name, stage_name)
+            logger.info(f"[PROGRESS] Stage: {display_name} ({self.stage_start_progress:.1f}% → {stage_end}%, items: {total_items})")
     
     def update_work_progress(self, items_done: int):
         """Update work-based progress (for CP-SAT clusters, GA generations, RL episodes)"""
@@ -84,22 +119,27 @@ class EnterpriseProgressTracker:
     def calculate_smooth_progress(self) -> float:
         """
         ENTERPRISE SMOOTH: Chrome/TensorFlow style - NEVER jumps, NEVER sticks
+        Uses absolute stage boundaries (start→end) for consistent progress ranges
         """
         now = time.time()
         time_since_last = now - getattr(self, '_last_update_time', now)
         self._last_update_time = now
         
+        # Get stage boundaries
+        stage_info = self.stage_config.get(self.current_stage, {'start': 0, 'end': 100, 'expected_time': 5})
+        stage_start = self.stage_start_progress  # Actual start (may be past config start)
+        stage_end = stage_info['end']
+        stage_range = stage_end - stage_start
+        
         # Calculate target progress based on work/time
         if self.stage_items_total > 0:
             # Work-based: Calculate target from actual completion
             work_ratio = min(1.0, self.stage_items_done / self.stage_items_total)
-            stage_weight = self.stage_config.get(self.current_stage, {}).get('weight', 10)
-            target_progress = self.stage_start_progress + (work_ratio * stage_weight)
+            target_progress = stage_start + (work_ratio * stage_range)
         else:
             # Time-based: Asymptotic approach to stage end
             elapsed = now - self.stage_start_time
-            expected = self.stage_config.get(self.current_stage, {}).get('expected_time', 5)
-            stage_weight = self.stage_config.get(self.current_stage, {}).get('weight', 10)
+            expected = stage_info.get('expected_time', 5)
             
             if elapsed < expected:
                 ratio = elapsed / expected
@@ -108,21 +148,27 @@ class EnterpriseProgressTracker:
                 overtime = elapsed - expected
                 ratio = 1.0 - (0.01 * (0.5 ** (overtime / expected)))
             
-            target_progress = self.stage_start_progress + (ratio * stage_weight)
+            target_progress = stage_start + (ratio * stage_range)
+        
+        # Cap target at stage end (never exceed stage boundary)
+        target_progress = min(stage_end, target_progress)
         
         # SMOOTH INTERPOLATION: Move towards target at constant speed
-        # Speed: 1% per 500ms = 2% per second (smooth visible movement)
-        max_step = 1.0 * (time_since_last / 0.5)
+        # Speed: 0.3% per 500ms = 0.6% per second (smoother, prevents jumps)
+        max_step = 0.3 * (time_since_last / 0.5)
         
         if target_progress > self.last_progress:
             # Move towards target smoothly
             step = min(max_step, target_progress - self.last_progress)
             new_progress = self.last_progress + step
         else:
-            # Always move forward (minimum 0.1% per 500ms = never stuck)
-            new_progress = self.last_progress + (0.1 * (time_since_last / 0.5))
+            # Always move forward (minimum 0.03% per 500ms = never stuck)
+            new_progress = self.last_progress + (0.03 * (time_since_last / 0.5))
         
-        # Cap at 98% until completion
+        # Cap at stage end (never exceed current stage)
+        new_progress = min(stage_end, new_progress)
+        
+        # Cap at 98% until final completion
         new_progress = min(98.0, new_progress)
         self.last_progress = new_progress
         
@@ -165,11 +211,12 @@ class EnterpriseProgressTracker:
             self._smoothed_eta = remaining_time
             self._last_eta_update = time.time()
         else:
-            # Only update every 2 seconds to prevent jitter
+            # Update immediately on first call, then every 2 seconds
             time_since_update = time.time() - self._last_eta_update
-            if time_since_update >= 2.0:
-                # Apply exponential smoothing
-                self._smoothed_eta = int(0.8 * self._smoothed_eta + 0.2 * remaining_time)
+            if time_since_update >= 1.5 or self._smoothed_eta == remaining_time:
+                # Apply exponential smoothing (more responsive on startup)
+                alpha = 0.3 if time_since_update < 10 else 0.2  # More responsive in first 10 seconds
+                self._smoothed_eta = int((1 - alpha) * self._smoothed_eta + alpha * remaining_time)
                 self._last_eta_update = time.time()
         
         # Clamp to reasonable range (1 second to 15 minutes)
@@ -207,14 +254,17 @@ class EnterpriseProgressTracker:
             # Calculate ETA
             remaining_seconds, eta = self.calculate_eta()
             
-            # Build progress data
+            # Get user-friendly stage name
+            stage_display = self.stage_display_names.get(self.current_stage, message)
+            
+            # Build progress data with user-friendly names
             progress_data = {
                 'job_id': self.job_id,
                 'progress': progress,
                 'progress_percent': progress,
                 'status': 'completed' if progress >= 100 else 'running',
-                'stage': message,
-                'message': message,
+                'stage': stage_display,  # User-friendly name
+                'message': stage_display,  # User-friendly message
                 'time_remaining_seconds': remaining_seconds if progress < 100 else 0,
                 'eta_seconds': remaining_seconds if progress < 100 else 0,
                 'eta': eta if progress < 100 else datetime.now(timezone.utc).isoformat(),
@@ -301,6 +351,12 @@ class ProgressUpdateTask:
         try:
             update_count = 0
             while self.running:
+                # CHECK CANCELLATION: Stop progress updates if job cancelled
+                if await self._check_cancellation():
+                    logger.info(f"[PROGRESS] Job {self.tracker.job_id} cancelled - stopping progress updates")
+                    self.running = False
+                    break
+                
                 # Build message with work progress if available
                 stage_name = self.tracker.current_stage.replace('_', ' ').title()
                 
@@ -320,6 +376,16 @@ class ProgressUpdateTask:
                 
                 await asyncio.sleep(0.5)  # Update every 500ms (2 updates/sec = smooth + efficient)
         except asyncio.CancelledError:
-            pass
+            logger.info(f"[PROGRESS] Progress task cancelled for {self.tracker.job_id}")
         except Exception as e:
             logger.error(f"[PROGRESS] Update loop error: {e}")
+    
+    async def _check_cancellation(self) -> bool:
+        """Check if job has been cancelled via Redis"""
+        try:
+            if self.tracker.redis_client and self.tracker.job_id:
+                cancel_flag = self.tracker.redis_client.get(f"cancel:job:{self.tracker.job_id}")
+                return cancel_flag is not None and cancel_flag
+        except Exception as e:
+            logger.debug(f"[PROGRESS] Cancellation check failed: {e}")
+        return False
