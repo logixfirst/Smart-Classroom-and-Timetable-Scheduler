@@ -132,7 +132,7 @@ export default function AdminTimetablesPage() {
       const timeoutId = setTimeout(() => controller.abort(), 3000)
       
       const response = await fetch(
-        `${API_BASE}/generation-jobs/?status=running&page=1&page_size=5`,
+        `${API_BASE}/generation-jobs/?status=running,pending&page=1&page_size=5`,
         { credentials: 'include', signal: controller.signal }
       )
       clearTimeout(timeoutId)
@@ -143,7 +143,7 @@ export default function AdminTimetablesPage() {
       }
       
       const data = await response.json()
-      const jobs = (data.results || []).filter((job: any) => job.status === 'running')
+      const jobs = (data.results || []).filter((job: any) => ['running', 'pending'].includes(job.status))
       
       if (jobs.length === 0) {
         setRunningJobs([])
@@ -153,9 +153,9 @@ export default function AdminTimetablesPage() {
       // Simplified: Use job data directly without extra progress calls
       const runningJobs = jobs.map((job: any) => ({
         job_id: job.job_id || job.id,
-        progress: job.progress || 0,
-        status: job.status,
-        message: job.current_stage || 'Processing...',
+        progress: job.progress || 1,  // Show at least 1% to indicate activity
+        status: job.status === 'pending' ? 'running' : job.status,  // Treat pending as running
+        message: job.current_stage || (job.status === 'pending' ? 'Starting...' : 'Processing...'),
         time_remaining_seconds: null
       }))
       
@@ -281,8 +281,8 @@ export default function AdminTimetablesPage() {
 
   return (
       <div className="space-y-6">
-        {/* Running Jobs Banner - Only show if jobs have progress > 0 */}
-        {runningJobs.length > 0 && runningJobs.some(j => j.progress > 0 || j.status === 'running') && (
+        {/* Running Jobs Banner - Show for any running/queued jobs */}
+        {runningJobs.length > 0 && (
           <div className="card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
             <div className="card-header">
               <h3 className="font-semibold text-blue-900 dark:text-blue-100">🔄 Generation in Progress</h3>

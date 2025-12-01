@@ -250,20 +250,40 @@ class TimetableSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class GenerationJobSerializer(serializers.ModelSerializer):
-    department_name = serializers.CharField(
-        source="department.department_name", read_only=True
+class GenerationJobListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for list view - excludes heavy timetable_data"""
+    organization_name = serializers.CharField(
+        source="organization.org_name", read_only=True
     )
-    batch_name = serializers.CharField(source="batch.batch_id", read_only=True)
-    created_by_username = serializers.CharField(
-        source="created_by.username", read_only=True
+
+    class Meta:
+        model = GenerationJob
+        fields = [
+            "id",
+            "organization",
+            "organization_name",
+            "status",
+            "progress",
+            "created_at",
+            "updated_at",
+            "completed_at",
+            "error_message",
+        ]
+        # CRITICAL: Exclude timetable_data for fast list loading
+        # timetable_data can be 5-50MB per job!
+
+
+class GenerationJobSerializer(serializers.ModelSerializer):
+    """Full serializer for detail view - includes timetable_data"""
+    organization_name = serializers.CharField(
+        source="organization.org_name", read_only=True
     )
 
     class Meta:
         model = GenerationJob
         fields = "__all__"
         read_only_fields = [
-            "job_id",
+            "id",
             "status",
             "progress",
             "created_at",

@@ -59,9 +59,9 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
 
         if (res.ok) {
           const data = await res.json()
-          const newProgress = data.progress || 0
+          const newProgress = data.progress || 1  // Show at least 1%
           const newStatus = data.status || 'running'
-          const newPhase = data.stage || data.message || 'Processing...'
+          const newPhase = data.stage || data.message || 'Initializing...'
           const newTimeRemaining = data.time_remaining_seconds || null
 
           setProgress(newProgress)
@@ -104,6 +104,7 @@ export default function TimetableProgressTracker({ jobId, onComplete, onCancel }
         }
       } catch (err) {
         console.error('Failed to poll progress:', err)
+        // Don't set error state on network failures - keep showing last known state
       }
     }
 

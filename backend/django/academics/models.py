@@ -854,6 +854,11 @@ class GenerationJob(models.Model):
     class Meta:
         db_table = "generation_jobs"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["-created_at"], name="idx_job_created"),
+            models.Index(fields=["status", "-created_at"], name="idx_job_status_created"),
+            models.Index(fields=["organization", "-created_at"], name="idx_job_org_created"),
+        ]
 
 
 class Timetable(models.Model):

@@ -252,25 +252,26 @@ def get_progress(request, job_id):
             job = GenerationJob.objects.get(id=job_id)
             return Response({
                 'job_id': str(job.id),
-                'progress': job.progress,
+                'progress': max(1, job.progress),  # Show at least 1% if running
                 'status': job.status,
-                'message': job.error_message or f'Status: {job.status}',
-                'stage': job.status,
+                'message': job.error_message or 'Initializing generation...',
+                'stage': 'Starting' if job.status == 'running' and job.progress < 5 else job.status,
                 'time_remaining_seconds': None,
                 'eta': None
             })
         except GenerationJob.DoesNotExist:
+            logger.warning(f"Job {job_id} not found in database")
             return Response(
                 {
                     'job_id': job_id,
                     'progress': 0,
-                    'status': 'queued',
-                    'message': 'Job queued, waiting for FastAPI...',
-                    'stage': 'queued',
+                    'status': 'error',
+                    'message': 'Job not found. Please check the job ID.',
+                    'stage': 'error',
                     'time_remaining_seconds': None,
                     'eta': None
                 },
-                status=status.HTTP_200_OK
+                status=status.HTTP_404_NOT_FOUND
             )
         
     except Exception as e:

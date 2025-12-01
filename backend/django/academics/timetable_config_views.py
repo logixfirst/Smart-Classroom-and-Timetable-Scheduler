@@ -15,7 +15,7 @@ class TimetableConfigurationViewSet(viewsets.ModelViewSet):
     
     GET /api/timetable-configs/ - List all configs
     GET /api/timetable-configs/last-used/ - Get last used config
-    POST /api/timetable-configs/ - Create new config
+    POST /api/timetable-configs/ - Create or update config
     PUT /api/timetable-configs/{id}/ - Update config
     DELETE /api/timetable-configs/{id}/ - Delete config
     """
@@ -30,6 +30,67 @@ class TimetableConfigurationViewSet(viewsets.ModelViewSet):
                 organization=self.request.user.organization
             )
         return TimetableConfiguration.objects.none()
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Create or update configuration
+        If config exists for same org + academic_year + semester, update it
+        Otherwise create new
+        """
+        # Get organization from user
+        if not hasattr(request.user, 'organization') or not request.user.organization:
+            return Response(
+                {'error': 'User organization not found'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        organization = request.user.organization
+        academic_year = request.data.get('academic_year')
+        semester = request.data.get('semester')
+        
+        if not academic_year or not semester:
+            return Response(
+                {'error': 'academic_year and semester are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if configuration exists for this org + academic_year + semester
+        existing_config = TimetableConfiguration.objects.filter(
+            organization=organization,
+            academic_year=academic_year,
+            semester=semester
+        ).first()
+        
+        if existing_config:
+            # Update existing configuration
+            serializer = self.get_serializer(existing_config, data=request.data, partial=False)
+            serializer.is_valid(raise_exception=True)
+            config = serializer.save()
+            
+            return Response(
+                {
+                    'success': True,
+                    'message': 'Configuration updated successfully',
+                    'config': self.get_serializer(config).data,
+                    'action': 'updated'
+                },
+                status=status.HTTP_200_OK
+            )
+        else:
+            # Create new configuration
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            config = serializer.save(organization=organization)
+            
+            return Response(
+                {
+                    'success': True,
+                    'message': 'Configuration created successfully',
+                    'config': self.get_serializer(config).data,
+                    'action': 'created'
+                },
+                status=status.HTTP_201_CREATED
+            )
     
     @action(detail=False, methods=['get'])
     def last_used(self, request):

@@ -337,38 +337,100 @@ class DjangoAPIClient:
                 self.db_conn.rollback()
             return []
 
-    async def fetch_time_slots(self, org_name: str) -> List[TimeSlot]:
-        """Generate standard time slots"""
+    async def fetch_time_slots(self, org_name: str, time_config: dict = None) -> List[TimeSlot]:
+        """
+        Generate dynamic time slots based on time_config from TimetableConfiguration
+        
+        Args:
+            org_name: Organization name
+            time_config: Time configuration dict with working_days, slots_per_day, start_time, etc.
+        
+        Returns:
+            List of TimeSlot objects
+        """
         try:
-            # Generate standard time slots (8 AM - 5 PM, 6 days, 8 slots per day)
-            days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-            times = [
-                ('08:00', '09:00'), ('09:00', '10:00'), ('10:00', '11:00'), ('11:00', '12:00'),
-                ('12:00', '13:00'),  # Lunch break can be skipped if needed
-                ('13:00', '14:00'), ('14:00', '15:00'), ('15:00', '16:00'), ('16:00', '17:00')
-            ]
+            from datetime import datetime, timedelta
             
+            # Use time_config if provided, otherwise use defaults
+            if time_config:
+                working_days = time_config.get('working_days', 6)
+                slots_per_day = time_config.get('slots_per_day', 9)
+                start_time_str = time_config.get('start_time', '08:00')
+                end_time_str = time_config.get('end_time', '17:00')
+                slot_duration = time_config.get('slot_duration_minutes', 60)
+                lunch_break_enabled = time_config.get('lunch_break_enabled', True)
+                lunch_break_start = time_config.get('lunch_break_start', '12:00')
+                lunch_break_end = time_config.get('lunch_break_end', '13:00')
+                logger.info(f"[TIME_SLOTS] Using config: {working_days} days, {slots_per_day} slots/day, {start_time_str}-{end_time_str}")
+            else:
+                # Default configuration (matches old behavior)
+                working_days = 6
+                slots_per_day = 9
+                start_time_str = '08:00'
+                end_time_str = '17:00'
+                slot_duration = 60
+                lunch_break_enabled = True
+                lunch_break_start = '12:00'
+                lunch_break_end = '13:00'
+                logger.warning("[TIME_SLOTS] No time_config provided, using defaults")
+            
+            # Parse start time
+            start_time = datetime.strptime(start_time_str, '%H:%M')
+            
+            # Parse lunch break times
+            lunch_start = datetime.strptime(lunch_break_start, '%H:%M') if lunch_break_enabled else None
+            lunch_end = datetime.strptime(lunch_break_end, '%H:%M') if lunch_break_enabled else None
+            
+            # Generate time slots
+            days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'][:working_days]
             time_slots = []
             slot_id = 0
+            
             for day_idx, day in enumerate(days):
-                for period_idx, (start, end) in enumerate(times):
+                current_time = start_time
+                period_idx = 0
+                
+                for _ in range(slots_per_day):
+                    # Calculate slot end time
+                    slot_end = current_time + timedelta(minutes=slot_duration)
+                    
+                    # Check if this slot overlaps with lunch break
+                    if lunch_break_enabled and lunch_start and lunch_end:
+                        # Skip if slot starts during lunch break
+                        if lunch_start <= current_time < lunch_end:
+                            current_time = lunch_end  # Jump to end of lunch break
+                            continue
+                    
+                    # Create time slot
+                    start_str = current_time.strftime('%H:%M')
+                    end_str = slot_end.strftime('%H:%M')
+                    
                     slot = TimeSlot(
                         slot_id=str(slot_id),
                         day_of_week=day,
                         day=day_idx,
                         period=period_idx,
-                        start_time=start,
-                        end_time=end,
-                        slot_name=f"{day.capitalize()} {start}-{end}"
+                        start_time=start_str,
+                        end_time=end_str,
+                        slot_name=f"{day.capitalize()} {start_str}-{end_str}"
                     )
                     time_slots.append(slot)
+                    
+                    # Move to next slot
+                    current_time = slot_end
+                    period_idx += 1
                     slot_id += 1
             
-            logger.info(f"Generated {len(time_slots)} time slots")
+            logger.info(f"[TIME_SLOTS] Generated {len(time_slots)} time slots ({working_days} days × {slots_per_day} slots)")
+            if lunch_break_enabled:
+                logger.info(f"[TIME_SLOTS] Lunch break: {lunch_break_start}-{lunch_break_end}")
+            
             return time_slots
 
         except Exception as e:
-            logger.error(f"Failed to generate time slots: {e}")
+            logger.error(f"[TIME_SLOTS] Failed to generate time slots: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return []
 
     async def fetch_students(self, org_name: str) -> Dict[str, Student]:

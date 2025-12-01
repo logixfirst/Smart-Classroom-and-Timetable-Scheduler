@@ -69,16 +69,31 @@ def generate_timetable_task(self, job_id, org_id, academic_year, semester):
                 semester_map = {'odd': 1, 'even': 2, 'ODD': 1, 'EVEN': 2}
                 semester_int = semester_map.get(str(semester), 1)
             
+            # CRITICAL FIX: Extract time_config from job data
+            time_config = None
+            if job.timetable_data and isinstance(job.timetable_data, dict):
+                time_config = job.timetable_data.get('time_config')
+            
+            # Build request payload
+            payload = {
+                'job_id': str(job_id),
+                'organization_id': org_id,
+                'department_id': None,
+                'batch_ids': [],
+                'semester': semester_int,
+                'academic_year': academic_year,
+            }
+            
+            # Add time_config if available
+            if time_config:
+                payload['time_config'] = time_config
+                logger.info(f"[CELERY] Sending time_config to FastAPI: {time_config}")
+            else:
+                logger.warning(f"[CELERY] No time_config found in job data for {job_id}")
+            
             response = requests.post(
                 f"{fastapi_url}/api/generate_variants",
-                json={
-                    'job_id': str(job_id),
-                    'organization_id': org_id,
-                    'department_id': None,
-                    'batch_ids': [],
-                    'semester': semester_int,
-                    'academic_year': academic_year,
-                },
+                json=payload,
                 timeout=5  # FastAPI MUST respond in <5s (just queues the job)
             )
             

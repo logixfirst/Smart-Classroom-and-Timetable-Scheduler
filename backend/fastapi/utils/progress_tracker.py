@@ -30,17 +30,17 @@ class EnterpriseProgressTracker:
         self.last_progress = 0.0
         self._progress_lock = asyncio.Lock()  # Thread-safe progress updates
         
-        # Stage configuration with CORRECT weights based on actual execution times
-        # Total time: ~15 minutes = 900s (INCREASED FROM 10 MINUTES)
-        # load=2s, cluster=5s, cpsat=60s, ga=750s, rl=75s, final=8s
-        # Weights adjusted for 15-minute timeout
+        # Stage configuration with REALISTIC weights based on actual execution times
+        # Total time: ~10-12 minutes = 600-720s
+        # Observed: load=5s, cluster=10s, cpsat=180s, ga=300s, rl=180s, final=5s
+        # Progress ranges aligned with actual stage durations
         self.stage_config = {
-            'load_data': {'weight': 2, 'expected_time': 2},      # 0% → 2%
-            'clustering': {'weight': 3, 'expected_time': 5},     # 2% → 5%
-            'cpsat': {'weight': 10, 'expected_time': 60},        # 5% → 15%
-            'ga': {'weight': 70, 'expected_time': 750},          # 15% → 85%
-            'rl': {'weight': 10, 'expected_time': 75},           # 85% → 95%
-            'finalize': {'weight': 5, 'expected_time': 8}        # 95% → 100%
+            'load_data': {'weight': 5, 'expected_time': 5},       # 0% → 5%
+            'clustering': {'weight': 5, 'expected_time': 10},     # 5% → 10%
+            'cpsat': {'weight': 50, 'expected_time': 180},        # 10% → 60%
+            'ga': {'weight': 25, 'expected_time': 300},           # 60% → 85%
+            'rl': {'weight': 10, 'expected_time': 180},           # 85% → 95%
+            'finalize': {'weight': 5, 'expected_time': 5}         # 95% → 100%
         }
         
         # Current stage tracking
@@ -129,28 +129,58 @@ class EnterpriseProgressTracker:
         return self.last_progress
     
     def calculate_eta(self) -> tuple[int, str]:
-        """SMOOTH ETA: Exponential moving average for stability"""
+        """
+        FIXED ETA: Calculate based on global time and stage expectations
+        Prevents resets between stages by using total expected time, not progress-based calculation
+        """
         elapsed = time.time() - self.start_time
         
-        # Calculate instantaneous ETA
-        if self.last_progress > 5:  # Need 5% for accurate estimate
-            time_per_percent = elapsed / self.last_progress
-            remaining_percent = 100 - self.last_progress
-            instant_eta = int(time_per_percent * remaining_percent)
-        else:
-            # Early stage: use stage-based estimate
-            total_weight = sum(s['weight'] for s in self.stage_config.values())
-            total_time = sum(s['expected_time'] for s in self.stage_config.values())
-            instant_eta = int(total_time * (100 - self.last_progress) / 100)
+        # Calculate remaining time based on stage expectations (more stable than progress-based)
+        remaining_time = 0
+        current_stage_found = False
         
-        # Smooth ETA with exponential moving average (alpha=0.3)
+        for stage_name, config in self.stage_config.items():
+            if not current_stage_found:
+                if stage_name == self.current_stage:
+                    current_stage_found = True
+                    # Calculate remaining time for current stage
+                    stage_elapsed = time.time() - self.stage_start_time
+                    stage_expected = config['expected_time']
+                    stage_remaining = max(1, stage_expected - stage_elapsed)
+                    remaining_time += stage_remaining
+                # else: stage already completed, skip
+            else:
+                # Add time for all future stages
+                remaining_time += config['expected_time']
+        
+        # If progress > 90%, use progress-based calculation for final accuracy
+        if self.last_progress > 90:
+            # Near completion, switch to progress-based for accuracy
+            if self.last_progress > 95:
+                progress_based_eta = int(elapsed * (100 - self.last_progress) / self.last_progress)
+                remaining_time = min(remaining_time, progress_based_eta)
+        
+        # Smooth ETA with exponential moving average (alpha=0.2 for more stability)
         if not hasattr(self, '_smoothed_eta'):
-            self._smoothed_eta = instant_eta
+            self._smoothed_eta = remaining_time
+            self._last_eta_update = time.time()
         else:
-            self._smoothed_eta = int(0.7 * self._smoothed_eta + 0.3 * instant_eta)
+            # Only update every 2 seconds to prevent jitter
+            time_since_update = time.time() - self._last_eta_update
+            if time_since_update >= 2.0:
+                # Apply exponential smoothing
+                self._smoothed_eta = int(0.8 * self._smoothed_eta + 0.2 * remaining_time)
+                self._last_eta_update = time.time()
         
-        # Clamp to reasonable range
-        remaining = max(1, min(600, self._smoothed_eta))
+        # Clamp to reasonable range (1 second to 15 minutes)
+        remaining = max(1, min(900, self._smoothed_eta))
+        
+        # Ensure ETA decreases over time (never increases)
+        if hasattr(self, '_last_eta_value'):
+            if remaining > self._last_eta_value + 5:  # Allow 5s tolerance for smoothing
+                remaining = self._last_eta_value  # Don't let it jump up
+        self._last_eta_value = remaining
+        
         eta = (datetime.now(timezone.utc) + timedelta(seconds=remaining)).isoformat()
         return remaining, eta
     
@@ -172,7 +202,7 @@ class EnterpriseProgressTracker:
                 self.last_progress = float(progress)
             else:
                 progress_float = self.calculate_smooth_progress()
-                progress = int(progress_float)  # Convert to int for display
+                progress = round(progress_float)  # Round to nearest integer
             
             # Calculate ETA
             remaining_seconds, eta = self.calculate_eta()

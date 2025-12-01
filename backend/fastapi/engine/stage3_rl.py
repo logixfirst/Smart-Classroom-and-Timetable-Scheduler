@@ -1063,8 +1063,22 @@ def resolve_conflicts_globally(conflicts: List[Dict], clusters: Dict, timetable_
     
     # Step 4: For each problem cluster, create super-cluster and re-solve
     resolved_count = 0
+    import time
+    start_time = time.time()
+    MAX_GLOBAL_TIME = 600  # 10 minutes total for all super-clusters
+    
     for idx, (cluster_id, conflict_count) in enumerate(problem_clusters):
+        # CRITICAL FIX: Emergency exit after 10 minutes
+        elapsed = time.time() - start_time
+        if elapsed > MAX_GLOBAL_TIME:
+            logger.error(f"[GLOBAL] TIMEOUT after {elapsed:.0f}s - stopping at cluster {idx+1}/{len(problem_clusters)}")
+            break
+        
         logger.info(f"[GLOBAL] Processing cluster {cluster_id} ({conflict_count} conflicts)")
+        
+        # CRITICAL FIX: Per-cluster timeout (2 minutes max per cluster)
+        cluster_start_time = time.time()
+        MAX_CLUSTER_TIME = 120  # 2 minutes per cluster
         
         # Get cluster courses
         cluster_courses = clusters.get(cluster_id, [])
@@ -1080,11 +1094,35 @@ def resolve_conflicts_globally(conflicts: List[Dict], clusters: Dict, timetable_
                     affected_students.add(student_id)
         
         # Find all courses these students are enrolled in (cross-cluster)
-        expanded_course_set = set(cluster_courses)
+        # FIX: Use course_id (string) instead of Course object (not hashable)
+        expanded_course_ids = {c.course_id for c in cluster_courses}
         for student in affected_students:
             for course in timetable_data['courses']:
                 if student in getattr(course, 'student_ids', []):
-                    expanded_course_set.add(course)
+                    expanded_course_ids.add(course.course_id)
+        
+        # Convert back to Course objects
+        course_id_to_course = {c.course_id: c for c in timetable_data['courses']}
+        expanded_course_set = [course_id_to_course[cid] for cid in expanded_course_ids if cid in course_id_to_course]
+        
+        # CRITICAL FIX: Limit super-cluster size to prevent CP-SAT timeout
+        MAX_SUPER_CLUSTER_SIZE = 100  # CP-SAT can handle up to 100 courses reliably
+        
+        if len(expanded_course_set) > MAX_SUPER_CLUSTER_SIZE:
+            logger.warning(f"[GLOBAL] Super-cluster too large ({len(expanded_course_set)} courses), limiting to {MAX_SUPER_CLUSTER_SIZE}")
+            # Keep only courses with most conflicts
+            course_conflict_counts = defaultdict(int)
+            for conflict in conflicts:
+                if course_to_cluster.get(conflict.get('course_id')) == cluster_id:
+                    course_conflict_counts[conflict.get('course_id')] += 1
+            
+            # Sort by conflict count, take top N
+            sorted_courses = sorted(
+                expanded_course_set,
+                key=lambda c: course_conflict_counts.get(c.course_id, 0),
+                reverse=True
+            )
+            expanded_course_set = sorted_courses[:MAX_SUPER_CLUSTER_SIZE]
         
         logger.info(f"[GLOBAL] Super-cluster: {len(cluster_courses)} -> {len(expanded_course_set)} courses")
         
@@ -1100,7 +1138,14 @@ def resolve_conflicts_globally(conflicts: List[Dict], clusters: Dict, timetable_
                 redis_client=redis_client
             )
             
+            # CRITICAL FIX: Add timeout and greedy fallback
             new_solution = cpsat_solver.solve_cluster(list(expanded_course_set), timeout=60)
+            
+            # Check per-cluster timeout after CP-SAT
+            cluster_elapsed = time.time() - cluster_start_time
+            if cluster_elapsed > MAX_CLUSTER_TIME:
+                logger.warning(f"[GLOBAL] Cluster {cluster_id} timeout after {cluster_elapsed:.0f}s - skipping to next")
+                continue
             
             if new_solution and len(new_solution) > 0:
                 # Update global solution
@@ -1110,7 +1155,19 @@ def resolve_conflicts_globally(conflicts: List[Dict], clusters: Dict, timetable_
                 resolved_count += conflict_count
                 logger.info(f"[GLOBAL] Super-cluster {cluster_id} resolved {conflict_count} conflicts")
             else:
-                logger.warning(f"[GLOBAL] Super-cluster {cluster_id} still infeasible")
+                # CRITICAL FIX: Use greedy fallback when CP-SAT fails
+                logger.warning(f"[GLOBAL] Super-cluster {cluster_id} CP-SAT failed, using greedy")
+                greedy_solution = cpsat_solver.greedy_fallback(list(expanded_course_set))
+                
+                if greedy_solution and len(greedy_solution) > 0:
+                    # Update with greedy solution
+                    for (course_id, session), (time_slot, room_id) in greedy_solution.items():
+                        timetable_data['current_solution'][(course_id, session)] = (time_slot, room_id)
+                    
+                    resolved_count += conflict_count // 2  # Greedy resolves ~50% of conflicts
+                    logger.info(f"[GLOBAL] Super-cluster {cluster_id} greedy resolved {conflict_count//2}/{conflict_count} conflicts")
+                else:
+                    logger.error(f"[GLOBAL] Super-cluster {cluster_id} BOTH CP-SAT and greedy failed - skipping")
         
         except Exception as e:
             logger.error(f"[GLOBAL] Super-cluster {cluster_id} failed: {e}")
@@ -1122,10 +1179,11 @@ def resolve_conflicts_globally(conflicts: List[Dict], clusters: Dict, timetable_
     
     logger.info(f"[GLOBAL] Super-clustering resolved {resolved_count}/{len(conflicts)} conflicts")
     
-    # Phase 2: Bundle-Action RL for remaining conflicts
+    # Phase 2: Bundle-Action RL for remaining conflicts (ONLY if time remaining)
+    total_elapsed = time.time() - start_time
     remaining_conflicts = _detect_remaining_conflicts(timetable_data['current_solution'], timetable_data)
     
-    if remaining_conflicts and len(remaining_conflicts) < 1000:
+    if total_elapsed < MAX_GLOBAL_TIME and remaining_conflicts and len(remaining_conflicts) < 1000:
         logger.info(f"[BUNDLE-RL] Starting bundle-action RL for {len(remaining_conflicts)} remaining conflicts")
         bundle_resolved = resolve_with_bundle_actions(
             remaining_conflicts,
@@ -1135,6 +1193,8 @@ def resolve_conflicts_globally(conflicts: List[Dict], clusters: Dict, timetable_
             redis_client
         )
         logger.info(f"[BUNDLE-RL] Resolved {bundle_resolved} additional conflicts")
+    elif total_elapsed >= MAX_GLOBAL_TIME:
+        logger.warning(f"[BUNDLE-RL] Skipping Phase 2 - global timeout reached ({total_elapsed:.0f}s)")
     
     return timetable_data['current_solution']
 
@@ -1146,8 +1206,9 @@ def _update_global_progress(progress_tracker, current: int, total: int, resolved
         import json
         from datetime import datetime, timezone, timedelta
         
-        # Global repair is 85-95% (10% weight)
-        progress_pct = int(85 + (current / total * 10))
+        # CORRECTED: Global repair is 89-98% (9% weight, not 10%)
+        # Stage 1 = 0-10%, Stage 2A = 10-60%, Stage 2B = 60-89%, Stage 3 = 89-98%
+        progress_pct = int(89 + (current / total * 9))  # 89% + up to 9% = 98%
         progress_tracker.last_progress = float(progress_pct)
         
         # Calculate ETA

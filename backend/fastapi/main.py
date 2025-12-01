@@ -327,12 +327,19 @@ class TimetableGenerationSaga:
             org_id = request_data['organization_id']
             semester = request_data['semester']
             
+            # CRITICAL FIX: Extract time_config from request
+            time_config = request_data.get('time_config')
+            if time_config:
+                logger.info(f"[DATA] Using time_config from Django: {time_config}")
+            else:
+                logger.warning("[DATA] No time_config in request, using defaults")
+            
             # Load data in parallel (optimized for hardware)
             if hardware_profile.cpu_cores >= 4:
                 courses_task = client.fetch_courses(org_id, semester)
                 faculty_task = client.fetch_faculty(org_id)
                 rooms_task = client.fetch_rooms(org_id)
-                time_slots_task = client.fetch_time_slots(org_id)
+                time_slots_task = client.fetch_time_slots(org_id, time_config)  # Pass time_config
                 students_task = client.fetch_students(org_id)
                 
                 courses, faculty, rooms, time_slots, students = await asyncio.gather(
@@ -343,7 +350,7 @@ class TimetableGenerationSaga:
                 courses = await client.fetch_courses(org_id, semester)
                 faculty = await client.fetch_faculty(org_id)
                 rooms = await client.fetch_rooms(org_id)
-                time_slots = await client.fetch_time_slots(org_id)
+                time_slots = await client.fetch_time_slots(org_id, time_config)  # Pass time_config
                 students = await client.fetch_students(org_id)
             
             # Validate data
@@ -698,9 +705,8 @@ class TimetableGenerationSaga:
         }
     
     def _solve_cluster_safe(self, cluster_id, courses, rooms, time_slots, faculty, total_clusters=None, completed=0):
-        """Solve single cluster with progressive relaxation: CP-SAT → Smart Greedy → Basic Greedy"""
+        """Solve single cluster with CP-SAT → Basic Greedy fallback"""
         from engine.stage2_cpsat import AdaptiveCPSATSolver
-        from engine.stage2_greedy import SmartGreedyScheduler
         
         global redis_client_global
         
@@ -726,24 +732,8 @@ class TimetableGenerationSaga:
                 logger.info(f"Cluster {cluster_id}: CP-SAT succeeded with {len(solution)} assignments")
                 return solution
             
-            # Fallback 1: Smart greedy with constraint awareness
-            logger.info(f"Cluster {cluster_id}: CP-SAT failed, trying smart greedy")
-            try:
-                greedy_solver = SmartGreedyScheduler(
-                    courses=courses,
-                    rooms=rooms,
-                    time_slots=time_slots,
-                    faculty=faculty
-                )
-                solution = greedy_solver.solve(courses)
-                if solution and len(solution) > 0:
-                    logger.info(f"Cluster {cluster_id}: Smart greedy succeeded with {len(solution)} assignments")
-                    return solution
-            except Exception as e:
-                logger.warning(f"Cluster {cluster_id}: Smart greedy failed: {e}")
-            
-            # Fallback 2: Basic greedy (always returns something)
-            logger.info(f"Cluster {cluster_id}: Using basic greedy fallback")
+            # Fallback: Basic greedy (always returns something)
+            logger.info(f"Cluster {cluster_id}: CP-SAT failed, using basic greedy fallback")
             return self._greedy_schedule(cluster_id, courses, rooms, time_slots, faculty)
             
         except Exception as e:
@@ -1316,6 +1306,17 @@ class TimetableGenerationSaga:
 
 
 # Pydantic models
+class TimeConfig(BaseModel):
+    """Time configuration from Django TimetableConfiguration model"""
+    working_days: int = 6
+    slots_per_day: int = 9
+    start_time: str = '08:00'
+    end_time: str = '17:00'
+    slot_duration_minutes: int = 60
+    lunch_break_enabled: bool = True
+    lunch_break_start: Optional[str] = '12:00'
+    lunch_break_end: Optional[str] = '13:00'
+
 class GenerationRequest(BaseModel):
     job_id: Optional[str] = None
     organization_id: str
@@ -1324,6 +1325,7 @@ class GenerationRequest(BaseModel):
     semester: int
     academic_year: str
     quality_mode: Optional[str] = 'balanced'  # 'fast', 'balanced', 'best'
+    time_config: Optional[TimeConfig] = None  # CRITICAL: Time configuration
 
 class GenerationResponse(BaseModel):
     job_id: str
@@ -1950,15 +1952,17 @@ async def generate_variants_enterprise(request: GenerationRequest):
             
             progress_data = {
                 'job_id': job_id,
-                'progress': 0,
-                'status': 'queued',
-                'stage': 'Queued',
-                'message': 'Job queued for enterprise processing',
+                'progress': 1,  # Start at 1% to show immediate progress
+                'status': 'running',  # Set to running immediately
+                'stage': 'Starting',
+                'message': 'Initializing timetable generation...',
                 'time_remaining_seconds': estimated_time_seconds,
                 'eta': (datetime.now(timezone.utc) + timedelta(seconds=estimated_time_seconds)).isoformat(),
                 'timestamp': start_time
             }
             redis_client_global.setex(f"progress:job:{job_id}", 3600, json.dumps(progress_data))
+            # Publish immediately so frontend gets instant update
+            redis_client_global.publish(f"progress:{job_id}", json.dumps(progress_data))
             logger.info(f"[OK] Initial progress set in Redis for job {job_id}")
         else:
             logger.error(f"[ERROR] Redis not available for job {job_id}")
@@ -1970,7 +1974,7 @@ async def generate_variants_enterprise(request: GenerationRequest):
         
         return GenerationResponse(
             job_id=job_id,
-            status="queued",
+            status="running",  # Return running status immediately
             message=f"Timetable generation started (est. {estimated_time_seconds//60} min)",
             estimated_time_seconds=estimated_time_seconds
         )

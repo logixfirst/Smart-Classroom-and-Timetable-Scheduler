@@ -17,6 +17,7 @@ from .models import Batch, Department, GenerationJob, Timetable
 from .serializers import (
     GenerationJobCreateSerializer,
     GenerationJobSerializer,
+    GenerationJobListSerializer,
     TimetableSerializer,
 )
 
@@ -38,9 +39,22 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
             return [AllowAny()]
         return [IsAuthenticated()]
 
+    def get_serializer_class(self):
+        """Use lightweight serializer for list view (excludes timetable_data)"""
+        if self.action == 'list':
+            return GenerationJobListSerializer
+        return GenerationJobSerializer
+
     def get_queryset(self):
         """Filter jobs based on user role and status"""
         queryset = GenerationJob.objects.all().order_by('-created_at')
+        
+        # CRITICAL: Use select_related to avoid N+1 queries
+        queryset = queryset.select_related('organization')
+        
+        # CRITICAL: Defer timetable_data for list view (can be 5-50MB per job!)
+        if self.action == 'list':
+            queryset = queryset.defer('timetable_data')
         
         # Filter by status if provided
         status_filter = self.request.query_params.get('status')
@@ -118,10 +132,68 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
             else:
                 priority_value = {'high': 9, 'normal': 5, 'low': 1}.get(priority, 5)
             
+            # CRITICAL FIX: Get time configuration from TimetableConfiguration
+            from .timetable_config_models import TimetableConfiguration
+            try:
+                # Try to get the most recently used config for this org/semester
+                time_config = TimetableConfiguration.objects.filter(
+                    organization=org,
+                    academic_year=academic_year,
+                    semester=1 if semester == 'odd' else 2
+                ).order_by('-last_used_at').first()
+                
+                if not time_config:
+                    # Fallback to latest config for this org
+                    time_config = TimetableConfiguration.objects.filter(
+                        organization=org
+                    ).order_by('-last_used_at').first()
+                
+                if time_config:
+                    time_config_dict = {
+                        'working_days': time_config.working_days,
+                        'slots_per_day': time_config.slots_per_day,
+                        'start_time': time_config.start_time.strftime('%H:%M'),
+                        'end_time': time_config.end_time.strftime('%H:%M'),
+                        'slot_duration_minutes': time_config.slot_duration_minutes,
+                        'lunch_break_enabled': time_config.lunch_break_enabled,
+                        'lunch_break_start': time_config.lunch_break_start.strftime('%H:%M') if time_config.lunch_break_enabled else None,
+                        'lunch_break_end': time_config.lunch_break_end.strftime('%H:%M') if time_config.lunch_break_enabled else None,
+                    }
+                    logger.info(f"Using time config: {time_config_dict}")
+                    
+                    # Update last_used_at timestamp (auto-updated by model, but we can save explicitly)
+                    # This happens automatically since last_used_at has auto_now=True
+                    time_config.save(update_fields=['last_used_at'])
+                else:
+                    # Use default config if none found
+                    time_config_dict = {
+                        'working_days': 6,
+                        'slots_per_day': 9,
+                        'start_time': '08:00',
+                        'end_time': '17:00',
+                        'slot_duration_minutes': 60,
+                        'lunch_break_enabled': True,
+                        'lunch_break_start': '12:00',
+                        'lunch_break_end': '13:00',
+                    }
+                    logger.warning(f"No TimetableConfiguration found, using defaults: {time_config_dict}")
+            except Exception as config_error:
+                logger.error(f"Error fetching time config: {config_error}, using defaults")
+                time_config_dict = {
+                    'working_days': 6,
+                    'slots_per_day': 9,
+                    'start_time': '08:00',
+                    'end_time': '17:00',
+                    'slot_duration_minutes': 60,
+                    'lunch_break_enabled': True,
+                    'lunch_break_start': '12:00',
+                    'lunch_break_end': '13:00',
+                }
+            
             # Create job entry for university-wide generation
             job = GenerationJob.objects.create(
                 organization=org,
-                status="pending",
+                status="running",  # Set to running immediately
                 progress=0,
                 timetable_data={
                     'academic_year': academic_year,
@@ -129,9 +201,35 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                     'org_id': str(org_id),
                     'priority': priority_value,
                     'generation_type': 'full',
-                    'scope': 'university'
+                    'scope': 'university',
+                    'time_config': time_config_dict  # CRITICAL: Include time configuration
                 }
             )
+            
+            # CRITICAL FIX: Set Redis cache IMMEDIATELY after job creation
+            # This prevents race condition where frontend polls before cache exists
+            import redis
+            import json
+            from django.conf import settings
+            
+            try:
+                redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+                cache_key = f"progress:job:{job.id}"
+                initial_progress = {
+                    'job_id': str(job.id),
+                    'progress': 0,
+                    'status': 'running',
+                    'stage': 'Starting',
+                    'message': 'Initializing timetable generation...',
+                    'timestamp': timezone.now().isoformat(),
+                    'time_remaining_seconds': None
+                }
+                redis_client.setex(cache_key, 3600, json.dumps(initial_progress))
+                logger.info(f"[INIT] Redis progress cache set for job {job.id}")
+            except Exception as e:
+                logger.error(f"Failed to set initial Redis cache: {e}")
+                # Fallback to Django cache
+                cache.set(cache_key, initial_progress, timeout=3600)
 
             # Return IMMEDIATELY to frontend (don't wait for Celery/FastAPI)
             job_serializer = GenerationJobSerializer(job)
@@ -143,7 +241,11 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 "job": job_serializer.data,
             }
             
-            # Queue job AFTER returning response (async)
+            # CRITICAL: Return response FIRST, then queue job in background
+            # This prevents frontend from waiting for FastAPI connection
+            response = Response(response_data, status=status.HTTP_201_CREATED)
+            
+            # Queue job AFTER response is created (async, non-blocking)
             import threading
             threading.Thread(
                 target=self._queue_generation_job,
@@ -151,7 +253,7 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 daemon=True
             ).start()
             
-            return Response(response_data, status=status.HTTP_201_CREATED)
+            return response
 
         except Exception as e:
             logger.error(f"Error creating generation job: {str(e)}")
@@ -187,32 +289,76 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=False, methods=["get"], url_path="progress/(?P<job_id>[^/.]+)")
+    def get_progress_public(self, request, job_id=None):
+        """
+        Public progress endpoint (no auth required)
+        GET /api/progress/{job_id}/
+        """
+        try:
+            job = GenerationJob.objects.filter(id=job_id).first()
+            if not job:
+                return Response({
+                    "success": False,
+                    "error": "Job not found",
+                    "job_id": job_id,
+                    "status": "not_found",
+                    "progress": 0,
+                    "message": "Job not found in database"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Try Redis first (real-time progress from FastAPI)
+            cache_key = f"progress:job:{job.id}"
+            redis_data = cache.get(cache_key)
+            
+            if redis_data:
+                import json
+                if isinstance(redis_data, str):
+                    progress_data = json.loads(redis_data)
+                else:
+                    progress_data = redis_data
+                
+                return Response({
+                    "success": True,
+                    "job_id": str(job.id),
+                    "status": progress_data.get('status', job.status),
+                    "progress": progress_data.get('progress', job.progress),
+                    "stage": progress_data.get('stage', progress_data.get('message', 'Processing...')),
+                    "message": progress_data.get('message', 'Processing...'),
+                    "time_remaining_seconds": progress_data.get('time_remaining_seconds'),
+                    "updated_at": progress_data.get('timestamp', job.updated_at.isoformat() if job.updated_at else None)
+                })
+            
+            # Fallback to database
+            return Response({
+                "success": True,
+                "job_id": str(job.id),
+                "status": job.status,
+                "progress": job.progress or 1,
+                "stage": "Starting...",
+                "message": "Initializing generation...",
+                "time_remaining_seconds": None,
+                "updated_at": job.updated_at.isoformat() if job.updated_at else None
+            })
+
+        except Exception as e:
+            logger.error(f"Error fetching progress for {job_id}: {str(e)}")
+            return Response(
+                {"success": False, "error": str(e), "job_id": job_id},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+    
     @action(detail=True, methods=["get"], url_path="progress")
     def get_progress(self, request, pk=None):
         """
         Get real-time progress from Redis
-        GET /api/timetable/progress/{job_id}/
+        GET /api/generation-jobs/{job_id}/progress/
         """
         try:
             job = self.get_object()
-            cache_key = f"generation_progress:{job.id}"
-
-            # Get progress from Redis
-            progress = cache.get(cache_key)
-            if progress is None:
-                progress = job.progress
-
-            return Response(
-                {
-                    "success": True,
-                    "job_id": str(job.id),
-                    "status": job.status,
-                    "progress": progress,
-                    "updated_at": job.updated_at.isoformat()
-                    if job.updated_at
-                    else None,
-                }
-            )
+            
+            # Use the public endpoint logic
+            return self.get_progress_public(request, job_id=str(job.id)).data
 
         except Exception as e:
             logger.error(f"Error fetching progress: {str(e)}")
@@ -485,7 +631,7 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 try:
                     fastapi_url = os.getenv("FASTAPI_AI_SERVICE_URL", "http://localhost:8001")
                     
-                    # Call FastAPI with correct endpoint and NO timeout (returns immediately)
+                    # CRITICAL: Call FastAPI with short timeout and don't fail if it's down
                     response = requests.post(
                         f"{fastapi_url}/api/generate_variants",
                         json={
@@ -495,19 +641,24 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                             "academic_year": job.timetable_data.get('academic_year'),
                             "quality_mode": "balanced"
                         },
-                        timeout=5  # Short timeout since FastAPI returns immediately
+                        timeout=3  # Very short timeout - FastAPI returns immediately
                     )
                     
                     if response.status_code == 200:
                         result = response.json()
-                        logger.info(f"FastAPI queued job {job.id}: {result.get('message')}")
+                        logger.info(f"[OK] FastAPI queued job {job.id}: {result.get('message')}")
                     else:
-                        logger.error(f"FastAPI returned error: {response.status_code} - {response.text}")
+                        logger.warning(f"[WARN] FastAPI returned {response.status_code}, job will retry")
                         
+                except requests.exceptions.ConnectionError:
+                    logger.warning(f"[WARN] FastAPI not reachable, job {job.id} will retry when service is available")
+                except requests.exceptions.Timeout:
+                    logger.warning(f"[WARN] FastAPI timeout, job {job.id} may still be processing")
                 except Exception as api_error:
-                    logger.error(f"FastAPI call failed: {api_error}")
-                    # Keep job as pending - worker will pick it up later
-                    logger.info(f"Job {job.id} queued in Redis, waiting for worker")
+                    logger.warning(f"[WARN] FastAPI call failed: {api_error}, job will retry")
+                
+                # Job is queued in Redis regardless of FastAPI status
+                logger.info(f"[OK] Job {job.id} queued in Redis, will be picked up by worker")
                 
         except Exception as e:
             logger.error(f"Error queuing job: {str(e)}")
