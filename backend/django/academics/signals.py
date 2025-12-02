@@ -28,7 +28,19 @@ def invalidate_cache(org_name: str):
         for semester in [1, 2]:
             version_key = f"ttdata:version:{org_name}:{semester}"
             redis_client.setex(version_key, 86400, new_version)
-        logger.info(f"[CACHE] Invalidated cache for {org_name}")
+        
+        # Clear course cache for this organization (all semesters and departments)
+        course_pattern = f"courses:{org_name}:*"
+        keys_to_delete = []
+        for key in redis_client.scan_iter(match=course_pattern):
+            keys_to_delete.append(key)
+        
+        if keys_to_delete:
+            redis_client.delete(*keys_to_delete)
+            logger.info(f"[CACHE] Invalidated {len(keys_to_delete)} course cache keys for {org_name}")
+        else:
+            logger.info(f"[CACHE] Invalidated version cache for {org_name}")
+            
     except Exception as e:
         logger.warning(f"Cache invalidation failed: {e}")
 

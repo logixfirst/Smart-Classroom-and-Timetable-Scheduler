@@ -161,12 +161,40 @@ class DjangoAPIClient:
                 return False
             return True
         
-        # Try cache first
-        cached_courses = await self.cache_manager.get('courses', org_id, semester=semester, department_id=department_id)
-        if cached_courses:
-            logger.info(f"[CACHE] Using cached courses: {len(cached_courses)} courses")
-            # Deserialize from dict back to Course objects
-            return [Course(**c) for c in cached_courses]
+        # Check cache version (Django signals update this when data changes)
+        cache_valid = True
+        if self.cache_manager.redis_client:
+            try:
+                version_key = f"ttdata:version:{org_id}:{semester}"
+                stored_version = self.cache_manager.redis_client.get(version_key)
+                cache_key = self.cache_manager._generate_cache_key('courses', org_id, semester=semester, department_id=department_id)
+                cache_version_key = f"{cache_key}:version"
+                cached_version = self.cache_manager.redis_client.get(cache_version_key)
+                
+                if stored_version and cached_version and stored_version != cached_version:
+                    logger.info(f"[CACHE] Version mismatch detected - invalidating course cache for {org_id}")
+                    await self.cache_manager.invalidate('courses', org_id, semester=semester, department_id=department_id)
+                    cache_valid = False
+            except Exception as e:
+                logger.warning(f"[CACHE] Version check error: {e}")
+        
+        # Try cache first (if version is valid)
+        if cache_valid:
+            cached_courses = await self.cache_manager.get('courses', org_id, semester=semester, department_id=department_id)
+            if cached_courses:
+                logger.info(f"[CACHE] Using cached courses: {len(cached_courses)} courses")
+                # Deserialize from dict back to Course objects, filtering out invalid faculty
+                valid_courses = []
+                skipped = 0
+                for c in cached_courses:
+                    if _is_valid_uuid(c.get('faculty_id')):
+                        valid_courses.append(Course(**c))
+                    else:
+                        skipped += 1
+                        logger.warning(f"[CACHE] Skipping cached course {c.get('course_id')} with invalid faculty_id: {c.get('faculty_id')}")
+                if skipped > 0:
+                    logger.warning(f"[CACHE] Filtered out {skipped} courses with invalid faculty from cache")
+                return valid_courses
         
         # Fetch from database
         try:
@@ -261,19 +289,23 @@ class DjangoAPIClient:
                                 if _is_valid_uuid(f)
                             ]
                         
-                        # Determine available faculty: primary + co_faculty
+                        # Determine available faculty for parallel sections:
+                        # - Primary faculty: MUST be from same department as course
+                        # - Co-faculty: Can be from ANY department (cross-department teaching)
                         primary_fid = str(row['primary_faculty_id'])
                         # Safety check: primary faculty must be valid UUID
                         if not _is_valid_uuid(primary_fid):
                             logger.warning(f"[PARALLEL] Course {row['course_code']} has invalid primary_faculty_id: {primary_fid}, skipping")
                             continue
                         
+                        # Build faculty pool: primary (same dept) + co-faculty (any dept)
                         available_faculty = [primary_fid]
                         available_faculty.extend(co_faculty_list)
                         
-                        # Number of sections = min(num_faculty, ceiling(students/60))
+                        # Number of sections = MUST be enough to keep each section ≤60 students
+                        # BUG FIX: Don't limit by faculty count - faculty can teach multiple sections
                         max_sections_by_students = (len(student_ids) + 59) // 60
-                        num_sections = min(len(available_faculty), max_sections_by_students)
+                        num_sections = max_sections_by_students  # Force split based on student count ONLY
                         
                         students_per_section = len(student_ids) // num_sections
                         remainder = len(student_ids) % num_sections
@@ -287,8 +319,15 @@ class DjangoAPIClient:
                             section_students = student_ids[start_idx:start_idx + section_size]
                             start_idx += section_size
                             
-                            # Assign different faculty to each section (enables parallel scheduling)
-                            section_faculty_id = available_faculty[section_idx] if section_idx < len(available_faculty) else available_faculty[0]
+                            # Assign faculty (cycle through available faculty if needed)
+                            # BUG FIX: Use modulo to cycle - same faculty can teach multiple sections
+                            section_faculty_id = available_faculty[section_idx % len(available_faculty)]
+                            
+                            # Double-check faculty validity before creating course
+                            logger.warning(f"[PARALLEL SECTION CHECK] Course {row['course_code']} sec{section_idx}: faculty_id={repr(section_faculty_id)}, valid={_is_valid_uuid(section_faculty_id)}")
+                            if not _is_valid_uuid(section_faculty_id):
+                                logger.error(f"[PARALLEL SECTION] Course {row['course_code']} section {section_idx} has invalid faculty_id: {section_faculty_id}, skipping this section")
+                                continue
                             
                             course = Course(
                                 course_id=f"{row['course_id']}_off_{row['offering_id']}_sec{section_idx}",
@@ -403,6 +442,23 @@ class DjangoAPIClient:
             # Cache courses for 30 minutes (convert to dict for JSON serialization)
             courses_dict = [c.dict() for c in courses]
             await self.cache_manager.set('courses', org_id, courses_dict, ttl=1800, semester=semester, department_id=department_id)
+            
+            # Store cache version for invalidation detection
+            if self.cache_manager.redis_client:
+                try:
+                    version_key = f"ttdata:version:{org_id}:{semester}"
+                    current_version = self.cache_manager.redis_client.get(version_key)
+                    if not current_version:
+                        import time
+                        current_version = str(int(time.time()))
+                        self.cache_manager.redis_client.setex(version_key, 86400, current_version)
+                    
+                    cache_key = self.cache_manager._generate_cache_key('courses', org_id, semester=semester, department_id=department_id)
+                    cache_version_key = f"{cache_key}:version"
+                    self.cache_manager.redis_client.setex(cache_version_key, 1800, current_version)
+                except Exception as e:
+                    logger.warning(f"[CACHE] Version storage error: {e}")
+            
             logger.info(f"[CACHE] Cached {len(courses)} courses")
             
             return courses
