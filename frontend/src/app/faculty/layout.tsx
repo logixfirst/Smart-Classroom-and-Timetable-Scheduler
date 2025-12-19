@@ -12,7 +12,7 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
     if (!isLoading) {
       if (!user) {
         router.push('/login')
-      } else if (user.role !== 'faculty') {
+      } else if (user.role.toLowerCase() !== 'faculty') {
         router.push('/unauthorized')
       }
     }
@@ -26,7 +26,7 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
     )
   }
 
-  if (!user || user.role !== 'faculty') {
+  if (!user || user.role.toLowerCase() !== 'faculty') {
     return null
   }
 

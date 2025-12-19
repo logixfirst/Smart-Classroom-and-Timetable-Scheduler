@@ -10,7 +10,7 @@ import { useToast } from '@/components/Toast'
 interface Faculty {
   id: number
   faculty_id: string
-  employee_id?: string
+  faculty_code: string
   faculty_name: string
   designation: string
   specialization: string
@@ -272,7 +272,7 @@ export default function FacultyManagePage() {
                         {member.faculty_name}
                       </h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {member.employee_id || member.faculty_id}
+                        {member.faculty_code}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-500">
                         {member.designation}
@@ -346,7 +346,7 @@ export default function FacultyManagePage() {
                       <tr key={member.id} className="table-row">
                         <td className="table-cell">
                           <span className="font-mono text-sm">
-                            {member.employee_id || member.faculty_id}
+                            {member.faculty_code}
                           </span>
                         </td>
 

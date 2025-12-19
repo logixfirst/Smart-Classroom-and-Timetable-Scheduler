@@ -12,7 +12,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     if (!isLoading) {
       if (!user) {
         router.push('/login')
-      } else if (user.role !== 'staff') {
+      } else if (user.role.toLowerCase() !== 'staff') {
         router.push('/unauthorized')
       }
     }
@@ -26,7 +26,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
     )
   }
 
-  if (!user || user.role !== 'staff') {
+  if (!user || user.role.toLowerCase() !== 'staff') {
     return null
   }
 

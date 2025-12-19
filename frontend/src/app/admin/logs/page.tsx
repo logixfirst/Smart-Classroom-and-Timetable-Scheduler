@@ -1,4 +1,4 @@
-import DashboardLayout from '@/components/dashboard-layout'
+'use client'
 
 export default function LogsPage() {
   const logs = [
@@ -45,9 +45,8 @@ export default function LogsPage() {
   ]
 
   return (
-    <DashboardLayout role="admin" pageTitle="System Logs">
-      <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
           <div className="flex flex-col sm:flex-row gap-2 ml-auto">
             <label htmlFor="level-filter" className="sr-only">
               Filter by log level
@@ -64,9 +63,9 @@ export default function LogsPage() {
               Export
             </button>
           </div>
-        </div>
+      </div>
 
-        <div className="card">
+      <div className="card">
           <div className="card-header">
             <h3 className="card-title">Recent Activity</h3>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
@@ -164,10 +163,8 @@ export default function LogsPage() {
               </tbody>
             </table>
           </div>
-        </div>
       </div>
-    </DashboardLayout>
+    </div>
   )
 }
 
-// kslksdjglkdjgl

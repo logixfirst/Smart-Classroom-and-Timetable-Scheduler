@@ -12,7 +12,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     if (!isLoading) {
       if (!user) {
         router.push('/login')
-      } else if (user.role !== 'student') {
+      } else if (user.role.toLowerCase() !== 'student') {
         router.push('/unauthorized')
       }
     }
@@ -26,7 +26,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     )
   }
 
-  if (!user || user.role !== 'student') {
+  if (!user || user.role.toLowerCase() !== 'student') {
     return null
   }
 

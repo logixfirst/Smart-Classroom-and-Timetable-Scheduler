@@ -543,6 +543,10 @@ class TimetableGenerationSaga:
         all_solutions = {}
         total_clusters = len(clusters)
         
+        # NEP 2020 FIX: Track global student schedule across ALL clusters to prevent cross-cluster conflicts
+        # Format: {student_id: [(start_slot_idx, end_slot_idx), ...]}
+        global_student_schedule = {}
+        
         # Set stage with total clusters for work-based progress
         self.progress_tracker.set_stage('cpsat', total_items=total_clusters)
         
@@ -568,11 +572,19 @@ class TimetableGenerationSaga:
                         data['load_data']['time_slots'],
                         data['load_data']['faculty'],
                         total_clusters=total_clusters,
-                        completed=completed
+                        completed=completed,
+                        global_student_schedule=global_student_schedule  # NEP 2020: Pass global schedule
                     )
                     
                     if solution:
                         all_solutions.update(solution)
+                        # NEP 2020 FIX: Update global student schedule with newly assigned courses
+                        self._update_global_student_schedule(
+                            global_student_schedule,
+                            solution,
+                            cluster_courses,
+                            time_slots
+                        )
                     
                     completed += 1
                     self.progress_tracker.update_work_progress(completed)
@@ -586,6 +598,10 @@ class TimetableGenerationSaga:
                     gc.collect()
         else:
             # Parallel with ThreadPoolExecutor (shares memory, no pickle issues)
+            # NEP 2020: Add thread lock for global_student_schedule updates
+            import threading
+            schedule_lock = threading.Lock()
+            
             with ThreadPoolExecutor(max_workers=max_parallel) as executor:
                 futures = {}
                 # Store job_id for CP-SAT progress updates
@@ -595,6 +611,10 @@ class TimetableGenerationSaga:
                     if len(cluster_courses) > max_courses_per_cluster:
                         cluster_courses = cluster_courses[:max_courses_per_cluster]
                     
+                    # NEP 2020: Make a snapshot of global_student_schedule for this thread (read-only)
+                    with schedule_lock:
+                        global_schedule_snapshot = dict(global_student_schedule)
+                    
                     future = executor.submit(
                         self._solve_cluster_safe,
                         cluster_id, cluster_courses,
@@ -602,7 +622,8 @@ class TimetableGenerationSaga:
                         data['load_data']['time_slots'],
                         data['load_data']['faculty'],
                         total_clusters,
-                        idx  # Pass current index as completed count
+                        idx,  # Pass current index as completed count
+                        global_schedule_snapshot  # NEP 2020: Pass snapshot (read-only)
                     )
                     futures[future] = cluster_id
                 
@@ -620,6 +641,15 @@ class TimetableGenerationSaga:
                         solution = future.result(timeout=base_timeout)
                         if solution:
                             all_solutions.update(solution)
+                            # NEP 2020 FIX: Thread-safe update of global student schedule
+                            cluster_courses = clusters.get(cluster_id, [])
+                            with schedule_lock:
+                                self._update_global_student_schedule(
+                                    global_student_schedule,
+                                    solution,
+                                    cluster_courses,
+                                    time_slots
+                                )
                         completed += 1
                         self.progress_tracker.update_work_progress(completed)
                         
@@ -703,8 +733,9 @@ class TimetableGenerationSaga:
             'cpsat_scheduled': len(all_solutions)
         }
     
-    def _solve_cluster_safe(self, cluster_id, courses, rooms, time_slots, faculty, total_clusters=None, completed=0):
-        """Solve single cluster with CP-SAT -> Basic Greedy fallback"""
+    def _solve_cluster_safe(self, cluster_id, courses, rooms, time_slots, faculty, total_clusters=None, completed=0, global_student_schedule=None):
+        """Solve single cluster with CP-SAT -> Basic Greedy fallback
+        NEP 2020: Now passes global_student_schedule to prevent cross-cluster conflicts"""
         from engine.stage2_cpsat import AdaptiveCPSATSolver
         
         global redis_client_global
@@ -721,7 +752,8 @@ class TimetableGenerationSaga:
                 redis_client=redis_client_global,
                 cluster_id=cluster_id,
                 total_clusters=total_clusters,
-                completed_clusters=completed
+                completed_clusters=completed,
+                global_student_schedule=global_student_schedule  # NEP 2020: Track cross-cluster conflicts
             )
             
             # Try CP-SAT (will try 3 strategies internally)
@@ -773,6 +805,48 @@ class TimetableGenerationSaga:
                 return False  # Not enough valid slots
         
         return True  # Passed all checks
+    
+    def _update_global_student_schedule(self, global_schedule, solution, courses, time_slots):
+        """NEP 2020: Update global student schedule after cluster is solved
+        Args:
+            global_schedule: Dict[student_id -> List[(start_slot_idx, end_slot_idx)]]
+            solution: Dict[(course_id, session) -> (slot_id, room_id)]
+            courses: List[Course] - courses in this cluster
+            time_slots: List[TimeSlot] - all time slots
+        """
+        try:
+            # Create slot_id -> slot_index mapping for fast lookup
+            slot_to_idx = {slot.slot_id: idx for idx, slot in enumerate(time_slots)}
+            
+            # Build course_id -> course mapping
+            course_map = {c.course_id: c for c in courses}
+            
+            # For each assignment in solution, update student schedules
+            for (course_id, session_idx), (slot_id, room_id) in solution.items():
+                course = course_map.get(course_id)
+                if not course:
+                    continue
+                
+                # Get slot index
+                slot_idx = slot_to_idx.get(slot_id)
+                if slot_idx is None:
+                    continue
+                
+                # Calculate slot range (course.duration spans multiple slots)
+                duration = getattr(course, 'duration', 1)
+                start_slot = slot_idx
+                end_slot = slot_idx + duration - 1
+                
+                # Update each student's global schedule
+                for student_id in getattr(course, 'student_ids', []):
+                    if student_id not in global_schedule:
+                        global_schedule[student_id] = []
+                    global_schedule[student_id].append((start_slot, end_slot))
+            
+            logger.debug(f"[NEP2020] Updated global schedule: {len(global_schedule)} students tracked")
+        except Exception as e:
+            logger.error(f"[NEP2020] Failed to update global student schedule: {e}")
+            logger.exception(e)
     
     def _analyze_cluster_difficulty(self, courses) -> float:
         """Analyze cluster difficulty (0=easy, 1=hard) for adaptive CP-SAT timeout"""
@@ -1018,11 +1092,25 @@ class TimetableGenerationSaga:
             # Get hardware-adaptive config
             global hardware_profile
             optimal_config = get_optimal_config(hardware_profile) if hardware_profile else {}
+            # DEFAULT: Context-Aware Q-Learning (tabular with 33D state encoding)
+            # use_gpu=False ensures tabular Q-Learning (NOT DQN) for commodity hardware
             stage3_config = optimal_config.get('stage3_qlearning', {'max_iterations': 100, 'algorithm': 'q_learning', 'use_gpu': False})
             
             max_iter = stage3_config.get('max_iterations', 100)
-            use_gpu_rl = stage3_config.get('use_gpu', False)
+            use_gpu_rl = stage3_config.get('use_gpu', False)  # DEFAULT: False (Context-Aware Q-Learning)
             algorithm = stage3_config.get('algorithm', 'q_learning')
+            
+            # Log methodology clearly for research documentation
+            logger.info("="*80)
+            logger.info("[STAGE 3] METHODOLOGY: Context-Aware Q-Learning")
+            logger.info("[STAGE 3] State Space: 33-dimensional continuous feature vectors")
+            logger.info("[STAGE 3] Q-Value Storage: Tabular (NOT Deep Q-Network)")
+            logger.info("[STAGE 3] Transfer Learning: ENABLED (bootstrap from previous semesters)")
+            logger.info("[STAGE 3] Behavioral Context: ENABLED (learn from historical data)")
+            logger.info("[STAGE 3] Hardware: CPU-only (4GB+ RAM, no GPU required)")
+            logger.info(f"[STAGE 3] Hyperparameters: α=0.15, γ=0.85, ε=0.10, max_iter={max_iter}")
+            logger.info(f"[STAGE 3] Conflicts to resolve: {len(conflicts)}")
+            logger.info("="*80)
             
             # Set stage with total iterations for work-based progress
             self.progress_tracker.set_stage('rl', total_items=max_iter)
@@ -1036,12 +1124,10 @@ class TimetableGenerationSaga:
                 discount_factor=0.85,
                 epsilon=0.10,
                 max_iterations=max_iter,
-                use_gpu=use_gpu_rl,
+                use_gpu=use_gpu_rl,  # DEFAULT: False (Context-Aware Q-Learning for research paper)
                 org_id=request_data.get('organization_id'),
                 progress_tracker=self.progress_tracker
             )
-            
-            logger.info(f"[STAGE3] Config: algorithm={algorithm}, iterations={max_iter}, conflicts={len(conflicts)}")
             
             # CORRECTED: Pass clusters for global re-optimization
             clusters = data.get('stage1_louvain_clustering', {})

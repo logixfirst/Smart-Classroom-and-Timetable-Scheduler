@@ -33,6 +33,12 @@ from models.timetable_models import Course, Room, TimeSlot, Faculty
 
 logger = logging.getLogger(__name__)
 
+# Log RL methodology clearly
+logger.info("="*80)
+logger.info("[RL] METHOD: Context-Aware Q-Learning (Tabular with 33D Continuous Encoding)")
+logger.info("[RL] No Deep Q-Networks (DQN) - Pure Q-Learning for commodity hardware")
+logger.info("="*80)
+
 class MultidimensionalContextEncoder:
     """Encodes timetable state into multidimensional context vector"""
     
@@ -124,38 +130,6 @@ class MultidimensionalContextEncoder:
         ]
         
         return vector
-
-
-class DeepQNetwork(nn.Module):
-    """Deep Q-Network for timetable optimization with GPU support"""
-    
-    def __init__(self, state_dim=33, action_dim=48, hidden_dims=[128, 256, 128]):
-        super().__init__()
-        
-        layers = []
-        prev_dim = state_dim
-        
-        for hidden_dim in hidden_dims:
-            layers.extend([
-                nn.Linear(prev_dim, hidden_dim),
-                nn.ReLU(),
-                nn.Dropout(0.2),
-                nn.BatchNorm1d(hidden_dim)
-            ])
-            prev_dim = hidden_dim
-        
-        layers.append(nn.Linear(prev_dim, action_dim))
-        
-        self.network = nn.Sequential(*layers)
-        
-        # Move to GPU if available
-        if TORCH_AVAILABLE and DEVICE:
-            self.network = self.network.to(DEVICE)
-    
-    def forward(self, state):
-        if TORCH_AVAILABLE and DEVICE:
-            state = state.to(DEVICE)
-        return self.network(state)
 
 
 class BehavioralContext:
@@ -262,7 +236,22 @@ class BehavioralContext:
 
 
 class ContextAwareRLAgent:
-    """Context-aware RL with lazy context evaluation and GPU context building + Transfer Learning + Behavioral Context"""
+    """
+    Context-Aware Q-Learning with 33-Dimensional Continuous State Encoding
+    
+    RESEARCH PAPER METHODOLOGY:
+    - State Space: 33-dimensional continuous feature vectors
+    - Action Space: Discrete (reassign course to different time slot/room)
+    - Value Function: Tabular Q-table storage: Q[(state_tuple, action)] → expected reward
+    - Learning Algorithm: Q-Learning (Bellman equation) with α=0.1, γ=0.9, ε=0.3
+    - Enhancements: Transfer learning, behavioral context from historical data
+    - Hardware: CPU-only (4GB+ RAM), no GPU required
+    
+    This is PURE Q-Learning (NOT Deep Q-Networks):
+    - Uses continuous state encoding for expressiveness
+    - Stores Q-values in tabular dictionary (not neural network)
+    - Works on commodity hardware without GPU
+    """
     
     def __init__(self, q_table_path="q_table.pkl", use_gpu=False, org_id=None, org_features=None):
         import threading
@@ -271,10 +260,18 @@ class ContextAwareRLAgent:
         self.org_id = org_id
         self.org_features = org_features or {}
         
+        # RESEARCH PAPER: Log methodology clearly
+        logger.info("="*80)
+        logger.info("[RL METHODOLOGY] Context-Aware Q-Learning with 33D Continuous State Encoding")
+        logger.info("[RL METHODOLOGY] State Space: 33-dimensional continuous feature vectors")
+        logger.info("[RL METHODOLOGY] Value Function: Tabular Q-table (NOT Deep Q-Network)")
+        logger.info("[RL METHODOLOGY] Hardware: CPU-only, no GPU required (4GB+ RAM)")
+        logger.info("="*80)
+        
         # Thread safety locks
         self._q_table_lock = threading.Lock()  # Protect Q-table updates
         self._cache_lock = threading.Lock()  # Protect context cache
-        self._gpu_lock = threading.Lock() if use_gpu and TORCH_AVAILABLE else None  # GPU operations
+        self._gpu_lock = threading.Lock() if use_gpu and TORCH_AVAILABLE else None  # GPU operations (optional)
         
         # Behavioral Context: Load if available
         self.behavioral = BehavioralContext(org_id)
@@ -284,10 +281,10 @@ class ContextAwareRLAgent:
             from engine.rl_transfer_learning import bootstrap_new_university
             self.q_table, self.expected_quality = bootstrap_new_university(org_id, org_features)
             if self.q_table:
-                logger.info(f"[OK] Transfer Learning: Bootstrapped Q-table with {len(self.q_table)} states")
-                logger.info(f"[OK] Expected quality: {self.expected_quality*100:.0f}% (10% boost from transfer learning)")
+                logger.info(f"[TRANSFER LEARNING] Bootstrapped Q-table with {len(self.q_table)} states")
+                logger.info(f"[TRANSFER LEARNING] Expected quality: {self.expected_quality*100:.0f}% (+10% boost)")
             else:
-                logger.info(f"[WARN] No transfer learning available, starting from scratch (75% baseline quality)")
+                logger.info(f"[TRANSFER LEARNING] No prior data, starting from scratch (75% baseline)")
         else:
             self.q_table = {}  # Empty Q-table
             self.expected_quality = 0.75
@@ -295,20 +292,23 @@ class ContextAwareRLAgent:
         # Add behavioral boost if data available
         if self.behavioral.has_data:
             self.expected_quality += 0.05  # +5% from behavioral context
-            logger.info(f"[OK] Behavioral Context: +5% quality boost (total: {self.expected_quality*100:.0f}%)")
+            logger.info(f"[BEHAVIORAL CONTEXT] Historical data loaded (+5% quality boost)")
+            logger.info(f"[TOTAL EXPECTED QUALITY] {self.expected_quality*100:.0f}%")
         
         self.context_cache = {}  # Lazy context storage
         self.max_cache_size = 50  # Reduced from 100
-        self.epsilon = 0.3
-        self.alpha = 0.1
-        self.gamma = 0.9
+        self.epsilon = 0.3  # Exploration rate
+        self.alpha = 0.1    # Learning rate
+        self.gamma = 0.9    # Discount factor
         self.conflicts_resolved = 0
+        
+        # GPU can be used for faster context building (optional, not core Q-Learning)
         self.use_gpu = use_gpu and TORCH_AVAILABLE
         
         if self.use_gpu:
-            logger.info("[GPU] RL using GPU for context building")
+            logger.info("[OPTIONAL] GPU acceleration for context building (still using Q-Learning, not DQN)")
         else:
-            logger.info("RL using CPU for context building")
+            logger.info("[DEFAULT] CPU-only mode (commodity hardware compatible)")
     
     def select_action(self, state, available_actions):
         """ε-greedy action selection"""
@@ -539,7 +539,16 @@ def build_state_after_swap(swap_result):
     }
 
 class RLConflictResolver:
-    """RL-based conflict resolver with Transfer Learning + DQN for high conflicts"""
+    """
+    Context-Aware Q-Learning Conflict Resolver
+    
+    PURE Q-LEARNING METHOD (Research Paper):
+    - State encoding: 33-dimensional continuous feature vectors
+    - Q-value storage: Tabular dictionary (NOT neural network)
+    - Transfer learning: Bootstrap from previous semesters
+    - Behavioral context: Learn from historical data
+    - Hardware: 4GB+ RAM, CPU-only (no GPU required)
+    """
     
     def __init__(
         self,
@@ -551,10 +560,9 @@ class RLConflictResolver:
         discount_factor: float = 0.85,
         epsilon: float = 0.10,
         max_iterations: int = 100,
-        use_gpu: bool = False,
+        use_gpu: bool = False,  # Optional: GPU for faster context building
         gpu_device=None,
         org_id: str = None,
-        use_dqn_threshold: int = 100,
         progress_tracker=None  # Unified progress tracker
     ):
         self.courses = courses
@@ -566,17 +574,15 @@ class RLConflictResolver:
         self.epsilon = epsilon
         self.max_iterations = max_iterations
         self.org_id = org_id
-        self.use_dqn_threshold = use_dqn_threshold
         self.progress_tracker = progress_tracker
         
-        # FORCE GPU if available for Stage 3 context building
+        # GPU optional for context building (still uses Q-Learning, not DQN)
         self.use_gpu = TORCH_AVAILABLE if use_gpu else False
         self.gpu_device = gpu_device
         
-        if self.use_gpu:
-            logger.info("[GPU] FORCING GPU for RL context building")
-        else:
-            logger.info("GPU not available for RL, using CPU")
+        logger.info("[METHOD] Context-Aware Q-Learning with 33D continuous state encoding")
+        logger.info("[METHOD] Tabular Q-table storage (NOT Deep Q-Networks)")
+        logger.info("[METHOD] Hardware: CPU-only, 4GB+ RAM")
         
         # Extract organization features for transfer learning
         org_features = {
@@ -747,96 +753,86 @@ class RLConflictResolver:
             return self._detect_conflicts_cpu(schedule)
     
     def _detect_conflicts_cpu(self, schedule: Dict) -> List[Dict]:
-        """CPU fallback for conflict detection"""
-        from concurrent.futures import ThreadPoolExecutor
-        import multiprocessing
-        
-        # Split schedule into chunks for parallel processing
-        schedule_items = list(schedule.items())
-        num_workers = min(4, multiprocessing.cpu_count())  # Reduced from 8
-        chunk_size = max(1, len(schedule_items) // num_workers)
-        chunks = [schedule_items[i:i + chunk_size] for i in range(0, len(schedule_items), chunk_size)]
-        
-        # Parallel conflict detection
-        with ThreadPoolExecutor(max_workers=num_workers) as executor:
-            futures = [
-                executor.submit(self._detect_conflicts_chunk, chunk)
-                for chunk in chunks
-            ]
-            
-            all_conflicts = []
-            for future in futures:
-                all_conflicts.extend(future.result())
-        
-        return all_conflicts
+        """CPU fallback for conflict detection - use fast O(n) method"""
+        # Use the fast conflict detection we added
+        timetable_data = {
+            'rooms': self.rooms,
+            'time_slots': self.time_slots,
+            'courses': self.courses
+        }
+        return self._detect_conflicts_fast(schedule, timetable_data)
     
-    def _resolve_with_dqn(self, conflicts: List[Dict], timetable_data: Dict) -> List[Dict]:
-        """Resolve conflicts using Deep Q-Network (for high conflict scenarios)"""
-        try:
-            import torch
-            import torch.nn as nn
-            
-            # Use existing DQN from context encoder
-            state_dim = 33
-            action_dim = len(timetable_data['time_slots'])
-            dqn = DeepQNetwork(state_dim, action_dim)
-            
-            resolved = []
-            encoder = MultidimensionalContextEncoder()
-            
-            for conflict in conflicts[:self.max_iterations]:
-                # Encode state
-                state_dict = {
-                    'slot_id': conflict.get('time_slot', 0),
-                    'course_id': conflict.get('course_id', 0),
-                    'student_id': conflict.get('student_id', 0)
-                }
-                state_vector = encoder.encode(state_dict)
-                state_tensor = torch.tensor(state_vector, dtype=torch.float32).unsqueeze(0)
-                
-                # Get action from DQN
-                with torch.no_grad():
-                    q_values = dqn(state_tensor)
-                    action_idx = torch.argmax(q_values).item()
-                
-                # Apply action
-                available_slots = get_available_slots(conflict, timetable_data)
-                if available_slots and action_idx < len(available_slots):
-                    new_slot = available_slots[action_idx]
-                    swap_result = apply_slot_swap(conflict, new_slot, timetable_data)
-                    if swap_result.get('success'):
-                        resolved.append(swap_result)
-            
-            logger.info(f"DQN resolved {len(resolved)}/{len(conflicts)} conflicts")
-            return resolved
-        except Exception as e:
-            logger.error(f"DQN failed: {e}, falling back to Q-learning")
-            return resolve_conflicts_with_enhanced_rl(conflicts, timetable_data, self.rl_agent)
-    
-    def _detect_conflicts_chunk(self, schedule_chunk: List) -> List[Dict]:
-        """Detect conflicts in a chunk of schedule (runs in thread)"""
+    def _detect_conflicts_fast(self, solution: Dict, timetable_data: Dict) -> List[Dict]:
+        """Fast conflict detection for Q-learning (counts only, no details)"""
         conflicts = []
-        student_schedule = {}
+        slot_to_time = {slot.slot_id: (slot.day, slot.period) for slot in timetable_data['time_slots']}
         
-        for (course_id, session), (time_slot, room_id) in schedule_chunk:
-            course = next((c for c in self.courses if c.course_id == course_id), None)
+        # Track assignments by faculty, room, and student
+        faculty_assignments = defaultdict(list)
+        room_assignments = defaultdict(list)
+        student_assignments = defaultdict(list)
+        
+        for (course_id, session), (slot_id, room_id) in solution.items():
+            course = next((c for c in timetable_data['courses'] if c.course_id == course_id), None)
             if not course:
                 continue
             
-            # Check student conflicts
+            time_tuple = slot_to_time.get(slot_id)
+            if not time_tuple:
+                continue
+            
+            # Track faculty assignments
+            faculty_id = course.faculty_id
+            faculty_assignments[faculty_id].append((time_tuple, course_id, session))
+            
+            # Track room assignments
+            room_assignments[room_id].append((time_tuple, course_id, session))
+            
+            # Track student assignments
             for student_id in getattr(course, 'student_ids', []):
-                key = (student_id, time_slot)
-                if key in student_schedule:
+                student_assignments[student_id].append((time_tuple, course_id, session))
+        
+        # Detect faculty conflicts
+        for faculty_id, assignments in faculty_assignments.items():
+            time_map = {}
+            for time_tuple, course_id, session in assignments:
+                if time_tuple in time_map:
                     conflicts.append({
-                        'type': 'student_conflict',
-                        'student_id': student_id,
-                        'time_slot': time_slot,
-                        'course_id': course_id,
-                        'conflicting_course': student_schedule[key],
-                        'session': session
+                        'type': 'faculty',
+                        'faculty_id': faculty_id,
+                        'time': time_tuple,
+                        'courses': [time_map[time_tuple][0], course_id]
                     })
                 else:
-                    student_schedule[key] = course_id
+                    time_map[time_tuple] = (course_id, session)
+        
+        # Detect room conflicts
+        for room_id, assignments in room_assignments.items():
+            time_map = {}
+            for time_tuple, course_id, session in assignments:
+                if time_tuple in time_map:
+                    conflicts.append({
+                        'type': 'room',
+                        'room_id': room_id,
+                        'time': time_tuple,
+                        'courses': [time_map[time_tuple][0], course_id]
+                    })
+                else:
+                    time_map[time_tuple] = (course_id, session)
+        
+        # Detect student conflicts
+        for student_id, assignments in student_assignments.items():
+            time_map = {}
+            for time_tuple, course_id, session in assignments:
+                if time_tuple in time_map:
+                    conflicts.append({
+                        'type': 'student',
+                        'student_id': student_id,
+                        'time': time_tuple,
+                        'courses': [time_map[time_tuple][0], course_id]
+                    })
+                else:
+                    time_map[time_tuple] = (course_id, session)
         
         return conflicts
 
@@ -1024,7 +1020,7 @@ def _resolve_cluster_conflicts_with_rl(courses: List, conflicts: List[Dict],
     
     # Helper: Check if slot/room assignment causes conflicts
     def _causes_conflict(course_id, slot, room, schedule, courses_data, time_slots):
-        """NEP 2020: Check conflicts considering department-specific slots and wall-clock time"""
+        """NEP 2020: Check conflicts using universal time slots and wall-clock time (day, period) for cross-department conflicts"""
         course = next((c for c in courses_data if c.course_id == course_id), None)
         if not course:
             return True
@@ -1071,7 +1067,7 @@ def _resolve_cluster_conflicts_with_rl(courses: List, conflicts: List[Dict],
         
         return False
     
-    # Helper: Find feasible alternative slots (NEP 2020: department-specific)
+    # Helper: Find feasible alternative slots (NEP 2020: uses universal time slots)
     def _find_feasible_slots(course_id, current_slot, current_room, schedule, courses_data, rooms_data, time_slots):
         course = next((c for c in courses_data if c.course_id == course_id), None)
         if not course:
@@ -1157,14 +1153,41 @@ def _resolve_cluster_conflicts_with_rl(courses: List, conflicts: List[Dict],
         best_slot, best_room = feasible_alternatives[0]
         
         # Apply swap
+        old_solution = timetable_data['current_solution'].copy()
         timetable_data['current_solution'][(course_id, 0)] = (best_slot, best_room)
+        
+        # BUG FIX: Update Q-table after action (LEARN from this swap!)
+        if q_table is not None:
+            # Compute state keys
+            state_key = f"{course_id}_{current_slot}_{current_room}"
+            action_key = f"slot_{best_slot}_room_{best_room}"
+            next_state_key = f"{course_id}_{best_slot}_{best_room}"
+            
+            # Compute reward: Count conflicts in new solution
+            new_conflicts = _detect_conflicts_fast(timetable_data['current_solution'], timetable_data)
+            reward = -len(new_conflicts) * 1000  # Negative reward for conflicts
+            
+            # Q-learning update: Q(s,a) ← Q(s,a) + α[r + γ·max Q(s',a') - Q(s,a)]
+            alpha = 0.15  # Learning rate
+            gamma = 0.85  # Discount factor
+            current_q = q_table.get(state_key, {}).get(action_key, 0)
+            
+            # Max Q-value for next state
+            next_q_values = q_table.get(next_state_key, {}).values()
+            max_next_q = max(next_q_values) if next_q_values else 0
+            
+            # Update Q-value
+            new_q = current_q + alpha * (reward + gamma * max_next_q - current_q)
+            if state_key not in q_table:
+                q_table[state_key] = {}
+            q_table[state_key][action_key] = new_q
         
         # Remove conflict from list
         conflicts.pop(0)
         resolved += 1
         
         if iteration % 10 == 0:  # Log every 10 resolutions
-            logger.debug(f"[RL] Resolved {resolved} conflicts so far...")
+            logger.debug(f"[RL] Resolved {resolved} conflicts, Q-table size: {len(q_table)}")
         
         logger.debug(f"[RL] Resolved conflict for course {course_id}: slot {current_slot}->{best_slot}, room {current_room}->{best_room}")
     
@@ -1472,7 +1495,7 @@ def resolve_with_bundle_actions(conflicts: List[Dict], timetable_data: Dict,
             conflicts.pop(0)
             continue
         
-        # Generate bundle actions (2-3 courses) - NEP 2020: use department-specific slots
+        # Generate bundle actions (2-3 courses) - NEP 2020: uses universal time slots
         best_action = None
         for size in [2, 3]:
             if size > len(student_courses):

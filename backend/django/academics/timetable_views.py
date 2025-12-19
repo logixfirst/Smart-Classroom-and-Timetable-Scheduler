@@ -37,7 +37,7 @@ def get_department_timetable(request, dept_id):
         )
 
     # HOD can only see their own department
-    if user.role == "hod":
+    if user.role.lower() == "hod":
         try:
             faculty_profile = user.faculty_profile
             if str(faculty_profile.department.dept_id) != dept_id:
@@ -166,24 +166,37 @@ def get_student_timetable(request):
     """
     user = request.user
 
-    if user.role != "student":
+    if user.role.lower() != "student":
         return Response(
             {"success": False, "error": "Only students can access this endpoint"},
             status=status.HTTP_403_FORBIDDEN,
         )
 
     try:
-        # Get student profile
-        student_profile = user.student_profile
+        # Get student profile by username
+        from .models import Student, Batch
+        student = Student.objects.select_related('department', 'program').get(username=user.username)
+        
+        # Get batch if batch_id exists
+        batch = None
+        batch_name = "N/A"
+        if student.batch_id:
+            try:
+                batch = Batch.objects.get(batch_id=student.batch_id)
+                batch_name = batch.batch_name
+            except Batch.DoesNotExist:
+                pass
 
         # Get all slots for student's batch
-        slots = (
-            TimetableSlot.objects.filter(
-                batch=student_profile.batch, timetable__is_active=True
+        slots = []
+        if batch:
+            slots = (
+                TimetableSlot.objects.filter(
+                    batch=batch, timetable__is_active=True
+                )
+                .select_related("subject", "faculty", "classroom", "timetable")
+                .order_by("day", "start_time")
             )
-            .select_related("subject", "faculty", "classroom", "timetable")
-            .order_by("day", "start_time")
-        )
 
         serializer = TimetableSlotSerializer(slots, many=True)
 
@@ -191,18 +204,24 @@ def get_student_timetable(request):
             {
                 "success": True,
                 "student": {
-                    "student_id": str(student_profile.student_id),
-                    "roll_number": student_profile.roll_number,
-                    "student_name": student_profile.student_name,
-                    "batch": student_profile.batch.batch_name,
-                    "semester": student_profile.current_semester,
-                    "department": student_profile.department.dept_name,
+                    "student_id": str(student.student_id),
+                    "roll_number": student.roll_number or student.enrollment_number,
+                    "student_name": f"{student.first_name} {student.middle_name or ''} {student.last_name}".strip(),
+                    "batch": batch_name,
+                    "semester": student.current_semester,
+                    "department": student.department.dept_name if student.department else "N/A",
                 },
-                "total_classes": slots.count(),
+                "total_classes": len(slots),
                 "slots": serializer.data,
             }
         )
 
+    except Student.DoesNotExist:
+        logger.error(f"Student with username {user.username} not found")
+        return Response(
+            {"success": False, "error": "Student profile not found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
     except Exception as e:
         logger.error(f"Error fetching student timetable: {str(e)}")
         return Response(

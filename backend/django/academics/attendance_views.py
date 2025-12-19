@@ -56,19 +56,19 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role == "admin" or user.role == "staff":
+        if user.role.lower() == "admin" or user.role.lower() == "staff":
             return AttendanceSession.objects.all().select_related(
                 "subject", "faculty", "batch"
             )
 
-        elif user.role == "faculty":
+        elif user.role.lower() == "faculty":
             # Faculty can see their own sessions
             faculty = Faculty.objects.get(email=user.email)
             return AttendanceSession.objects.filter(faculty=faculty).select_related(
                 "subject", "faculty", "batch"
             )
 
-        elif user.role == "student":
+        elif user.role.lower() == "student":
             # Students can see sessions of their enrolled subjects
             student = Student.objects.get(email=user.email)
             enrolled_subjects = SubjectEnrollment.objects.filter(
@@ -110,7 +110,7 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if user.role == "faculty":
+        if user.role.lower() == "faculty":
             faculty = Faculty.objects.get(email=user.email)
             if session.faculty != faculty:
                 return Response(
@@ -134,7 +134,7 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
         errors = []
 
         faculty = (
-            Faculty.objects.get(email=user.email) if user.role == "faculty" else None
+            Faculty.objects.get(email=user.email) if user.role.lower() == "faculty" else None
         )
 
         for record_data in serializer.validated_data["attendance_data"]:
@@ -248,13 +248,13 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
         """
         user = request.user
 
-        if user.role == "faculty":
+        if user.role.lower() == "faculty":
             faculty = Faculty.objects.get(email=user.email)
             sessions = AttendanceSession.objects.filter(
                 faculty=faculty, is_marked=False, date__lte=timezone.now().date()
             ).select_related("subject", "batch")
 
-        elif user.role in ["admin", "staff"]:
+        elif user.role.lower() in ["admin", "staff"]:
             sessions = AttendanceSession.objects.filter(
                 is_marked=False, date__lte=timezone.now().date()
             ).select_related("subject", "faculty", "batch")
@@ -308,7 +308,7 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
         marked_count = 0
         errors = []
         faculty = (
-            Faculty.objects.get(email=user.email) if user.role == "faculty" else None
+            Faculty.objects.get(email=user.email) if user.role.lower() == "faculty" else None
         )
 
         for row in reader:
@@ -366,7 +366,7 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
         marked_count = 0
         errors = []
         faculty = (
-            Faculty.objects.get(email=user.email) if user.role == "faculty" else None
+            Faculty.objects.get(email=user.email) if user.role.lower() == "faculty" else None
         )
 
         # Skip header row
@@ -467,7 +467,7 @@ class StudentAttendanceViewSet(viewsets.ViewSet):
         """
         user = request.user
 
-        if user.role != "student":
+        if user.role.lower() != "student":
             return Response(
                 {"error": "This endpoint is only for students"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -535,7 +535,7 @@ class StudentAttendanceViewSet(viewsets.ViewSet):
         for enrollment in enrollments:
             records = AttendanceRecord.objects.filter(
                 student=student, session__subject=enrollment.subject
-            )
+            ).select_related('session', 'marked_by').order_by('-session__date')
 
             total = records.count()
             present = records.filter(Q(status="present") | Q(status="late")).count()
@@ -545,17 +545,32 @@ class StudentAttendanceViewSet(viewsets.ViewSet):
 
             percentage = (present / total * 100) if total > 0 else 0
 
+            # Get recent records for this subject
+            recent_records = []
+            for record in records[:20]:  # Last 20 records
+                recent_records.append({
+                    "id": record.record_id,
+                    "session_id": record.session.session_id,
+                    "date": str(record.session.date),
+                    "subject_name": enrollment.subject.subject_name,
+                    "status": record.status,
+                    "marked_by_name": record.marked_by.faculty_name if record.marked_by else "System",
+                    "marked_at": record.marked_at.isoformat() if record.marked_at else None,
+                    "remarks": record.remarks or ""
+                })
+
             subject_wise.append(
                 {
                     "subject_id": enrollment.subject.subject_id,
                     "subject_name": enrollment.subject.subject_name,
-                    "total_classes": total,
-                    "attended": present,
-                    "missed": absent,
-                    "late": late,
-                    "excused": excused,
-                    "percentage": round(percentage, 2),
-                    "status": "at_risk" if percentage < min_percentage else "good",
+                    "total_sessions": total,
+                    "present_count": present,
+                    "absent_count": absent,
+                    "late_count": late,
+                    "excused_count": excused,
+                    "attendance_percentage": round(percentage, 2),
+                    "at_risk": percentage < min_percentage,
+                    "recent_records": recent_records
                 }
             )
 
@@ -574,9 +589,9 @@ class StudentAttendanceViewSet(viewsets.ViewSet):
             "student_name": student.name,
             "subject_wise_attendance": subject_wise,
             "overall_percentage": round(overall_percentage, 2),
-            "total_classes": total_classes,
-            "classes_attended": total_attended,
-            "classes_missed": total_missed,
+            "total_sessions": total_classes,
+            "present_count": total_attended,
+            "absent_count": total_missed,
             "late_count": total_late,
             "excused_count": total_excused,
             "at_risk": overall_percentage < min_percentage,

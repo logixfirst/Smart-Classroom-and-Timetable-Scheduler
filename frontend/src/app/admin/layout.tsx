@@ -15,7 +15,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         router.push('/login')
       } else {
         const role = user.role.toLowerCase()
-        if (role !== 'admin' && role !== 'org_admin') {
+        if (role !== 'admin' && role !== 'org_admin' && role !== 'super_admin') {
           router.push('/unauthorized')
         }
       }
@@ -35,7 +35,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   const role = user.role.toLowerCase()
-  if (role !== 'admin' && role !== 'org_admin') {
+  if (role !== 'admin' && role !== 'org_admin' && role !== 'super_admin') {
     return null
   }
 

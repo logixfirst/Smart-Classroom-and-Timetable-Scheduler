@@ -5,6 +5,43 @@ import DashboardLayout from '@/components/dashboard-layout'
 import ExportButton from '@/components/shared/ExportButton'
 import apiClient from '@/lib/api'
 
+interface Course {
+  offering_id: string
+  course_code: string
+  course_name: string
+  credits: number
+  department: string | null
+  faculty_name: string
+  academic_year: string
+  semester_type: string
+  semester_number: number
+  total_enrolled: number
+  number_of_sections: number
+}
+
+interface StudentProfile {
+  student_id: string
+  enrollment_number: string
+  roll_number: string | null
+  student_name: string
+  email: string
+  phone: string | null
+  department: string | null
+  department_code: string | null
+  program: string | null
+  program_code: string | null
+  current_semester: number
+  current_year: number
+  admission_year: number
+  cgpa: number | null
+  total_credits_earned: number | null
+  current_semester_credits: number | null
+  academic_status: string | null
+  is_active: boolean
+  enrolled_courses: Course[]
+  total_courses: number
+}
+
 interface TodayClass {
   time: string
   subject: string
@@ -26,13 +63,35 @@ interface TimetableSlot {
 }
 
 export default function StudentDashboard() {
+  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null)
   const [todaysClasses, setTodaysClasses] = useState<TodayClass[]>([])
   const [loading, setLoading] = useState(true)
   const [timetableData, setTimetableData] = useState<any>(null)
 
   useEffect(() => {
+    loadStudentProfile()
     loadTimetableData()
   }, [])
+
+  const loadStudentProfile = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/student/profile/', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to load student profile: ${response.status}`)
+      }
+      
+      const data: StudentProfile = await response.json()
+      setStudentProfile(data)
+    } catch (error) {
+      console.error('Failed to load student profile:', error)
+    }
+  }
 
   const loadTimetableData = async () => {
     try {
@@ -77,61 +136,27 @@ export default function StudentDashboard() {
           return {
             time: slot.time_slot,
             subject: slot.subject_name,
-            code: `CS${300 + index}`, // Mock course code
+            code: '', // Course code not available in slot data
             faculty: slot.faculty_name,
             room: slot.classroom_number,
             status,
-            type: index % 3 === 0 ? 'Lab' : index % 3 === 1 ? 'Lecture' : 'Tutorial',
+            type: 'Lecture', // Type not available in slot data
           }
         })
 
         setTodaysClasses(todaysClassesData)
       } else {
-        // Fallback to mock data if no approved timetable
-        loadMockData()
+        // No approved timetable available
+        setTodaysClasses([])
       }
     } catch (error) {
       console.error('Failed to load timetable data:', error)
-      // Fallback to mock data on error
-      loadMockData()
+      setTodaysClasses([])
     } finally {
       setLoading(false)
     }
   }
 
-  const loadMockData = () => {
-    // Fallback mock data
-    const mockClasses: TodayClass[] = [
-      {
-        time: '09:00 - 10:30',
-        subject: 'Data Structures',
-        code: 'CS301',
-        faculty: 'Dr. Rajesh Kumar',
-        room: 'Lab 1',
-        status: 'upcoming',
-        type: 'Lab',
-      },
-      {
-        time: '11:00 - 12:30',
-        subject: 'Database Systems',
-        code: 'CS302',
-        faculty: 'Prof. Meera Sharma',
-        room: 'Room 205',
-        status: 'current',
-        type: 'Lecture',
-      },
-      {
-        time: '14:00 - 15:30',
-        subject: 'Software Engineering',
-        code: 'CS303',
-        faculty: 'Dr. Vikram Gupta',
-        room: 'Room 301',
-        status: 'upcoming',
-        type: 'Tutorial',
-      },
-    ]
-    setTodaysClasses(mockClasses)
-  }
   return (
     <DashboardLayout role="student">
       <div className="space-y-4 sm:space-y-6">
@@ -141,10 +166,10 @@ export default function StudentDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div className="flex-1">
                 <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold tracking-tight text-gray-800 dark:text-gray-200">
-                  Welcome back, Arjun Singh
+                  {studentProfile ? `Welcome back, ${studentProfile.student_name}` : 'Student Dashboard'}
                 </h2>
                 <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-2">
-                  Computer Science Engineering • Semester 5 • Roll: CSE21001
+                  {studentProfile ? `${studentProfile.program || 'Program'} • Semester ${studentProfile.current_semester} • ${studentProfile.roll_number || studentProfile.enrollment_number}` : 'Loading...'}
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
@@ -309,7 +334,9 @@ export default function StudentDashboard() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
                     <h3 className="card-title">Current Enrollment</h3>
-                    <p className="card-description">Semester 5 • 24 Credits</p>
+                    <p className="card-description">
+                      {studentProfile ? `Semester ${studentProfile.current_semester} \u2022 ${studentProfile.current_semester_credits || 0} Credits` : 'Loading...'}
+                    </p>
                   </div>
                   <button className="btn-primary text-xs px-3 py-2 w-full sm:w-auto">
                     <span className="mr-1">🔍</span>
@@ -317,85 +344,50 @@ export default function StudentDashboard() {
                   </button>
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="table">
-                  <thead className="table-header">
-                    <tr>
-                      <th className="table-header-cell">Course</th>
-                      <th className="table-header-cell hidden sm:table-cell">Code</th>
-                      <th className="table-header-cell">Credits</th>
-                      <th className="table-header-cell hidden md:table-cell">Faculty</th>
-                      <th className="table-header-cell">Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      {
-                        name: 'Data Structures',
-                        code: 'CS301',
-                        credits: 4,
-                        faculty: 'Dr. Rajesh Kumar',
-                        type: 'Core',
-                      },
-                      {
-                        name: 'Database Systems',
-                        code: 'CS302',
-                        credits: 4,
-                        faculty: 'Prof. Meera Sharma',
-                        type: 'Core',
-                      },
-                      {
-                        name: 'Software Engineering',
-                        code: 'CS303',
-                        credits: 4,
-                        faculty: 'Dr. Vikram Gupta',
-                        type: 'Core',
-                      },
-                      {
-                        name: 'Machine Learning',
-                        code: 'CS401',
-                        credits: 4,
-                        faculty: 'Dr. Anita Verma',
-                        type: 'Elective',
-                      },
-                      {
-                        name: 'Web Development',
-                        code: 'CS402',
-                        credits: 4,
-                        faculty: 'Prof. Suresh Reddy',
-                        type: 'Elective',
-                      },
-                      {
-                        name: 'Technical Writing',
-                        code: 'EN301',
-                        credits: 4,
-                        faculty: 'Dr. Kavita Joshi',
-                        type: 'General',
-                      },
-                    ].map((course, index) => (
-                      <tr key={index} className="table-row">
-                        <td className="table-cell">{course.name}</td>
-                        <td className="table-cell hidden sm:table-cell">{course.code}</td>
-                        <td className="table-cell">{course.credits}</td>
-                        <td className="table-cell hidden md:table-cell">{course.faculty}</td>
-                        <td className="table-cell">
-                          <span
-                            className={`badge text-xs ${
-                              course.type === 'Core'
-                                ? 'badge-primary'
-                                : course.type === 'Elective'
-                                  ? 'badge-info'
-                                  : 'badge-neutral'
-                            }`}
-                          >
-                            {course.type}
-                          </span>
-                        </td>
+              
+              {!studentProfile ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Loading courses...</p>
+                  </div>
+                </div>
+              ) : studentProfile.enrolled_courses.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-4">📚</div>
+                  <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                    No Courses Enrolled
+                  </h4>
+                  <p className="text-gray-600 dark:text-gray-400">
+                    You are not enrolled in any courses for this semester.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="table">
+                    <thead className="table-header">
+                      <tr>
+                        <th className="table-header-cell">Course</th>
+                        <th className="table-header-cell hidden sm:table-cell">Code</th>
+                        <th className="table-header-cell">Credits</th>
+                        <th className="table-header-cell hidden md:table-cell">Faculty</th>
+                        <th className="table-header-cell hidden lg:table-cell">Dept</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {studentProfile.enrolled_courses.map((course, index) => (
+                        <tr key={index} className="table-row">
+                          <td className="table-cell">{course.course_name}</td>
+                          <td className="table-cell hidden sm:table-cell">{course.course_code}</td>
+                          <td className="table-cell">{course.credits}</td>
+                          <td className="table-cell hidden md:table-cell">{course.faculty_name}</td>
+                          <td className="table-cell">{course.department || 'N/A'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
 
@@ -441,77 +433,36 @@ export default function StudentDashboard() {
                 <h3 className="card-title text-sm sm:text-base">Attendance Overview</h3>
               </div>
               <div className="space-y-3">
-                {[
-                  {
-                    subject: 'Data Structures',
-                    code: 'CS301',
-                    attendance: 92,
-                    classes: 25,
-                    required: 75,
-                  },
-                  {
-                    subject: 'Database Systems',
-                    code: 'CS302',
-                    attendance: 88,
-                    classes: 22,
-                    required: 75,
-                  },
-                  {
-                    subject: 'Software Engineering',
-                    code: 'CS303',
-                    attendance: 95,
-                    classes: 20,
-                    required: 75,
-                  },
-                  {
-                    subject: 'Machine Learning',
-                    code: 'CS401',
-                    attendance: 73,
-                    classes: 18,
-                    required: 75,
-                  },
-                ].map((course, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 truncate block">
-                          {course.subject}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {course.code} • {course.classes} classes
-                        </span>
+                {studentProfile && studentProfile.enrolled_courses.length > 0 ? (
+                  studentProfile.enrolled_courses.map((course) => (
+                    <div key={course.offering_id} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 truncate block">
+                            {course.course_name}
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {course.course_code}
+                          </span>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <span className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
+                            0%
+                          </span>
+                          <p className="text-xs text-gray-400">No data</p>
+                        </div>
                       </div>
-                      <div className="text-right flex-shrink-0">
-                        <span
-                          className={`text-xs sm:text-sm font-medium ${
-                            course.attendance >= 90
-                              ? 'text-green-600'
-                              : course.attendance >= course.required
-                                ? 'text-yellow-600'
-                                : 'text-red-600'
-                          }`}
-                        >
-                          {course.attendance}%
-                        </span>
-                        {course.attendance < course.required && (
-                          <p className="text-xs text-red-500">Below {course.required}%</p>
-                        )}
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                        <div
+                          className="h-1.5 rounded-full bg-gray-400 transition-all duration-300"
+                          style={{ width: '0%' }}
+                        ></div>
                       </div>
                     </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-                      <div
-                        className={`h-1.5 rounded-full transition-all duration-300 ${
-                          course.attendance >= 90
-                            ? 'bg-green-600'
-                            : course.attendance >= course.required
-                              ? 'bg-yellow-600'
-                              : 'bg-red-600'
-                        }`}
-                        style={{ width: `${course.attendance}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500">No enrolled courses</p>
+                )}
               </div>
             </div>
 

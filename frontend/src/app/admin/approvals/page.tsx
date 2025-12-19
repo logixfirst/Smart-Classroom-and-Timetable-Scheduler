@@ -1,7 +1,5 @@
 'use client'
 
-import DashboardLayout from '@/components/dashboard-layout'
-
 export default function AdminApprovals() {
   const pendingApprovals = [
     {
@@ -47,32 +45,27 @@ export default function AdminApprovals() {
   }
 
   return (
-    <DashboardLayout
-      role="admin"
-      pageTitle="Pending Approvals"
-      pageDescription="Review and approve pending requests"
-    >
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
-          <div className="flex flex-col sm:flex-row gap-2 ml-auto">
-            <select className="input-primary w-full sm:w-36" aria-label="Filter by approval type">
-              <option>All Types</option>
-              <option>Timetable</option>
-              <option>Room Change</option>
-              <option>Faculty Leave</option>
-              <option>Course Update</option>
-            </select>
-            <select className="input-primary w-full sm:w-32" aria-label="Filter by priority level">
-              <option>All Priority</option>
-              <option>High</option>
-              <option>Medium</option>
-              <option>Low</option>
-            </select>
-          </div>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
+        <div className="flex flex-col sm:flex-row gap-2 ml-auto">
+          <select className="input-primary w-full sm:w-36" aria-label="Filter by approval type">
+            <option>All Types</option>
+            <option>Timetable</option>
+            <option>Room Change</option>
+            <option>Faculty Leave</option>
+            <option>Course Update</option>
+          </select>
+          <select className="input-primary w-full sm:w-32" aria-label="Filter by priority level">
+            <option>All Priority</option>
+            <option>High</option>
+            <option>Medium</option>
+            <option>Low</option>
+          </select>
         </div>
+      </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
@@ -120,10 +113,10 @@ export default function AdminApprovals() {
               </div>
             </div>
           </div>
-        </div>
+      </div>
 
-        {/* Approvals Table */}
-        <div className="card">
+      {/* Approvals Table */}
+      <div className="card">
           <div className="card-header">
             <h3 className="card-title">Pending Requests</h3>
           </div>
@@ -238,10 +231,10 @@ export default function AdminApprovals() {
               </tbody>
             </table>
           </div>
-        </div>
+      </div>
 
-        {/* Quick Actions */}
-        <div className="card">
+      {/* Quick Actions */}
+      <div className="card">
           <h3 className="card-title mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <button className="btn-success flex flex-col items-center gap-2 p-4">
@@ -261,8 +254,7 @@ export default function AdminApprovals() {
               <span className="text-sm font-medium">Export</span>
             </button>
           </div>
-        </div>
       </div>
-    </DashboardLayout>
+    </div>
   )
 }

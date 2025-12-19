@@ -4,6 +4,7 @@ Optimized for large-scale timetabling with student constraints
 """
 from ortools.sat.python import cp_model
 import logging
+import time
 from typing import List, Dict, Tuple, Optional, Set
 from collections import defaultdict
 from models.timetable_models import Course, Room, TimeSlot, Faculty
@@ -61,7 +62,8 @@ class AdaptiveCPSATSolver:
         redis_client = None,
         cluster_id: int = None,
         total_clusters: int = None,
-        completed_clusters: int = 0
+        completed_clusters: int = 0,
+        global_student_schedule: Dict[str, List[Tuple[int, int]]] = None  # NEP 2020: Track cross-cluster enrollments
     ):
         self.courses = courses
         self.rooms = rooms
@@ -73,6 +75,9 @@ class AdaptiveCPSATSolver:
         self.cluster_id = cluster_id
         self.total_clusters = total_clusters
         self.completed_clusters = completed_clusters
+        # NEP 2020 FIX: Track which time slots students are already scheduled in (across ALL clusters)
+        # Format: {student_id: [(slot_idx, slot_idx+duration-1), ...]}
+        self.global_student_schedule = global_student_schedule or {}
         
         # Auto-detect CPU cores for parallel solving
         import multiprocessing
@@ -98,6 +103,7 @@ class AdaptiveCPSATSolver:
     def solve_cluster(self, cluster: List[Course], timeout: float = None) -> Optional[Dict]:
         """
         Ultra-fast cluster solving with aggressive shortcuts + cancellation support
+        NEP 2020 FIX: Now respects global student schedule to prevent cross-cluster conflicts
         """
         import time
         cluster_start = time.time()
@@ -105,6 +111,9 @@ class AdaptiveCPSATSolver:
         logger.info(f"[CP-SAT] ========== CLUSTER SOLVE START ==========")
         logger.info(f"[CP-SAT] Cluster: {len(cluster)} courses, {len(self.rooms)} rooms, {len(self.time_slots)} slots")
         logger.info(f"[CP-SAT] Max cluster size: {self.max_cluster_size}, Timeout: {timeout}s")
+        if self.global_student_schedule:
+            num_scheduled_students = len(self.global_student_schedule)
+            logger.info(f"[CP-SAT] [NEP2020] Tracking {num_scheduled_students} students with existing schedules")
         self._update_progress(f"Starting ({len(cluster)} courses)")
         
         # Check cancellation before starting
@@ -350,6 +359,9 @@ class AdaptiveCPSATSolver:
         if self.job_id and self.redis_client:
             logger.info(f"[CP-SAT] [CALLBACK] Registering cancellation callback for job {self.job_id}")
             
+            # Import time module for nested class
+            import time as time_module
+            
             class CancellationCallback(cp_model.CpSolverSolutionCallback):
                 def __init__(self, redis_client, job_id):
                     cp_model.CpSolverSolutionCallback.__init__(self)
@@ -357,16 +369,16 @@ class AdaptiveCPSATSolver:
                     self.job_id = job_id
                     self._cancelled = False
                     self._solution_count = 0
-                    self._last_log_time = time.time()
+                    self._last_log_time = time_module.time()
                 
                 def on_solution_callback(self):
                     # Check cancellation every solution found
                     self._solution_count += 1
                     try:
                         # Log every 10 solutions to show solver progress
-                        if self._solution_count % 10 == 0 or time.time() - self._last_log_time > 5:
+                        if self._solution_count % 10 == 0 or time_module.time() - self._last_log_time > 5:
                             logger.info(f"[CP-SAT] [CALLBACK] Found {self._solution_count} solutions")
-                            self._last_log_time = time.time()
+                            self._last_log_time = time_module.time()
                         
                         cancel_flag = self.redis_client.get(f"cancel:job:{self.job_id}")
                         if cancel_flag:
@@ -634,7 +646,7 @@ class AdaptiveCPSATSolver:
                 rejected_features = 0
                 rejected_faculty = 0
                 
-                for t_slot in dept_slots:  # NEP 2020: Use department-specific slots
+                for t_slot in dept_slots:  # NEP 2020: Uses universal time slots (dept_slots = universal_slots on line 613)
                     # Faculty availability check
                     # BUG FIX: Empty/None available_slots means faculty is available for ALL slots
                     if faculty_avail and len(faculty_avail) > 0 and t_slot.slot_id not in faculty_avail:
@@ -842,6 +854,12 @@ class AdaptiveCPSATSolver:
             
             constraint_count = 0
             logger.info(f"[CP-SAT] [STUDENT CONSTRAINTS] Starting constraint generation for {len(all_students)} students")
+            
+            # NEP 2020 FIX: Check global student schedule to prevent cross-cluster conflicts
+            global_conflicts_prevented = 0
+            if self.global_student_schedule:
+                logger.info(f"[CP-SAT] [NEP2020] Adding global cross-cluster constraints for {len(self.global_student_schedule)} students")
+            
             # FIX 6: Add ALL constraints or fail - no partial constraints
             for idx, student_id in enumerate(all_students):
                 # Check timeout but DON'T skip - fail the entire cluster instead
@@ -854,6 +872,28 @@ class AdaptiveCPSATSolver:
                         return None  # Force greedy fallback with complete constraints
                 
                 courses_list = [c for c in cluster if student_id in c.student_ids]
+                
+                # NEP 2020 GLOBAL FIX: If student has courses scheduled in OTHER clusters, block those time slots
+                blocked_slots = set()
+                if student_id in self.global_student_schedule:
+                    for (start_slot, end_slot) in self.global_student_schedule[student_id]:
+                        # Block all slots in this range (course duration spans multiple slots)
+                        for slot_idx in range(start_slot, end_slot + 1):
+                            if slot_idx < len(self.time_slots):
+                                blocked_slots.add(slot_idx)
+                    
+                    if blocked_slots:
+                        global_conflicts_prevented += len(blocked_slots) * len(courses_list)
+                        # Add constraints: Student cannot be assigned to any of their blocked slots
+                        for course in courses_list:
+                            for s in range(course.duration):
+                                for slot_idx in blocked_slots:
+                                    for r in self.rooms:
+                                        var_key = (course.course_id, s, slot_idx, r.room_id)
+                                        if var_key in variables:
+                                            # Force this variable to 0 (cannot assign to blocked slot)
+                                            model.Add(variables[var_key] == 0)
+                                            constraint_count += 1
                 
                 # NEP 2020: For each wall-clock time, student can take at most 1 course (across all departments)
                 for time_key, slot_ids in slots_by_time.items():
@@ -870,6 +910,8 @@ class AdaptiveCPSATSolver:
                         constraint_count += 1
             
             elapsed = time.time() - start_time
+            if global_conflicts_prevented > 0:
+                logger.info(f"[CP-SAT] [NEP2020] Prevented {global_conflicts_prevented} potential cross-cluster conflicts")
             logger.info(f"Added {constraint_count} student constraints for {len(all_students)} students in {elapsed:.1f}s")
         
         elif priority == "CRITICAL":
@@ -901,6 +943,9 @@ class AdaptiveCPSATSolver:
             
             elapsed = time.time() - start_time
             logger.info(f"[CP-SAT] [STUDENT CONSTRAINTS] Added {constraint_count} CRITICAL student constraints in {elapsed:.1f}s (speed mode)")
+        
+        # Always return True if we completed successfully (didn't timeout)
+        return True
     
     def _group_students_by_conflicts(self, cluster: List[Course]) -> Dict[str, List[str]]:
         """Group students by number of enrolled courses"""

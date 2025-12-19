@@ -490,6 +490,35 @@ class CourseOffering(models.Model):
         return f"{self.course.course_code} - {self.semester_type}"
 
 
+class CourseEnrollment(models.Model):
+    """Student course enrollments - maps students to courses they're enrolled in"""
+    
+    enrollment_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="course_enrollments", db_column='org_id')
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name="course_enrollments", db_column='student_id')
+    course_offering = models.ForeignKey(CourseOffering, on_delete=models.CASCADE, related_name="enrollments", db_column='offering_id')
+    
+    enrollment_date = models.DateField(auto_now_add=True)
+    enrollment_status = models.CharField(max_length=50, default='ENROLLED')
+    grade = models.CharField(max_length=5, null=True, blank=True)
+    grade_points = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = "course_enrollments"
+        unique_together = [["student", "course_offering"]]
+        indexes = [
+            models.Index(fields=["organization", "student", "is_active"], name="idx_enrollment_student"),
+            models.Index(fields=["course_offering", "is_active"], name="idx_enrollment_offering"),
+        ]
+    
+    def __str__(self):
+        return f"{self.student.enrollment_number} - {self.course_offering.course.course_code}"
+
+
 # ============================================
 # 5. STUDENT MANAGEMENT (25000+ students)
 # ============================================

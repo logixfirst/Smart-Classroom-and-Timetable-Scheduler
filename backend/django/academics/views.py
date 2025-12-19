@@ -11,6 +11,8 @@ from .models import (
     Batch,
     Building,
     Course,
+    CourseEnrollment,
+    CourseOffering,
     Department,
     Faculty,
     Program,
@@ -662,3 +664,254 @@ def dashboard_stats(request):
             },
             "faculty": []
         })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def student_profile_and_courses(request):
+    """Get student profile and enrolled courses for the logged-in user"""
+    try:
+        username = request.user.username
+        
+        # Get student record by username
+        try:
+            student = Student.objects.select_related(
+                'program', 'department', 'organization', 'minor_dept'
+            ).get(username=username)
+        except Student.DoesNotExist:
+            return Response(
+                {"error": "Student profile not found for this user"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get enrolled courses from CourseOfferings based on student's program and semester
+        course_offerings = CourseOffering.objects.filter(
+            organization=student.organization,
+            semester_number=student.current_semester,
+            is_active=True
+        ).select_related('course', 'course__department', 'primary_faculty').defer('co_faculty_ids')
+        
+        # Build courses list
+        courses = []
+        for offering in course_offerings:
+            # Build faculty name
+            faculty = offering.primary_faculty
+            faculty_name = f"{faculty.first_name} {faculty.middle_name or ''} {faculty.last_name}".replace('  ', ' ').strip() if faculty else 'TBA'
+            
+            course_data = {
+                "offering_id": str(offering.offering_id),
+                "course_code": offering.course.course_code,
+                "course_name": offering.course.course_name,
+                "credits": offering.course.credits,
+                "department": offering.course.department.dept_name if offering.course.department else None,
+                "faculty_name": faculty_name,
+                "academic_year": offering.academic_year,
+                "semester_type": offering.semester_type,
+                "semester_number": offering.semester_number,
+                "total_enrolled": offering.total_enrolled,
+                "number_of_sections": offering.number_of_sections,
+            }
+            courses.append(course_data)
+        
+        # Build student profile response
+        student_name = f"{student.first_name} {student.middle_name or ''} {student.last_name}".replace('  ', ' ').strip()
+        student_data = {
+            "student_id": str(student.student_id),
+            "enrollment_number": student.enrollment_number,
+            "roll_number": student.roll_number,
+            "student_name": student_name,
+            "email": student.email,
+            "phone": student.phone_number,
+            "department": student.department.dept_name if student.department else None,
+            "department_code": student.department.dept_code if student.department else None,
+            "program": student.program.program_name if student.program else None,
+            "program_code": student.program.program_code if student.program else None,
+            "current_semester": student.current_semester,
+            "current_year": student.current_year,
+            "admission_year": student.admission_year,
+            "cgpa": float(student.cgpa) if student.cgpa else None,
+            "total_credits_earned": float(student.total_credits_earned) if student.total_credits_earned else None,
+            "current_semester_credits": student.current_semester_credits,
+            "academic_status": student.get_academic_status_display() if student.academic_status else None,
+            "is_active": student.is_active,
+            "enrolled_courses": courses,
+            "total_courses": len(courses),
+        }
+        
+        return Response(student_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        import traceback
+        print(f"Student profile error: {e}")
+        print(traceback.format_exc())
+        return Response(
+            {"error": f"Failed to fetch student profile: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def faculty_profile_and_courses(request):
+    """Get faculty profile and assigned courses for the logged-in user"""
+    try:
+        username = request.user.username
+        
+        # Get faculty record by username
+        try:
+            faculty = Faculty.objects.select_related('department', 'organization').get(username=username)
+        except Faculty.DoesNotExist:
+            return Response(
+                {"error": "Faculty profile not found for this user"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get assigned courses from CourseOfferings
+        course_offerings = CourseOffering.objects.filter(
+            primary_faculty=faculty,
+            is_active=True
+        ).select_related('course', 'course__department').defer('co_faculty_ids').order_by('course__course_code')
+        
+        # Build courses list with student counts and details
+        courses = []
+        for offering in course_offerings:
+            course_data = {
+                "offering_id": str(offering.offering_id),
+                "course_code": offering.course.course_code,
+                "course_name": offering.course.course_name,
+                "credits": offering.course.credits,
+                "department": offering.course.department.dept_name if offering.course.department else None,
+                "academic_year": offering.academic_year,
+                "semester_type": offering.semester_type,
+                "semester_number": offering.semester_number,
+                "total_enrolled": offering.total_enrolled,
+                "max_capacity": offering.max_capacity,
+                "number_of_sections": offering.number_of_sections,
+                "offering_status": offering.offering_status,
+            }
+            courses.append(course_data)
+        
+        # Build faculty profile response
+        faculty_name = f"{faculty.first_name} {faculty.middle_name or ''} {faculty.last_name}".replace('  ', ' ').strip()
+        faculty_data = {
+            "faculty_id": str(faculty.faculty_id),
+            "faculty_code": faculty.faculty_code,
+            "faculty_name": faculty_name,
+            "email": faculty.email,
+            "phone": faculty.phone_number,
+            "department": faculty.department.dept_name if faculty.department else None,
+            "department_code": faculty.department.dept_code if faculty.department else None,
+            "specialization": faculty.specialization,
+            "qualification": faculty.highest_qualification,
+            "designation": faculty.get_designation_display() if faculty.designation else None,
+            "max_workload_per_week": faculty.max_hours_per_week,
+            "is_active": faculty.is_active,
+            "assigned_courses": courses,
+            "total_courses": len(courses),
+        }
+        
+        return Response(faculty_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        import traceback
+        print(f"Faculty profile error: {e}")
+        print(traceback.format_exc())
+        return Response(
+            {"error": f"Failed to fetch faculty profile: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def student_profile_and_courses(request):
+    """Get student profile and enrolled courses for the logged-in user"""
+    try:
+        username = request.user.username
+        
+        # Get student record by username
+        try:
+            student = Student.objects.select_related('department', 'program', 'organization').get(username=username)
+        except Student.DoesNotExist:
+            return Response(
+                {"error": "Student profile not found for this user"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Try to get enrolled courses from CourseEnrollments
+        try:
+            enrollments = CourseEnrollment.objects.filter(
+                student=student,
+                is_active=True
+            ).select_related(
+                'course_offering__course',
+                'course_offering__course__department',
+                'course_offering__primary_faculty'
+            ).defer('course_offering__co_faculty_ids').order_by('course_offering__course__course_code')
+        except Exception as enrollment_error:
+            print(f"CourseEnrollment query error: {enrollment_error}")
+            import traceback
+            print(traceback.format_exc())
+            # If CourseEnrollment table doesn't exist or has issues, return empty enrollments
+            enrollments = []
+        
+        # Build enrolled courses list
+        courses = []
+        for enrollment in enrollments:
+            offering = enrollment.course_offering
+            course = offering.course
+            faculty_name = f"{offering.primary_faculty.first_name} {offering.primary_faculty.middle_name or ''} {offering.primary_faculty.last_name}".replace('  ', ' ').strip() if offering.primary_faculty else 'TBA'
+            
+            course_data = {
+                "offering_id": str(offering.offering_id),
+                "enrollment_id": str(enrollment.enrollment_id),
+                "course_code": course.course_code,
+                "course_name": course.course_name,
+                "credits": course.credits,
+                "department": course.department.dept_name if course.department else None,
+                "faculty_name": faculty_name,
+                "academic_year": offering.academic_year,
+                "semester_type": offering.semester_type,
+                "semester_number": offering.semester_number,
+                "total_enrolled": offering.total_enrolled,
+                "number_of_sections": offering.number_of_sections,
+                "enrollment_status": enrollment.enrollment_status,
+                "grade": enrollment.grade,
+            }
+            courses.append(course_data)
+        
+        # Build student profile response
+        student_name = f"{student.first_name} {student.middle_name or ''} {student.last_name}".replace('  ', ' ').strip()
+        student_data = {
+            "student_id": str(student.student_id),
+            "enrollment_number": student.enrollment_number,
+            "roll_number": student.roll_number,
+            "student_name": student_name,
+            "email": student.email,
+            "phone": student.phone_number,
+            "department": student.department.dept_name if student.department else None,
+            "department_code": student.department.dept_code if student.department else None,
+            "program": student.program.program_name if student.program else None,
+            "program_code": student.program.program_code if student.program else None,
+            "current_semester": student.current_semester,
+            "current_year": student.current_year,
+            "admission_year": student.admission_year,
+            "cgpa": float(student.cgpa) if student.cgpa else None,
+            "total_credits_earned": float(student.total_credits_earned) if student.total_credits_earned else None,
+            "current_semester_credits": student.current_semester_credits,
+            "academic_status": student.academic_status,
+            "is_active": student.is_active,
+            "enrolled_courses": courses,
+            "total_courses": len(courses),
+        }
+        
+        return Response(student_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        import traceback
+        print(f"Student profile error: {e}")
+        print(traceback.format_exc())
+        return Response(
+            {"error": f"Failed to fetch student profile: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

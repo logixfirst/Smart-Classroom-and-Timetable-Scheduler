@@ -148,7 +148,7 @@ export default function StudentTimetable() {
           <div className="card-compact">
             <div className="text-center">
               <div className="text-lg sm:text-xl font-semibold text-blue-600 dark:text-blue-400">
-                18
+                {schedule.length}
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-400">Total Classes</div>
             </div>
@@ -156,7 +156,7 @@ export default function StudentTimetable() {
           <div className="card-compact">
             <div className="text-center">
               <div className="text-lg sm:text-xl font-semibold text-green-600 dark:text-green-400">
-                5
+                {new Set(schedule.map(s => s.subject_code)).size}
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-400">Subjects</div>
             </div>
@@ -164,7 +164,7 @@ export default function StudentTimetable() {
           <div className="card-compact">
             <div className="text-center">
               <div className="text-lg sm:text-xl font-semibold text-purple-600 dark:text-purple-400">
-                8
+                {new Set(schedule.map(s => s.faculty_name)).size}
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-400">Faculty</div>
             </div>
@@ -192,65 +192,48 @@ export default function StudentTimetable() {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Today's Classes</h3>
-            <p className="card-description">Monday, December 16, 2024</p>
+            <p className="card-description">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
           </div>
           <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-bold text-blue-800 dark:text-blue-300">9:00</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                  Data Structures
-                </h4>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Dr. Rajesh Kumar • Lab 1</p>
-              </div>
-              <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">1h 30m</div>
-            </div>
-            <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-              <div className="w-12 h-12 bg-green-100 dark:bg-green-900/40 rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-bold text-green-800 dark:text-green-300">14:00</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                  Technical Writing
-                </h4>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Dr. Kavita Joshi • Room 101
-                </p>
-              </div>
-              <div className="text-xs text-green-600 dark:text-green-400 font-medium">1h 30m</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Upcoming Assignments */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Upcoming Assignments</h3>
-            <p className="card-description">Due dates and submissions</p>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                  Database Design Project
-                </h4>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Prof. Meera Sharma</p>
-              </div>
-              <div className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">
-                Due in 3 days
-              </div>
-            </div>
-            <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                  ML Algorithm Implementation
-                </h4>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Dr. Anita Verma</p>
-              </div>
-              <div className="text-xs text-red-600 dark:text-red-400 font-medium">Due tomorrow</div>
-            </div>
+            {(() => {
+              const today = new Date().toLocaleDateString('en-US', { weekday: 'long' })
+              const todayClasses = schedule.filter(s => s.day === today).sort((a, b) => {
+                const timeA = a.time_slot?.split('-')[0] || '00:00'
+                const timeB = b.time_slot?.split('-')[0] || '00:00'
+                return timeA.localeCompare(timeB)
+              })
+              
+              if (todayClasses.length === 0) {
+                return (
+                  <p className="text-sm text-gray-500 text-center py-4">No classes scheduled for today</p>
+                )
+              }
+              
+              const colors = ['blue', 'green', 'purple', 'orange', 'pink', 'indigo']
+              
+              return todayClasses.map((slot, index) => {
+                const color = colors[index % colors.length]
+                const startTime = slot.time_slot?.split('-')[0] || '00:00'
+                return (
+                  <div key={index} className={`flex items-center gap-3 p-3 bg-${color}-50 dark:bg-${color}-900/20 border border-${color}-200 dark:border-${color}-800 rounded-lg`}>
+                    <div className={`w-12 h-12 bg-${color}-100 dark:bg-${color}-900/40 rounded-lg flex items-center justify-center flex-shrink-0`}>
+                      <span className={`text-xs font-bold text-${color}-800 dark:text-${color}-300`}>{startTime}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                        {slot.subject_code}
+                      </h4>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">
+                        {slot.faculty_name} • {slot.room_number}
+                      </p>
+                    </div>
+                    <div className={`text-xs text-${color}-600 dark:text-${color}-400 font-medium`}>
+                      {slot.time_slot}
+                    </div>
+                  </div>
+                )
+              })
+            })()}
           </div>
         </div>
       </div>

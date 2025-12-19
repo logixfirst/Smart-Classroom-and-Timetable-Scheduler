@@ -41,7 +41,7 @@ class FacultyAttendanceViewSet(viewsets.ViewSet):
         """
         user = request.user
 
-        if user.role != "faculty":
+        if user.role.lower() != "faculty":
             return Response(
                 {"error": "This endpoint is only for faculty"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -75,7 +75,7 @@ class FacultyAttendanceViewSet(viewsets.ViewSet):
         """
         user = request.user
 
-        if user.role != "faculty":
+        if user.role.lower() != "faculty":
             return Response(
                 {"error": "This endpoint is only for faculty"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -119,26 +119,33 @@ class FacultyAttendanceViewSet(viewsets.ViewSet):
             present = records.filter(Q(status="present") | Q(status="late")).count()
             percentage = (present / total * 100) if total > 0 else 0
 
+            absent = records.filter(status="absent").count()
+            late = records.filter(status="late").count()
+            excused = records.filter(status="excused").count()
+
             student_data.append(
                 {
                     "student_id": student.student_id,
                     "student_name": student.name,
                     "total_classes": total,
-                    "attended": present,
-                    "percentage": round(percentage, 2),
-                    "status": "at_risk" if percentage < 75 else "good",
+                    "attendance_percentage": round(percentage, 2),
+                    "present_count": present,
+                    "absent_count": absent,
+                    "late_count": late,
+                    "excused_count": excused,
+                    "at_risk": percentage < 75,
                 }
             )
 
         # Sort by percentage (lowest first to identify at-risk students)
-        student_data.sort(key=lambda x: x["percentage"])
+        student_data.sort(key=lambda x: x["attendance_percentage"])
 
         return Response(
             {
                 "subject": {"id": subject.subject_id, "name": subject.subject_name},
                 "total_sessions": sessions.count(),
                 "students": student_data,
-                "at_risk_count": sum(1 for s in student_data if s["percentage"] < 75),
+                "at_risk_count": sum(1 for s in student_data if s["at_risk"]),
             }
         )
 
@@ -494,7 +501,7 @@ class AttendanceAlertViewSet(viewsets.ModelViewSet):
                 .order_by("-created_at")
             )
 
-        elif user.role == "faculty":
+        elif user.role.lower() == "faculty":
             faculty = Faculty.objects.get(email=user.email)
             return (
                 AttendanceAlert.objects.filter(faculty=faculty)
@@ -502,7 +509,7 @@ class AttendanceAlertViewSet(viewsets.ModelViewSet):
                 .order_by("-created_at")
             )
 
-        elif user.role == "student":
+        elif user.role.lower() == "student":
             student = Student.objects.get(email=user.email)
             return (
                 AttendanceAlert.objects.filter(student=student)

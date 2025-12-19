@@ -8,11 +8,35 @@ import ExportButton from '@/components/shared/ExportButton'
 import apiClient from '@/lib/api'
 
 interface Subject {
-  subject_id: string
-  subject_name: string
-  total_sessions: number
-  total_students: number
-  average_attendance: number
+  offering_id: string
+  course_code: string
+  course_name: string
+  credits: number
+  department: string | null
+  academic_year: string
+  semester_type: string
+  semester_number: number
+  total_enrolled: number
+  max_capacity: number | null
+  number_of_sections: number
+  offering_status: string
+}
+
+interface FacultyProfile {
+  faculty_id: string
+  faculty_code: string
+  faculty_name: string
+  email: string
+  phone: string | null
+  department: string | null
+  department_code: string | null
+  specialization: string | null
+  qualification: string | null
+  designation: string | null
+  max_workload_per_week: number
+  is_active: boolean
+  assigned_courses: Subject[]
+  total_courses: number
 }
 
 interface ClassSession {
@@ -46,6 +70,7 @@ interface TimetableSlot {
 
 export default function FacultyDashboard() {
   const router = useRouter()
+  const [facultyProfile, setFacultyProfile] = useState<FacultyProfile | null>(null)
   const [mySubjects, setMySubjects] = useState<Subject[]>([])
   const [todaysClasses, setTodaysClasses] = useState<ClassSession[]>([])
   const [mySchedule, setMySchedule] = useState<TimeSlot[]>([])
@@ -55,25 +80,32 @@ export default function FacultyDashboard() {
   const [timetableData, setTimetableData] = useState<any>(null)
 
   useEffect(() => {
-    loadMySubjects()
+    loadFacultyProfile()
     loadTimetableData()
   }, [])
 
-  const loadMySubjects = async () => {
+  const loadFacultyProfile = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/attendance/faculty/my-classes/', {
+      setLoading(true)
+      const response = await fetch('http://localhost:8000/api/faculty/profile/', {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json'
         }
       })
 
-      if (!response.ok) throw new Error('Failed to load subjects')
+      if (!response.ok) {
+        throw new Error(`Failed to load faculty profile: ${response.status}`)
+      }
       
-      const data = await response.json()
-      setMySubjects(Array.isArray(data) ? data : [])
+      const data: FacultyProfile = await response.json()
+      setFacultyProfile(data)
+      setMySubjects(data.assigned_courses || [])
     } catch (error) {
-      console.error('Failed to load subjects:', error)
+      console.error('Failed to load faculty profile:', error)
+      setMySubjects([])
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -109,7 +141,7 @@ export default function FacultyDashboard() {
           batch: slot.batch_id,
           time_slot: slot.time_slot,
           classroom: slot.classroom_number,
-          students_count: Math.floor(Math.random() * 40) + 20, // Mock student count
+          students_count: 0, // Student count not available in slot data
         }))
 
         setTodaysClasses(todaysClassesData)
@@ -126,79 +158,20 @@ export default function FacultyDashboard() {
 
         setMySchedule(scheduleData)
       } else {
-        // Fallback to mock data if no approved timetable
-        loadMockData()
+        // No approved timetable available
+        setTodaysClasses([])
+        setMySchedule([])
       }
     } catch (error) {
       console.error('Failed to load timetable data:', error)
-      // Fallback to mock data on error
-      loadMockData()
+      setTodaysClasses([])
+      setMySchedule([])
     } finally {
       setLoading(false)
     }
   }
 
-  const loadMockData = () => {
-    // Fallback mock data
-    const mockClasses: ClassSession[] = [
-      {
-        id: 1,
-        course_id: 101,
-        course_name: 'Data Structures',
-        time_slot: '9:00-10:00',
-        classroom: 'Room 101',
-        batch: 'CS-A',
-        students_count: 30,
-      },
-      {
-        id: 2,
-        course_id: 102,
-        course_name: 'Algorithms',
-        time_slot: '11:00-12:00',
-        classroom: 'Room 102',
-        batch: 'CS-B',
-        students_count: 25,
-      },
-    ]
-    setTodaysClasses(mockClasses)
 
-    const mockSchedule: TimeSlot[] = [
-      {
-        day: 'Monday',
-        time: '9:00-10:00',
-        subject: 'Data Structures',
-        faculty: 'Dr. Smith',
-        classroom: 'Room 101',
-        batch: 'CS-A',
-      },
-      {
-        day: 'Tuesday',
-        time: '11:00-12:00',
-        subject: 'Algorithms',
-        faculty: 'Dr. Smith',
-        classroom: 'Room 102',
-        batch: 'CS-B',
-      },
-      {
-        day: 'Wednesday',
-        time: '14:00-15:00',
-        subject: 'Database Systems',
-        faculty: 'Dr. Smith',
-        classroom: 'Lab 1',
-        batch: 'CS-A',
-      },
-    ]
-    setMySchedule(mockSchedule)
-  }
-
-  // Keep existing methods unchanged
-  const loadTodaysClasses = async () => {
-    // This method is now replaced by loadTimetableData, keeping for compatibility
-  }
-
-  const loadMySchedule = async () => {
-    // This method is now replaced by loadTimetableData, keeping for compatibility
-  }
 
   const handleTakeAttendance = (subjectId?: string) => {
     // Redirect to attendance page
@@ -213,16 +186,10 @@ export default function FacultyDashboard() {
   return (
     <DashboardLayout role="faculty">
       <div className="space-y-4 sm:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200">
-            Faculty Dashboard
-          </h1>
-        </div>
-
-        {/* My Assigned Subjects */}
+        {/* Assigned Subjects */}
         <div className="card">
           <div className="card-header">
-            <h3 className="card-title">My Assigned Subjects</h3>
+            <h3 className="card-title">Assigned Subjects</h3>
             <p className="card-description">Subjects assigned to you for attendance management</p>
           </div>
 
@@ -235,23 +202,23 @@ export default function FacultyDashboard() {
             <div className="space-y-3">
               {mySubjects.map(subject => (
                 <div
-                  key={subject.subject_id}
+                  key={subject.offering_id}
                   className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg gap-3"
                 >
                   <div className="flex-1">
                     <h4 className="font-medium text-gray-900 dark:text-white">
-                      {subject.subject_name}
+                      {subject.course_name}
                     </h4>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Subject ID: {subject.subject_id}
+                      {subject.course_code} • {subject.credits} credits
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-500">
-                      {subject.total_students} students • {subject.total_sessions} sessions • {subject.average_attendance.toFixed(1)}% avg attendance
+                      {subject.total_enrolled} students enrolled • {subject.number_of_sections} section(s) • {subject.semester_type} {subject.academic_year}
                     </p>
                   </div>
 
                   <button
-                    onClick={() => handleTakeAttendance(subject.subject_id)}
+                    onClick={() => handleTakeAttendance(subject.offering_id)}
                     className="btn-primary w-full sm:w-auto"
                   >
                     📝 Take Attendance
@@ -308,33 +275,66 @@ export default function FacultyDashboard() {
           </div>
         </div>
 
+        {/* Faculty Profile */}
+        {facultyProfile && (
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Faculty Profile</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Name</p>
+                <p className="font-medium text-gray-900 dark:text-white">{facultyProfile.faculty_name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Faculty Code</p>
+                <p className="font-medium text-gray-900 dark:text-white">{facultyProfile.faculty_code}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+                <p className="font-medium text-gray-900 dark:text-white">{facultyProfile.email}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Department</p>
+                <p className="font-medium text-gray-900 dark:text-white">{facultyProfile.department || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Designation</p>
+                <p className="font-medium text-gray-900 dark:text-white">{facultyProfile.designation || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Specialization</p>
+                <p className="font-medium text-gray-900 dark:text-white">{facultyProfile.specialization || 'N/A'}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Quick Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <div className="card text-center">
             <div className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400">
-              {todaysClasses.length}
+              {mySubjects.length}
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Today's Classes</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Assigned Courses</div>
           </div>
           <div className="card text-center">
             <div className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">
-              {mySchedule.length}
+              {mySubjects.reduce((sum, course) => sum + course.number_of_sections, 0)}
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Weekly Classes</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Total Sections</div>
           </div>
           <div className="card text-center">
             <div className="text-2xl sm:text-3xl font-bold text-purple-600 dark:text-purple-400">
-              {Array.isArray(todaysClasses)
-                ? todaysClasses.reduce((sum, cls) => sum + cls.students_count, 0)
-                : 0}
+              {mySubjects.reduce((sum, course) => sum + course.total_enrolled, 0)}
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Total Students</div>
           </div>
           <div className="card text-center">
             <div className="text-2xl sm:text-3xl font-bold text-orange-600 dark:text-orange-400">
-              85%
+              {facultyProfile?.max_workload_per_week || 0}h
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Avg Attendance</div>
+            <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">Max Workload/Week</div>
           </div>
         </div>
       </div>
