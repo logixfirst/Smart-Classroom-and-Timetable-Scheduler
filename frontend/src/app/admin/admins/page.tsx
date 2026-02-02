@@ -64,8 +64,8 @@ export default function AdminUsersPage() {
 
     setError(null)
     try {
-      // Build query params - Fetch all users with large page size
-      let url = `/users/?page=1&page_size=1000&_t=${Date.now()}`
+      // Build query params - Fetch all users with large page size, ordered by role
+      let url = `/users/?page=1&page_size=10000&ordering=role&_t=${Date.now()}`
 
       // Note: Backend doesn't support role filtering, so we filter client-side below
       // if (selectedRole) url += `&role=${selectedRole}`
@@ -76,13 +76,19 @@ export default function AdminUsersPage() {
         url += `&search=${encodeURIComponent(searchTerm)}`
       }
 
+      console.log('Fetching users from:', url)
       const response = await apiClient.request<PaginatedResponse<User>>(url)
+      console.log('API Response:', response)
 
       if (response.error) {
+        console.error('API Error:', response.error)
         setError(response.error)
       } else if (response.data) {
         // Filter to show only administrative users (client-side filtering)
         const allUsers = response.data.results || []
+        
+        console.log('Total users fetched:', allUsers.length)
+        console.log('User roles:', allUsers.map(u => ({ username: u.username, role: u.role })))
 
         let adminUsers = allUsers.filter(
           u => {
@@ -91,6 +97,8 @@ export default function AdminUsersPage() {
             return role === 'ADMIN' || role === 'STAFF'
           }
         )
+        
+        console.log('Admin users after filter:', adminUsers.length, adminUsers.map(u => ({ username: u.username, role: u.role })))
 
         // Apply role filter if selected
         if (selectedRole) {
@@ -100,8 +108,14 @@ export default function AdminUsersPage() {
         setUsers(adminUsers)
         setTotalCount(adminUsers.length)
         setTotalPages(Math.ceil(adminUsers.length / 100))
+      } else {
+        console.warn('No data in response')
+        setUsers([])
+        setTotalCount(0)
+        setTotalPages(0)
       }
     } catch (err) {
+      console.error('Exception fetching users:', err)
       setError('Failed to fetch admin users')
     } finally {
       setIsLoading(false)
