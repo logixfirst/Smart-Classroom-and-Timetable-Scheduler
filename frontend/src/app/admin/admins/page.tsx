@@ -70,9 +70,10 @@ export default function AdminUsersPage() {
       if (selectedRole) url += `&role=${selectedRole}`
       if (selectedDepartment) url += `&department=${selectedDepartment}`
 
-      // Search for harsh user or use search term
-      const searchQuery = searchTerm || 'harsh'
-      url += `&search=${encodeURIComponent(searchQuery)}`
+      // Add search term if provided
+      if (searchTerm) {
+        url += `&search=${encodeURIComponent(searchTerm)}`
+      }
 
       const response = await apiClient.request<PaginatedResponse<User>>(url)
 
