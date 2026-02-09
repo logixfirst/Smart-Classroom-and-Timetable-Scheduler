@@ -1,5 +1,0 @@
-# FastAPI Backend Logs - Started at 2026-02-02T14:46:26.693203
-2026-02-02 14:46:26,694 - __main__ - INFO - Logs saved to: D:\GitHub\Smart-Classroom-and-Timetable-Scheduler\backend\fastapi\fastapi_logs.txt
-2026-02-02 14:46:26,975 - __main__ - INFO - Starting Enterprise FastAPI Timetable Service...
-2026-02-02 14:46:28,520 - __main__ - INFO - [OK] Redis connection successful
-2026-02-02 14:46:28,729 - __main__ - INFO - Memory cleanup completed
