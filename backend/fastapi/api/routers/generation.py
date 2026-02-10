@@ -194,3 +194,50 @@ async def get_job_variants(
     except Exception as e:
         logger.error(f"[VARIANTS] Error fetching variants for {job_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/cancel/{job_id}")
+async def cancel_generation(
+    job_id: str,
+    redis = Depends(get_redis_client)
+):
+    """
+    Cancel a running timetable generation job.
+    
+    Industry-standard cooperative cancellation:
+    - Cancellation is requested, not forced
+    - Job stops at next safe point
+    - Partial results are discarded
+    
+    Args:
+        job_id: Job identifier to cancel
+        
+    Returns:
+        Cancellation status
+    """
+    try:
+        from core.cancellation import request_cancellation, CancellationReason
+        
+        # Request cancellation
+        success = request_cancellation(
+            job_id,
+            redis,
+            CancellationReason.USER_REQUESTED
+        )
+        
+        if success:
+            logger.info(f"[CANCEL] Cancellation requested for job {job_id}")
+            return {
+                "job_id": job_id,
+                "status": "cancellation_requested",
+                "message": "Job will stop at next safe point"
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to request cancellation"
+            )
+            
+    except Exception as e:
+        logger.error(f"[CANCEL] Error cancelling job {job_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

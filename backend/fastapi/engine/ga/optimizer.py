@@ -73,6 +73,7 @@ class GeneticAlgorithmOptimizer:
         best_fitness = float('-inf')
         
         # Evolution loop (single population, CPU-only)
+        # Google/Meta pattern: Check cancellation externally in saga between generations
         for generation in range(self.generations):
             # Evaluate fitness for all individuals
             fitness_scores = [

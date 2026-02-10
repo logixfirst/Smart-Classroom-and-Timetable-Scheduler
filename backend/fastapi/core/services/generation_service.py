@@ -63,8 +63,8 @@ class GenerationService:
             # Import Saga pattern
             from core.patterns.saga import TimetableGenerationSaga
             
-            # Create Saga
-            saga = TimetableGenerationSaga()
+            # Create Saga with Redis client for database access
+            saga = TimetableGenerationSaga(redis_client=self.redis)
             
             # Prepare request data
             request_data = {
@@ -84,11 +84,17 @@ class GenerationService:
             return results
             
         except asyncio.TimeoutError:
+            # Remove from running jobs on timeout
+            if self.redis:
+                self.redis.delete(f"start_time:job:{job_id}")
             logger.error(f"[JOB {job_id}] ❌ Generation timed out")
             await self._handle_timeout(job_id)
             raise
             
         except asyncio.CancelledError:
+            # Remove from running jobs on cancellation
+            if self.redis:
+                self.redis.delete(f"start_time:job:{job_id}")
             logger.warning(f"[JOB {job_id}] ⚠️  Generation cancelled by user")
             await self._handle_cancellation(job_id)
             raise

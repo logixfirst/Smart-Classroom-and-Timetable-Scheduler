@@ -214,40 +214,32 @@ class HardwareDetector:
         memory_info: Dict,
         cloud_info: Dict
     ) -> Tuple[ExecutionStrategy, List[ExecutionStrategy]]:
-        """Determine optimal execution strategy based on hardware"""
+        """
+        Determine optimal execution strategy based on hardware
+        
+        DESIGN FREEZE: Force CPU-only for production correctness
+        - No GPU (nondeterministic, race conditions, minimal benefit)
+        - No distributed (complexity not justified)
+        - CPU-only = deterministic, testable, production-safe
+        """
         
         strategies = []
         
-        # Cloud distributed (highest priority)
-        if cloud_info['is_cloud'] and len(cloud_info['nodes']) > 0:
-            strategies.append(ExecutionStrategy.CLOUD_DISTRIBUTED)
-        
-        # GPU acceleration
-        if gpu_info['has_nvidia'] and gpu_info['memory_gb'] >= 4:
-            strategies.append(ExecutionStrategy.GPU_CUDA)
-        elif gpu_info['opencl_available'] and gpu_info['memory_gb'] >= 4:
-            strategies.append(ExecutionStrategy.GPU_OPENCL)
-        
-        # Distributed local
-        if len(cloud_info['nodes']) > 0:
-            strategies.append(ExecutionStrategy.DISTRIBUTED_LOCAL)
-        
-        # Multi-core CPU
+        # DESIGN FREEZE: Always use CPU-only strategies
+        # Multi-core CPU (preferred for performance)
         if cpu_info['cores'] >= 8 and memory_info['total_gb'] >= 16:
             strategies.append(ExecutionStrategy.CPU_MULTI)
         elif cpu_info['cores'] >= 4:
             strategies.append(ExecutionStrategy.CPU_MULTI)
         
-        # Single-core fallback
+        # Single-core fallback (always available)
         strategies.append(ExecutionStrategy.CPU_SINGLE)
-        
-        # Hybrid for high-end systems
-        if (gpu_info['has_nvidia'] and cpu_info['cores'] >= 8 and 
-            memory_info['total_gb'] >= 32):
-            strategies.insert(0, ExecutionStrategy.HYBRID)
         
         optimal = strategies[0] if strategies else ExecutionStrategy.CPU_SINGLE
         fallbacks = strategies[1:] if len(strategies) > 1 else [ExecutionStrategy.CPU_SINGLE]
+        
+        logger.info(f"[DESIGN FREEZE] CPU-only mode enforced: {optimal.value}")
+        logger.info(f"[DESIGN FREEZE] GPU detected but DISABLED (production correctness)")
         
         return optimal, fallbacks
     

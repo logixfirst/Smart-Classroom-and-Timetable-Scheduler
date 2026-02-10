@@ -43,11 +43,10 @@ class LouvainClusterer:
         """
         Cluster courses using Louvain community detection
         Returns: Dictionary mapping cluster_id -> list of courses
-        """
-        # Check cancellation at start
-        if self._check_cancellation():
-            raise InterruptedError("Job cancelled by user during clustering")
         
+        NOTE: Cancellation handled by CancellationToken in saga (Google/Meta pattern)
+        This method focuses on clustering logic only
+        """
         # Build constraint graph (with progress update)
         logger.debug(f"Building constraint graph for {len(courses)} courses...")
         self._update_progress("Building constraint graph...")
@@ -55,20 +54,12 @@ class LouvainClusterer:
             self.progress_tracker.update_work_progress(3)
         G = self._build_constraint_graph(courses)
         
-        # Check cancellation after graph building
-        if self._check_cancellation():
-            raise InterruptedError("Job cancelled by user during clustering")
-        
         # Run Louvain clustering (with progress update)
         logger.debug(f"Running Louvain community detection...")
         self._update_progress("Running Louvain detection...")
         if self.progress_tracker:
             self.progress_tracker.update_work_progress(6)
         partition = self._run_louvain(G)
-        
-        # Check cancellation after Louvain
-        if self._check_cancellation():
-            raise InterruptedError("Job cancelled by user during clustering")
         
         # Optimize cluster sizes (with progress update)
         logger.debug(f"Optimizing cluster sizes...")
@@ -79,18 +70,6 @@ class LouvainClusterer:
         
         logger.info(f"Created {len(final_clusters)} clusters from {len(courses)} courses")
         return final_clusters
-    
-    def _check_cancellation(self) -> bool:
-        """Check if job has been cancelled via Redis"""
-        try:
-            if self.redis_client and self.job_id:
-                cancel_flag = self.redis_client.get(f"cancel:job:{self.job_id}")
-                if cancel_flag is not None and cancel_flag:
-                    logger.warning(f"Clustering: Job cancelled - {self.job_id}")
-                    return True
-        except Exception as e:
-            logger.debug(f"[STAGE1] Cancellation check failed: {e}")
-        return False
     
     def _update_progress(self, message: str):
         """Update progress via Redis for real-time updates"""
@@ -267,31 +246,31 @@ class LouvainClusterer:
         final_id = 0
         small_clusters = []
         
-        # Target: 15-20 courses per cluster (reduces cross-cluster conflicts)
-        MAX_CLUSTER_SIZE = 25
-        MIN_CLUSTER_SIZE = 8
-        MERGE_SIZE = 12
+        # Target: 10-15 courses per cluster (Google/Meta standard)
+        MAX_CLUSTER_SIZE = 15  # Reduced from 25
+        MIN_CLUSTER_SIZE = 5   # Reduced from 8
+        MERGE_SIZE = 10        # Reduced from 12
         
         for cluster_courses in raw_clusters.values():
             if len(cluster_courses) > MAX_CLUSTER_SIZE:
-                # Split very large clusters into 15-20 course chunks
-                for i in range(0, len(cluster_courses), 18):
-                    chunk = cluster_courses[i:i+18]
-                    if len(chunk) >= MIN_CLUSTER_SIZE or i + 18 >= len(cluster_courses):
+                # Split very large clusters into 10-15 course chunks
+                for i in range(0, len(cluster_courses), 12):
+                    chunk = cluster_courses[i:i+12]
+                    if len(chunk) >= MIN_CLUSTER_SIZE or i + 12 >= len(cluster_courses):
                         final_clusters[final_id] = chunk
                         final_id += 1
             elif len(cluster_courses) < MIN_CLUSTER_SIZE:
                 # Collect small clusters for merging
                 small_clusters.extend(cluster_courses)
             else:
-                # Keep medium-sized clusters (8-25 courses)
+                # Keep medium-sized clusters (5-15 courses)
                 final_clusters[final_id] = cluster_courses
                 final_id += 1
         
         # Clear raw_clusters to free memory
         raw_clusters.clear()
         
-        # Merge small clusters into ~12 course groups
+        # Merge small clusters into ~10 course groups
         if small_clusters:
             for i in range(0, len(small_clusters), MERGE_SIZE):
                 final_clusters[final_id] = small_clusters[i:i+MERGE_SIZE]
