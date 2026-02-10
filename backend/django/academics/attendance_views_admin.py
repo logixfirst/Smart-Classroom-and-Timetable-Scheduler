@@ -212,9 +212,9 @@ class AdminAttendanceViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
     def _check_admin_permission(self, user):
-        """Check if user has admin or staff role"""
+        """Check if user has admin role"""
         role_lower = user.role.lower()
-        if role_lower not in ["admin", "staff", "org_admin"]:
+        if role_lower not in ["admin", "org_admin"]:
             return False
         return True
 
@@ -494,7 +494,7 @@ class AttendanceAlertViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role in ["admin", "staff"]:
+        if user.role == "admin":
             return (
                 AttendanceAlert.objects.all()
                 .select_related("student", "faculty", "subject")

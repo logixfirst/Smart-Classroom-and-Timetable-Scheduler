@@ -38,7 +38,7 @@ export default function AdminUsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const { showToast } = useToast()
 
-  // Fetch users with debouncing for search - ONLY admin and staff roles
+  // Fetch users with debouncing for search - ONLY admin roles
   useEffect(() => {
     // Reset to page 1 when search filters change
     if (searchTerm || selectedRole || selectedDepartment) {
@@ -93,8 +93,8 @@ export default function AdminUsersPage() {
         let adminUsers = allUsers.filter(
           u => {
             const role = u.role?.toUpperCase()
-            // Only show ADMIN and STAFF roles (database constraint values)
-            return role === 'ADMIN' || role === 'STAFF'
+            // Only show ADMIN roles (database constraint values)
+            return role === 'ADMIN'
           }
         )
         
@@ -128,7 +128,7 @@ export default function AdminUsersPage() {
 
   // Get unique departments and roles from current page
   const departments = [...new Set(users.map(u => u.department))].filter(Boolean)
-  const roles = ['admin', 'org_admin', 'super_admin', 'staff'] // Administrative roles only
+  const roles = ['admin', 'org_admin', 'super_admin'] // Administrative roles only
 
   // Pagination handlers with table loading
   const handlePageChange = (newPage: number) => {
@@ -178,9 +178,9 @@ export default function AdminUsersPage() {
 
   const handleSaveUser = async (userData: any) => {
     try {
-      // Validate that role is admin or staff
-      if (userData.role !== 'admin' && userData.role !== 'staff') {
-        showToast('error', 'Only admin and staff users can be created on this page')
+      // Validate that role is admin
+      if (userData.role !== 'admin') {
+        showToast('error', 'Only admin users can be created on this page')
         return
       }
 
@@ -188,7 +188,7 @@ export default function AdminUsersPage() {
       if (editingUser) {
         response = await apiClient.updateUser(editingUser.id.toString(), userData)
       } else {
-        // Create admin/staff user
+        // Create admin user
         response = await apiClient.createUser(userData)
       }
 
@@ -229,7 +229,7 @@ export default function AdminUsersPage() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Manage admin and staff accounts | Total: {totalCount} users
+          Manage admin accounts | Total: {totalCount} users
         </p>
         <button onClick={handleAddUser} className="btn-primary w-full sm:w-auto px-6 py-3">
           <span className="mr-2 text-lg">➕</span>
@@ -239,7 +239,7 @@ export default function AdminUsersPage() {
 
       <div className="card">
         <div className="card-header">
-          <h3 className="card-title">Admin & Staff Users</h3>
+          <h3 className="card-title">Admin Users</h3>
           <p className="card-description">Administrative personnel only</p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
             <div className="relative flex-1">

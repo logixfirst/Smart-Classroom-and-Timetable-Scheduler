@@ -4,7 +4,7 @@ import { z } from 'zod'
 // User Validation Schemas
 // ============================================
 
-export const userRoles = ['admin', 'faculty', 'student', 'staff'] as const
+export const userRoles = ['admin', 'faculty', 'student'] as const
 
 export const userSchema = z.object({
   username: z

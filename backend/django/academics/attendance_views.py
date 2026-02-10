@@ -56,7 +56,7 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        if user.role.lower() == "admin" or user.role.lower() == "staff":
+        if user.role.lower() == "admin":
             return AttendanceSession.objects.all().select_related(
                 "subject", "faculty", "batch"
             )
@@ -88,7 +88,7 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         # Only faculty and admin can create sessions
-        if self.request.user.role not in ["faculty", "admin", "staff"]:
+        if self.request.user.role not in ["faculty", "admin"]:
             raise PermissionError("Only faculty and admin can create sessions")
 
         serializer.save()
@@ -104,7 +104,7 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
         user = request.user
 
         # Permission check
-        if user.role not in ["faculty", "admin", "staff"]:
+        if user.role not in ["faculty", "admin"]:
             return Response(
                 {"error": "Only faculty and admin can mark attendance"},
                 status=status.HTTP_403_FORBIDDEN,
@@ -254,7 +254,7 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
                 faculty=faculty, is_marked=False, date__lte=timezone.now().date()
             ).select_related("subject", "batch")
 
-        elif user.role.lower() in ["admin", "staff"]:
+        elif user.role.lower() == "admin":
             sessions = AttendanceSession.objects.filter(
                 is_marked=False, date__lte=timezone.now().date()
             ).select_related("subject", "faculty", "batch")
@@ -276,7 +276,7 @@ class AttendanceSessionViewSet(viewsets.ModelViewSet):
         user = request.user
 
         # Permission check
-        if user.role not in ["faculty", "admin", "staff"]:
+        if user.role not in ["faculty", "admin"]:
             return Response(
                 {"error": "Only faculty and admin can import attendance"},
                 status=status.HTTP_403_FORBIDDEN,

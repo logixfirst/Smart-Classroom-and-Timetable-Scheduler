@@ -678,7 +678,6 @@ class User(AbstractUser):
         ("hod", "Head of Department"),
         ("faculty", "Faculty"),
         ("student", "Student"),
-        ("staff", "Administrative Staff"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, db_column='user_id')

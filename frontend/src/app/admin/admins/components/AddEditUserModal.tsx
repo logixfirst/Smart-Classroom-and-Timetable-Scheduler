@@ -11,7 +11,7 @@ const simpleUserSchema = z.object({
   first_name: z.string().min(1, 'First name is required'),
   last_name: z.string().min(1, 'Last name is required'),
   email: z.string().email('Valid email is required'),
-  role: z.enum(['admin', 'staff', 'faculty', 'student']),
+  role: z.enum(['admin', 'faculty', 'student']),
   department: z.string().min(1, 'Department is required'),
   is_active: z.union([z.boolean(), z.string()])
 })
@@ -112,7 +112,6 @@ export default function AddEditUserModal({ isOpen, onClose, user, onSave }: AddE
             name="role"
             options={[
               { value: 'admin', label: 'Admin' },
-              { value: 'staff', label: 'Staff' },
               { value: 'faculty', label: 'Faculty' },
               { value: 'student', label: 'Student' }
             ]}

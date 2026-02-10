@@ -7,7 +7,7 @@ import Sidebar from '@/components/layout/Sidebar'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
-  role: 'admin' | 'staff' | 'faculty' | 'student'
+  role: 'admin' | 'faculty' | 'student'
   pageTitle?: string
   pageDescription?: string
 }

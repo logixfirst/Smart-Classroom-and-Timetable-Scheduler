@@ -9,7 +9,7 @@ interface SidebarProps {
   sidebarCollapsed: boolean
   setSidebarOpen: (open: boolean) => void
   setSidebarCollapsed: (collapsed: boolean) => void
-  role: 'admin' | 'staff' | 'faculty' | 'student'
+  role: 'admin' | 'faculty' | 'student'
   setShowSignOutDialog: (show: boolean) => void
 }
 
@@ -27,17 +27,6 @@ const getNavigationItems = (role: string) => {
         { name: 'Timetables', href: '/admin/timetables', icon: '📅' },
         { name: 'Approvals', href: '/admin/approvals', icon: '✅' },
         { name: 'Logs', href: '/admin/logs', icon: '📋' },
-      ]
-    case 'staff':
-      return [
-        ...baseItems,
-        { name: 'Approvals', href: '/staff/approvals', icon: '✅' },
-        { name: 'Reports', href: '/staff/reports', icon: '📊' },
-        { name: 'Analytics', href: '/staff/analytics', icon: '📈' },
-        { name: 'Messages', href: '/staff/messages', icon: '💬' },
-        { name: 'Resources', href: '/staff/resources', icon: '🔧' },
-        { name: 'Sections', href: '/staff/sections', icon: '🎓' },
-        { name: 'Workload', href: '/staff/workload', icon: '⚖️' },
       ]
     case 'faculty':
       return [
@@ -158,9 +147,7 @@ export default function Sidebar({
                   {userName ||
                     (role === 'admin'
                       ? 'Admin User'
-                      : role === 'staff'
-                        ? 'Staff User'
-                        : role === 'faculty'
+                      : role === 'faculty'
                           ? 'Faculty User'
                           : 'Student User')}
                 </p>

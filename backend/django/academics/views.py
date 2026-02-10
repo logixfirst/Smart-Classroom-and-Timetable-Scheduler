@@ -69,7 +69,6 @@ class UserViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet):
             "by_role": {
                 "admin": queryset.filter(role="admin").count(),
                 "faculty": queryset.filter(role="faculty").count(),
-                "staff": queryset.filter(role="staff").count(),
                 "student": queryset.filter(role="student").count(),
             },
             "active_users": queryset.filter(is_active=True).count(),

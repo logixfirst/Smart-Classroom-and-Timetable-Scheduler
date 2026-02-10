@@ -460,13 +460,6 @@ export default function AdminDashboard() {
             </div>
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Staff</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Approvals, Reports</p>
-              </div>
-              <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">-</span>
-            </div>
-            <div className="interactive-element flex items-center justify-between p-3">
-              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Faculty</p>
                 <p className="text-xs text-gray-600 dark:text-gray-400">Schedule View</p>
               </div>

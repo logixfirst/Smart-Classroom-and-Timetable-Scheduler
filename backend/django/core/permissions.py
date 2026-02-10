@@ -22,21 +22,6 @@ class IsAdmin(permissions.BasePermission):
         )
 
 
-class IsStaff(permissions.BasePermission):
-    """
-    Permission to only allow staff users
-    """
-
-    message = "Only staff members can perform this action."
-
-    def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and request.user.role in ["admin", "staff"]
-        )
-
-
 class IsFaculty(permissions.BasePermission):
     """
     Permission to only allow faculty users
@@ -48,7 +33,7 @@ class IsFaculty(permissions.BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role in ["admin", "staff", "faculty"]
+            and request.user.role in ["admin", "faculty"]
         )
 
 
@@ -120,16 +105,16 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 
 class CanManageTimetable(permissions.BasePermission):
     """
-    Permission for managing timetables (admin and staff only)
+    Permission for managing timetables (admin only)
     """
 
-    message = "Only administrators and staff can manage timetables."
+    message = "Only administrators can manage timetables."
 
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role in ["admin", "staff"]
+            and request.user.role == "admin"
         )
 
 
@@ -160,8 +145,8 @@ class DepartmentBasedPermission(permissions.BasePermission):
         if request.user.role == "admin":
             return True
 
-        # Staff and faculty can only access their department
-        if request.user.role in ["staff", "faculty"]:
+        # Faculty can only access their department
+        if request.user.role == "faculty":
             if hasattr(obj, "department"):
                 return obj.department.department_id == request.user.department
             elif hasattr(obj, "department_id"):
@@ -172,7 +157,7 @@ class DepartmentBasedPermission(permissions.BasePermission):
 
 class CanManageFaculty(permissions.BasePermission):
     """
-    Permission for managing faculty (admin and department staff)
+    Permission for managing faculty (admin only)
     """
 
     message = "You do not have permission to manage faculty."
@@ -181,16 +166,12 @@ class CanManageFaculty(permissions.BasePermission):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role in ["admin", "staff"]
+            and request.user.role == "admin"
         )
 
     def has_object_permission(self, request, view, obj):
         if request.user.role == "admin":
             return True
-
-        # Staff can only manage faculty in their department
-        if request.user.role == "staff":
-            return obj.department.department_id == request.user.department
 
         return False
 
@@ -203,8 +184,8 @@ class CanViewStudentData(permissions.BasePermission):
     message = "You do not have permission to view student data."
 
     def has_permission(self, request, view):
-        # Admin, staff, and faculty can view
-        if request.user.role in ["admin", "staff", "faculty"]:
+        # Admin and faculty can view
+        if request.user.role in ["admin", "faculty"]:
             return True
 
         # Students can only view their own data
@@ -214,8 +195,8 @@ class CanViewStudentData(permissions.BasePermission):
         return False
 
     def has_object_permission(self, request, view, obj):
-        # Admin, staff, and faculty can view all
-        if request.user.role in ["admin", "staff", "faculty"]:
+        # Admin and faculty can view all
+        if request.user.role in ["admin", "faculty"]:
             return True
 
         # Students can only view their own data
@@ -242,16 +223,16 @@ class CanSubmitLeaveRequest(permissions.BasePermission):
 
 class CanApproveLeaveRequest(permissions.BasePermission):
     """
-    Permission for approving leave requests (admin and staff)
+    Permission for approving leave requests (admin only)
     """
 
-    message = "Only administrators and staff can approve leave requests."
+    message = "Only administrators can approve leave requests."
 
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role in ["admin", "staff"]
+            and request.user.role == "admin"
         )
 
 
@@ -290,8 +271,8 @@ def check_department_permission(user, department_id: str) -> bool:
     if user.role == "admin":
         return True
 
-    # Staff and faculty can only access their department
-    if user.role in ["staff", "faculty"]:
+    # Faculty can only access their department
+    if user.role == "faculty":
         return user.department == department_id
 
     return False

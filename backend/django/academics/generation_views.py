@@ -453,11 +453,11 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         POST /api/timetable/approve/{job_id}/
         Body: { "action": "approve" | "reject", "comments": "..." }
         """
-        if request.user.role not in ["admin", "staff"]:
+        if request.user.role != "admin":
             return Response(
                 {
                     "success": False,
-                    "error": "Only admin and staff can approve timetables",
+                    "error": "Only admin can approve timetables",
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )

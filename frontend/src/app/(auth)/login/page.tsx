@@ -43,9 +43,6 @@ export default function LoginPage() {
           case 'org_admin':
             router.push('/admin/dashboard')
             break
-          case 'staff':
-            router.push('/staff/dashboard')
-            break
           case 'student':
             router.push('/student/dashboard')
             break
@@ -59,8 +56,6 @@ export default function LoginPage() {
         // Fallback to username-based redirect if role not available
         if (data.username.includes('admin')) {
           router.push('/admin/dashboard')
-        } else if (data.username.includes('staff')) {
-          router.push('/staff/dashboard')
         } else if (data.username.includes('student')) {
           router.push('/student/dashboard')
         } else {
