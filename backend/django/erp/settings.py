@@ -70,7 +70,6 @@ APPEND_SLASH = False
 # Application definition
 
 INSTALLED_APPS = [
-    "daphne",  # WebSocket support - must be first
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -85,7 +84,6 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "corsheaders",
     "django_filters",
-    "channels",  # WebSocket support
     # Local apps
     "core",
     "academics",
@@ -321,17 +319,6 @@ CACHES = {
 CACHE_MIDDLEWARE_ALIAS = "default"
 CACHE_MIDDLEWARE_SECONDS = 300
 CACHE_MIDDLEWARE_KEY_PREFIX = f"sih28_{SENTRY_ENVIRONMENT}"
-
-# Channels Configuration (WebSocket support)
-ASGI_APPLICATION = "erp.asgi.application"
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [REDIS_URL],
-        },
-    },
-}
 
 # FastAPI AI Service URL
 FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8001")

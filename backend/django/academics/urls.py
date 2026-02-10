@@ -12,8 +12,6 @@ from .timetable_views import (
 from .workflow_views import TimetableWorkflowViewSet, TimetableVariantViewSet
 from .timetable_config_views import TimetableConfigurationViewSet
 from .conflict_views import ConflictViewSet
-from .cross_enrollment_views import CrossEnrollmentViewSet
-from .analytics_views import AnalyticsViewSet
 from .views_optimized import (
     fast_generation_jobs,
     fast_faculty,
@@ -66,8 +64,6 @@ router.register(r"timetable/workflows", TimetableWorkflowViewSet, basename="work
 router.register(r"timetable/variants", TimetableVariantViewSet, basename="variant")
 router.register(r"timetable-configs", TimetableConfigurationViewSet, basename="timetable-config")
 router.register(r"conflicts", ConflictViewSet, basename="conflict")
-router.register(r"cross-enrollment", CrossEnrollmentViewSet, basename="cross-enrollment")
-router.register(r"analytics", AnalyticsViewSet, basename="analytics")
 
 urlpatterns = [
     # Faculty and Student profile - MUST be before router to avoid conflict

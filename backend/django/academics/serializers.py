@@ -1,7 +1,6 @@
 from rest_framework import serializers
 
 from .models import (
-    Attendance,
     Batch,
     Building,
     Course,
@@ -328,14 +327,3 @@ class UniversityTimetableGenerationSerializer(serializers.Serializer):
                 "Academic year must be in format YYYY-YYYY (e.g., 2024-2025)"
             )
         return value
-
-
-class AttendanceSerializer(serializers.ModelSerializer):
-    student_name = serializers.CharField(source="student.name", read_only=True)
-    subject_name = serializers.CharField(
-        source="slot.subject.subject_name", read_only=True
-    )
-
-    class Meta:
-        model = Attendance
-        fields = "__all__"

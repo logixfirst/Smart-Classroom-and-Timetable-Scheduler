@@ -84,20 +84,6 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         org_id = request.data.get("org_id") or getattr(
             request.user, "organization", None
         )
-        
-        # Check tenant limits and hardware resources
-        from core.tenant_limits import TenantLimits
-        
-        can_start, error_msg = TenantLimits.can_start_generation(str(org_id))
-        if not can_start:
-            return Response(
-                {
-                    "success": False,
-                    "error": error_msg,
-                    "retry_after": 60
-                },
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
 
         if not academic_year or not semester:
             return Response(
@@ -122,15 +108,8 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_404_NOT_FOUND,
                 )
             
-            # Increment concurrent count
-            from core.tenant_limits import TenantLimits
-            TenantLimits.increment_concurrent(str(org_id))
-            
-            # Get priority from tenant tier if not specified
-            if priority == "normal":
-                priority_value = TenantLimits.get_priority(str(org_id))
-            else:
-                priority_value = {'high': 9, 'normal': 5, 'low': 1}.get(priority, 5)
+            # Set priority value
+            priority_value = {'high': 9, 'normal': 5, 'low': 1}.get(priority, 5)
             
             # Get time configuration: PRIORITY ORDER
             # 1. Use form data from request.data['config'] if provided (user just filled form)
@@ -388,14 +367,9 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
             )
 
     def _decrement_concurrent_on_complete(self, job):
-        """Decrement concurrent count when job completes"""
-        try:
-            from core.tenant_limits import TenantLimits
-            org_id = job.timetable_data.get('org_id') if job.timetable_data else None
-            if org_id:
-                TenantLimits.decrement_concurrent(org_id)
-        except Exception as e:
-            logger.error(f"Error decrementing concurrent count: {e}")
+        """Placeholder for cleanup when job completes"""
+        # Tenant limits system removed
+        pass
     
     @action(detail=True, methods=["post"], url_path="cancel")
     def cancel_generation(self, request, pk=None):

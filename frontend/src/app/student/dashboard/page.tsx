@@ -1,9 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import DashboardLayout from '@/components/dashboard-layout'
-import ExportButton from '@/components/shared/ExportButton'
 import apiClient from '@/lib/api'
+
+// Lazy load ExportButton to reduce initial bundle size (removes jsPDF, html2canvas, xlsx ~800KB)
+const ExportButton = dynamic(() => import('@/components/shared/ExportButton'), {
+  ssr: false,
+  loading: () => <button className="btn-primary text-xs px-3 py-2">📥 Export</button>
+})
 
 interface Course {
   offering_id: string
@@ -193,26 +199,19 @@ export default function StudentDashboard() {
           <div className="card-header">
             <h3 className="card-title">Quick Actions</h3>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 lg:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 lg:gap-4">
             {[
-              { icon: '📅', label: 'Timetable', sublabel: 'View Schedule' },
-              { icon: '📝', label: 'Exams', sublabel: 'Schedule' },
-              { icon: '📋', label: 'Assignments', sublabel: 'Due Soon' },
-              { icon: '📊', label: 'Grades', sublabel: 'View Results' },
-              { icon: '📚', label: 'Materials', sublabel: 'Download' },
-              { icon: '💬', label: 'Feedback', sublabel: 'Anonymous' },
-              { icon: '🔍', label: 'Clash Check', sublabel: 'Courses' },
-              { icon: '📤', label: 'Export', sublabel: 'Calendar' },
+              { icon: '📅', label: 'View Timetable', href: '/student/timetable' },
+              { icon: '📤', label: 'Export Schedule', action: 'export' },
+              { icon: '🔍', label: 'My Courses', action: 'courses' },
             ].map((action, index) => (
               <button
                 key={index}
-                className="btn-secondary flex flex-col items-center justify-center p-3 h-16 sm:h-20 text-xs"
+                onClick={() => action.href ? window.location.href = action.href : null}
+                className="btn-secondary flex flex-col items-center justify-center p-4 h-20 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
               >
-                <span className="text-lg sm:text-2xl mb-1">{action.icon}</span>
-                <span className="font-medium text-center leading-tight">{action.label}</span>
-                <span className="text-xs text-gray-500 dark:text-gray-400 text-center hidden sm:block">
-                  {action.sublabel}
-                </span>
+                <span className="text-2xl mb-2">{action.icon}</span>
+                <span className="font-medium text-center">{action.label}</span>
               </button>
             ))}
           </div>

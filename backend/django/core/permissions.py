@@ -206,36 +206,6 @@ class CanViewStudentData(permissions.BasePermission):
         return False
 
 
-class CanSubmitLeaveRequest(permissions.BasePermission):
-    """
-    Permission for submitting leave requests (faculty only)
-    """
-
-    message = "Only faculty members can submit leave requests."
-
-    def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and request.user.role == "faculty"
-        )
-
-
-class CanApproveLeaveRequest(permissions.BasePermission):
-    """
-    Permission for approving leave requests (admin only)
-    """
-
-    message = "Only administrators can approve leave requests."
-
-    def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and request.user.role == "admin"
-        )
-
-
 def check_role_permission(user, required_roles: list) -> bool:
     """
     Helper function to check if user has required role

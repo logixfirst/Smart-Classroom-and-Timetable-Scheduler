@@ -33,16 +33,11 @@ const getNavigationItems = (role: string) => {
         ...baseItems,
         { name: 'Schedule', href: '/faculty/schedule', icon: '📅' },
         { name: 'Preferences', href: '/faculty/preferences', icon: '⚙️' },
-        { name: 'Leave Requests', href: '/faculty/leave-requests', icon: '🏦️' },
-        { name: 'Communication', href: '/faculty/communication', icon: '💬' },
       ]
     case 'student':
       return [
         ...baseItems,
         { name: 'Timetable', href: '/student/timetable', icon: '📅' },
-        { name: 'Enrollments', href: '/student/enrollments', icon: '📝' },
-        { name: 'Notifications', href: '/student/notifications', icon: '🔔' },
-        { name: 'Feedback', href: '/student/feedback', icon: '💭' },
       ]
     default:
       return baseItems

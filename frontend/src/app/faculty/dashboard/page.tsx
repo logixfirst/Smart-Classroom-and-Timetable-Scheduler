@@ -2,10 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import DashboardLayout from '@/components/dashboard-layout'
 import TimetableGrid from '@/components/shared/TimetableGrid'
-import ExportButton from '@/components/shared/ExportButton'
 import apiClient from '@/lib/api'
+
+// Lazy load ExportButton to reduce initial bundle size (removes jsPDF, html2canvas, xlsx ~800KB)
+const ExportButton = dynamic(() => import('@/components/shared/ExportButton'), {
+  ssr: false,
+  loading: () => <button className="btn-primary text-xs px-3 py-2">📥 Export</button>
+})
 
 interface Subject {
   offering_id: string

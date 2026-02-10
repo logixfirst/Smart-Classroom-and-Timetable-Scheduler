@@ -17,7 +17,6 @@ class AcademicsConfig(AppConfig):
         from core.cache_service import register_cache_invalidation
 
         from .models import (
-            Attendance,
             Batch,
             Building,
             Course,
@@ -46,6 +45,5 @@ class AcademicsConfig(AppConfig):
             School,
             Timetable,
             TimetableSlot,
-            Attendance,
         ]:
             register_cache_invalidation(model)

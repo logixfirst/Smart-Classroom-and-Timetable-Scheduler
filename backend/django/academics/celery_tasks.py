@@ -9,7 +9,6 @@ import requests
 import logging
 from .models import GenerationJob
 from django.utils import timezone
-from core.tenant_limits import TenantLimits
 
 logger = logging.getLogger(__name__)
 
@@ -136,9 +135,6 @@ def generate_timetable_task(self, job_id, org_id, academic_year, semester):
                 timeout=7200
             )
         
-        # Decrement concurrent counter
-        TenantLimits.decrement_concurrent(org_id)
-        
         return {'status': 'failed', 'error': str(e)}
 
 
@@ -225,11 +221,7 @@ def fastapi_callback_task(job_id, status, variants=None, error=None):
         cache.delete(f"generation_queue:{job_id}")
         cache.delete(f"cancel:job:{job_id}")  # Cleanup cancel flag
         
-        # Decrement concurrent counter
-        org_id = job.organization.org_code if job.organization else 'unknown'
-        TenantLimits.decrement_concurrent(org_id)
-        
-        logger.info(f"[CALLBACK] Job {job_id} finalized, concurrent counter decremented")
+        logger.info(f"[CALLBACK] Job {job_id} finalized")
         
     except GenerationJob.DoesNotExist:
         logger.error(f"[CALLBACK] Job {job_id} not found in database")
