@@ -207,27 +207,7 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
             
             # CRITICAL FIX: Set Redis cache IMMEDIATELY after job creation
             # This prevents race condition where frontend polls before cache exists
-            import redis
-            import json
-            from django.conf import settings
-            
-            try:
-                redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
-                cache_key = f"progress:job:{job.id}"
-                initial_progress = {
-                    'job_id': str(job.id),
-                    'progress': 0,
-                    'status': 'running',
-                    'stage': 'Starting',
-                    'message': 'Initializing timetable generation...',
-                    'timestamp': timezone.now().isoformat(),
-                    'time_remaining_seconds': None
-                }
-                redis_client.setex(cache_key, 3600, json.dumps(initial_progress))
-                logger.info(f"[INIT] Redis progress cache set for job {job.id}")
-            except Exception as e:
-                logger.error(f"Failed to set initial Redis cache: {e}")
-                # Fallback to Django cache
+            # Job initialization
                 cache.set(cache_key, initial_progress, timeout=3600)
 
             # Return IMMEDIATELY to frontend (don't wait for Celery/FastAPI)
@@ -269,98 +249,11 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         """
         try:
             job = self.get_object()
-
-            # Check Redis for real-time progress
-            cache_key = f"generation_progress:{job.id}"
-            redis_progress = cache.get(cache_key)
-
-            if redis_progress is not None:
-                job.progress = redis_progress
-                job.save(update_fields=["progress"])
-
             serializer = GenerationJobSerializer(job)
             return Response({"success": True, "job": serializer.data})
 
         except Exception as e:
             logger.error(f"Error fetching job status: {str(e)}")
-            return Response(
-                {"success": False, "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    @action(detail=False, methods=["get"], url_path="progress/(?P<job_id>[^/.]+)")
-    def get_progress_public(self, request, job_id=None):
-        """
-        Public progress endpoint (no auth required)
-        GET /api/progress/{job_id}/
-        """
-        try:
-            job = GenerationJob.objects.filter(id=job_id).first()
-            if not job:
-                return Response({
-                    "success": False,
-                    "error": "Job not found",
-                    "job_id": job_id,
-                    "status": "not_found",
-                    "progress": 0,
-                    "message": "Job not found in database"
-                }, status=status.HTTP_404_NOT_FOUND)
-            
-            # Try Redis first (real-time progress from FastAPI)
-            cache_key = f"progress:job:{job.id}"
-            redis_data = cache.get(cache_key)
-            
-            if redis_data:
-                import json
-                if isinstance(redis_data, str):
-                    progress_data = json.loads(redis_data)
-                else:
-                    progress_data = redis_data
-                
-                return Response({
-                    "success": True,
-                    "job_id": str(job.id),
-                    "status": progress_data.get('status', job.status),
-                    "progress": progress_data.get('progress', job.progress),
-                    "stage": progress_data.get('stage', progress_data.get('message', 'Processing...')),
-                    "message": progress_data.get('message', 'Processing...'),
-                    "time_remaining_seconds": progress_data.get('time_remaining_seconds'),
-                    "updated_at": progress_data.get('timestamp', job.updated_at.isoformat() if job.updated_at else None)
-                })
-            
-            # Fallback to database
-            return Response({
-                "success": True,
-                "job_id": str(job.id),
-                "status": job.status,
-                "progress": job.progress or 1,
-                "stage": "Starting...",
-                "message": "Initializing generation...",
-                "time_remaining_seconds": None,
-                "updated_at": job.updated_at.isoformat() if job.updated_at else None
-            })
-
-        except Exception as e:
-            logger.error(f"Error fetching progress for {job_id}: {str(e)}")
-            return Response(
-                {"success": False, "error": str(e), "job_id": job_id},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-    
-    @action(detail=True, methods=["get"], url_path="progress")
-    def get_progress(self, request, pk=None):
-        """
-        Get real-time progress from Redis
-        GET /api/generation-jobs/{job_id}/progress/
-        """
-        try:
-            job = self.get_object()
-            
-            # Use the public endpoint logic
-            return self.get_progress_public(request, job_id=str(job.id)).data
-
-        except Exception as e:
-            logger.error(f"Error fetching progress: {str(e)}")
             return Response(
                 {"success": False, "error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,

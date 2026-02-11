@@ -31,23 +31,14 @@ async def websocket_progress(websocket: WebSocket, job_id: str):
         await websocket.accept()
         logger.info(f"WebSocket connected for job {job_id}")
         
-        # Send initial snapshot if exists
+        # Send initial message
         try:
-            # Get Redis client from app state
-            redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-            redis_pool = await aioredis.create_redis_pool(redis_url, encoding='utf-8')
-            
-            # Try to get snapshot from Redis
-            snapshot = await redis_pool.get(f"progress:job:{job_id}")
-            if snapshot:
-                await websocket.send_text(snapshot)
-                logger.debug(f"Sent snapshot for job {job_id}")
+            await websocket.send_text('{"status": "connected", "message": "Progress tracking disabled"}')
         except Exception as e:
-           logger.warning(f"Could not send snapshot: {e}")
+           logger.warning(f"Could not send message: {e}")
         
-        # Subscribe to Redis pub/sub for real-time updates
+        # Keep connection open for compatibility
         try:
-            channels = await redis_pool.subscribe(f"progress:{job_id}")
             ch = channels[0]
             
             logger.info(f"Subscribed to progress updates for job {job_id}")

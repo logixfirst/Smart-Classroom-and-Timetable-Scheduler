@@ -19,9 +19,6 @@ class LouvainClusterer:
     
     def __init__(self, target_cluster_size: int = 10, edge_threshold: float = None):
         self.target_cluster_size = target_cluster_size
-        self.progress_tracker = None  # Set externally for real-time progress updates
-        self.job_id = None
-        self.redis_client = None
         # Adaptive edge threshold based on RAM
         if edge_threshold is None:
             import psutil
@@ -47,46 +44,20 @@ class LouvainClusterer:
         NOTE: Cancellation handled by CancellationToken in saga (Google/Meta pattern)
         This method focuses on clustering logic only
         """
-        # Build constraint graph (with progress update)
+        # Build constraint graph
         logger.debug(f"Building constraint graph for {len(courses)} courses...")
-        self._update_progress("Building constraint graph...")
-        if self.progress_tracker:
-            self.progress_tracker.update_work_progress(3)
         G = self._build_constraint_graph(courses)
         
-        # Run Louvain clustering (with progress update)
+        # Run Louvain clustering
         logger.debug(f"Running Louvain community detection...")
-        self._update_progress("Running Louvain detection...")
-        if self.progress_tracker:
-            self.progress_tracker.update_work_progress(6)
         partition = self._run_louvain(G)
         
-        # Optimize cluster sizes (with progress update)
+        # Optimize cluster sizes
         logger.debug(f"Optimizing cluster sizes...")
-        self._update_progress("Optimizing cluster sizes...")
-        if self.progress_tracker:
-            self.progress_tracker.update_work_progress(10)
         final_clusters = self._optimize_cluster_sizes(partition, courses)
         
         logger.info(f"Created {len(final_clusters)} clusters from {len(courses)} courses")
         return final_clusters
-    
-    def _update_progress(self, message: str):
-        """Update progress via Redis for real-time updates"""
-        try:
-            if self.redis_client and self.job_id:
-                import json
-                from datetime import datetime, timezone
-                progress_data = {
-                    'job_id': self.job_id,
-                    'stage': 'clustering',
-                    'message': message,
-                    'timestamp': datetime.now(timezone.utc).isoformat()
-                }
-                self.redis_client.publish(f"progress:{self.job_id}", json.dumps(progress_data))
-                logger.debug(f"{message}")
-        except Exception as e:
-            logger.debug(f"Progress update failed: {e}")
     
     def _build_constraint_graph(self, courses: List[Course]) -> nx.Graph:
         """Build weighted constraint graph with parallel edge computation"""

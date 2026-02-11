@@ -41,20 +41,6 @@ def generate_timetable_task(self, job_id, org_id, academic_year, semester):
         job.status = 'queued'
         job.save()
         
-        # Initialize Redis progress immediately
-        from django.core.cache import cache
-        cache.set(
-            f"progress:job:{job_id}",
-            {
-                'job_id': str(job_id),
-                'status': 'queued',
-                'progress': 0,
-                'stage': 'queued',
-                'message': 'Job queued, waiting for FastAPI...',
-            },
-            timeout=7200  # 2 hours
-        )
-        
         # Call FastAPI (fire-and-forget - FastAPI returns immediately)
         fastapi_url = getattr(settings, 'FASTAPI_URL', 'http://localhost:8001')
         
@@ -119,21 +105,6 @@ def generate_timetable_task(self, job_id, org_id, academic_year, semester):
             job.error_message = str(e)
             job.completed_at = timezone.now()
             job.save()
-            
-            # Update Redis so frontend knows it failed
-            from django.core.cache import cache
-            cache.set(
-                f"progress:job:{job_id}",
-                {
-                    'job_id': str(job_id),
-                    'status': 'failed',
-                    'progress': 0,
-                    'stage': 'failed',
-                    'message': str(e),
-                    'error': str(e)
-                },
-                timeout=7200
-            )
         
         return {'status': 'failed', 'error': str(e)}
 
@@ -154,20 +125,6 @@ def fastapi_callback_task(job_id, status, variants=None, error=None):
             job.error_message = 'Cancelled by user'
             job.completed_at = timezone.now()
             logger.info(f"[CALLBACK] Job {job_id} cancelled")
-            
-            # Update Redis
-            from django.core.cache import cache
-            cache.set(
-                f"progress:job:{job_id}",
-                {
-                    'job_id': str(job_id),
-                    'status': 'cancelled',
-                    'progress': 0,
-                    'stage': 'cancelled',
-                    'message': 'Generation cancelled by user',
-                },
-                timeout=7200
-            )
         
         elif status == 'completed':
             job.status = 'completed'
@@ -179,40 +136,11 @@ def fastapi_callback_task(job_id, status, variants=None, error=None):
             
             logger.info(f"[CALLBACK] Job {job_id} completed successfully with {len(variants) if variants else 0} variants")
             
-            # Update Redis with final status
-            from django.core.cache import cache
-            cache.set(
-                f"progress:job:{job_id}",
-                {
-                    'job_id': str(job_id),
-                    'status': 'completed',
-                    'progress': 100,
-                    'stage': 'completed',
-                    'message': 'Generation completed successfully',
-                },
-                timeout=7200
-            )
-            
         elif status == 'failed':
             job.status = 'failed'
             job.error_message = error or 'Generation failed - check logs'
             job.completed_at = timezone.now()
             logger.error(f"[CALLBACK] Job {job_id} failed: {error or 'No error message'}")
-            
-            # Update Redis with failed status
-            from django.core.cache import cache
-            cache.set(
-                f"progress:job:{job_id}",
-                {
-                    'job_id': str(job_id),
-                    'status': 'failed',
-                    'progress': 0,
-                    'stage': 'failed',
-                    'message': error or 'Generation failed',
-                    'error': error or 'Generation failed'
-                },
-                timeout=7200
-            )
         
         job.save()
         

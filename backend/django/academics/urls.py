@@ -7,7 +7,6 @@ from .timetable_views import (
     get_department_timetable,
     get_faculty_timetable,
     get_student_timetable,
-    get_progress,
 )
 from .workflow_views import TimetableWorkflowViewSet, TimetableVariantViewSet
 from .timetable_config_views import TimetableConfigurationViewSet
@@ -78,7 +77,6 @@ urlpatterns = [
     path("timetable/faculty/me/", get_faculty_timetable, name="faculty-timetable"),
     path("timetable/student/me/", get_student_timetable, name="student-timetable"),
     path("timetable/callback/", fastapi_callback, name="fastapi-callback"),
-    path("progress/<str:job_id>/", get_progress, name="get-progress"),
     # Auth endpoints - CSRF exempt via APICSRFExemptMiddleware
     path("auth/login/", login_view, name="login"),
     path("auth/login", login_view, name="login-no-slash"),

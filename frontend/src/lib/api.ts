@@ -394,14 +394,6 @@ class ApiClient {
     return this.request<any>(`/generation-jobs/${jobId}/`);
   }
 
-  async getGenerationStatus(jobId: string) {
-    return this.request<any>(`/generation-jobs/${jobId}/status/`);
-  }
-
-  async getGenerationProgress(jobId: string) {
-    return this.request<any>(`/generation-jobs/${jobId}/progress/`);
-  }
-
   async approveGeneration(jobId: string) {
     return this.request<any>(`/generation-jobs/${jobId}/approve/`, {
       method: 'POST',

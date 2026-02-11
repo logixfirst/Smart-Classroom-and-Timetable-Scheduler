@@ -12,7 +12,6 @@ import {
   GenerateTimetableResponse,
   ApprovalRequest,
   ApprovalResponse,
-  ProgressMessage,
   FacultyAvailability,
 } from '@/types/timetable'
 
@@ -258,95 +257,6 @@ export async function updateFacultyAvailability(
     body: JSON.stringify({ is_active: available }),
   })
   return handleResponse(response)
-}
-
-// ============================================
-// WEBSOCKET PROGRESS TRACKING
-// ============================================
-
-export class ProgressTracker {
-  private ws: WebSocket | null = null
-  private jobId: string
-  private onProgress: (message: ProgressMessage) => void
-  private onComplete: (message: ProgressMessage) => void
-  private onError: (error: string) => void
-  private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
-
-  constructor(
-    jobId: string,
-    callbacks: {
-      onProgress: (message: ProgressMessage) => void
-      onComplete: (message: ProgressMessage) => void
-      onError: (error: string) => void
-    }
-  ) {
-    this.jobId = jobId
-    this.onProgress = callbacks.onProgress
-    this.onComplete = callbacks.onComplete
-    this.onError = callbacks.onError
-  }
-
-  connect(): void {
-    const wsUrl = `${FASTAPI_WS_BASE}/ws/progress/${this.jobId}`
-
-    try {
-      this.ws = new WebSocket(wsUrl)
-
-      this.ws.onopen = () => {
-        console.log(`WebSocket connected for job ${this.jobId}`)
-        this.reconnectAttempts = 0
-      }
-
-      this.ws.onmessage = event => {
-        try {
-          const message: ProgressMessage = JSON.parse(event.data)
-
-          if (message.status === 'completed' || message.status === 'failed') {
-            this.onComplete(message)
-            this.disconnect()
-          } else {
-            this.onProgress(message)
-          }
-        } catch (error) {
-          console.error('Failed to parse WebSocket message:', error)
-        }
-      }
-
-      this.ws.onerror = error => {
-        console.error('WebSocket error:', error)
-        this.onError('Connection error occurred')
-      }
-
-      this.ws.onclose = event => {
-        console.log('WebSocket closed:', event.code, event.reason)
-
-        // Attempt reconnection if not intentionally closed
-        if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++
-          const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000)
-
-          console.log(
-            `Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
-          )
-
-          setTimeout(() => this.connect(), delay)
-        } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-          this.onError('Failed to maintain connection after multiple attempts')
-        }
-      }
-    } catch (error) {
-      console.error('Failed to create WebSocket:', error)
-      this.onError('Failed to establish connection')
-    }
-  }
-
-  disconnect(): void {
-    if (this.ws) {
-      this.ws.close(1000, 'Client disconnect')
-      this.ws = null
-    }
-  }
 }
 
 // ============================================

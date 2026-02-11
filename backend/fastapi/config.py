@@ -96,12 +96,6 @@ class Settings:
     CONTEXT_SOCIAL_WEIGHT: float = 0.15      # Peer group cohesion
     CONTEXT_SPATIAL_WEIGHT: float = 0.15     # Room and travel optimization
 
-    # Progress Tracking
-    PROGRESS_UPDATE_INTERVAL: int = 1  # Seconds between WebSocket updates
-    PROGRESS_EXPIRE_SECONDS: int = 3600  # 1 hour
-    RESULT_EXPIRE_SECONDS: int = 86400  # 24 hours
-    REDIS_PROGRESS_PREFIX: str = "progress:job:"  # Redis key prefix for progress
-
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")

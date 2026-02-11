@@ -57,21 +57,14 @@ async def get_job_status(job_id: str, redis = Depends(get_redis_client)):
         job_id: Job identifier
         
     Returns:
-        Job status, progress, and metadata
+        Job status metadata
     """
     try:
-        import json
-        
-        # Get progress from Redis
-        progress_data = redis.get(f"progress:job:{job_id}")
-        if progress_data:
-            return json.loads(progress_data)
-        else:
-            return {
-                "job_id": job_id,
-                "status": "not_found",
-                "message": "Job not found or expired"
-            }
+        return {
+            "job_id": job_id,
+            "status": "unknown",
+            "message": "Progress tracking disabled"
+        }
             
     except Exception as e:
         logger.error(f"Status check failed: {e}")

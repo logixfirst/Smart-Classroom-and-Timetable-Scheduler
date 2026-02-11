@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import TimetableProgressTracker from './ProgressTracker'
 
 // NEP 2020 / Harvard-style Timetable Generation
 // NO batch selection - students enroll individually in subjects
@@ -260,12 +259,13 @@ export default function NEP2020TimetableForm() {
 
   if (isGenerating && jobId) {
     return (
-      <TimetableProgressTracker
-        jobId={jobId}
-        onComplete={generatedTimetableId => {
-          router.push(`/admin/timetable/review/${generatedTimetableId}`)
-        }}
-      />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-lg text-gray-700 dark:text-gray-300">Generating timetable...</p>
+          <p className="mt-2 text-sm text-gray-500">Job ID: {jobId}</p>
+        </div>
+      </div>
     )
   }
 

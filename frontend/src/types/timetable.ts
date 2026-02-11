@@ -183,21 +183,6 @@ export interface FacultyAvailability {
 }
 
 // ============================================
-// WEBSOCKET PROGRESS MESSAGES
-// ============================================
-
-export interface ProgressMessage {
-  job_id: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
-  progress: number // 0-100
-  phase: string // 'initializing' | 'clustering' | 'optimization' | 'conflict_resolution' | 'completed'
-  message: string
-  eta_seconds?: number
-  current_step?: string
-  timestamp: string
-}
-
-// ============================================
 // API REQUEST/RESPONSE TYPES
 // ============================================
 

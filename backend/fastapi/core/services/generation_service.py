@@ -114,51 +114,18 @@ class GenerationService:
     async def _handle_timeout(self, job_id: str):
         """Handle job timeout"""
         if self.redis:
-            import json
-            timeout_data = {
-                'job_id': job_id,
-                'progress': 0,
-                'status': 'failed',
-                'stage': 'Timeout',
-                'message': 'Generation timed out after 15 minutes',
-                'timestamp': datetime.now(timezone.utc).isoformat()
-            }
-            self.redis.setex(f"progress:job:{job_id}", 3600, json.dumps(timeout_data))
-            self.redis.publish(f"progress:{job_id}", json.dumps(timeout_data))
             self.redis.delete(f"cancel:job:{job_id}")
             self.redis.delete(f"start_time:job:{job_id}")
     
     async def _handle_cancellation(self, job_id: str):
         """Handle job cancellation"""
         if self.redis:
-            import json
-            cancel_data = {
-                'job_id': job_id,
-                'progress': 0,
-                'status': 'cancelled',
-                'stage': 'Cancelled',
-                'message': 'Generation cancelled by user',
-                'timestamp': datetime.now(timezone.utc).isoformat()
-            }
-            self.redis.setex(f"progress:job:{job_id}", 3600, json.dumps(cancel_data))
-            self.redis.publish(f"progress:{job_id}", json.dumps(cancel_data))
             self.redis.delete(f"cancel:job:{job_id}")
             self.redis.delete(f"start_time:job:{job_id}")
     
     async def _handle_error(self, job_id: str, error: Exception):
         """Handle job error"""
         if self.redis:
-            import json
-            error_data = {
-                'job_id': job_id,
-                'progress': 0,
-                'status': 'failed',
-                'stage': 'Failed',
-                'message': f'Generation failed: {str(error)}',
-                'timestamp': datetime.now(timezone.utc).isoformat()
-            }
-            self.redis.setex(f"progress:job:{job_id}", 3600, json.dumps(error_data))
-            self.redis.publish(f"progress:{job_id}", json.dumps(error_data))
             self.redis.delete(f"cancel:job:{job_id}")
             self.redis.delete(f"start_time:job:{job_id}")
     
