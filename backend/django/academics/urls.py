@@ -8,6 +8,7 @@ from .timetable_views import (
     get_faculty_timetable,
     get_student_timetable,
 )
+from .progress_endpoints import get_progress, stream_progress, health_check
 from .workflow_views import TimetableWorkflowViewSet, TimetableVariantViewSet
 from .timetable_config_views import TimetableConfigurationViewSet
 from .conflict_views import ConflictViewSet
@@ -77,6 +78,10 @@ urlpatterns = [
     path("timetable/faculty/me/", get_faculty_timetable, name="faculty-timetable"),
     path("timetable/student/me/", get_student_timetable, name="student-timetable"),
     path("timetable/callback/", fastapi_callback, name="fastapi-callback"),
+    # Progress tracking endpoints (Enterprise SSE pattern)
+    path("generation/progress/<str:job_id>/", get_progress, name="generation-progress"),
+    path("generation/stream/<str:job_id>/", stream_progress, name="generation-stream"),
+    path("generation/health/", health_check, name="generation-health"),
     # Auth endpoints - CSRF exempt via APICSRFExemptMiddleware
     path("auth/login/", login_view, name="login"),
     path("auth/login", login_view, name="login-no-slash"),

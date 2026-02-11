@@ -54,6 +54,7 @@ from core.cancellation import (
     AtomicSection,
     clear_cancellation
 )
+from utils.progress_tracker import ProgressTracker
 
 logger = logging.getLogger(__name__)
 
@@ -106,36 +107,59 @@ class TimetableGenerationSaga:
         # Create cancellation token (SOFT mode by default)
         token = CancellationToken(job_id, self.redis_client, CancellationMode.SOFT)
         
+        # Create progress tracker (Enterprise pattern: worker owns progress)
+        tracker = ProgressTracker(job_id, self.redis_client) if self.redis_client else None
+        
         try:
             # STEP 1: Load data (CANCELABLE)
             with SafePoint(token, "data_loading"):
                 logger.info("[SAGA] Step 1/5: Loading data...")
-                data = await self._load_data(job_id, request_data)
+                if tracker:
+                    tracker.start_stage('loading')
+                data = await self._load_data(job_id, request_data, tracker)
                 self.stage_completed['data_load'] = True
+                if tracker:
+                    tracker.complete_stage()
             
             # STEP 2: Clustering (CANCELABLE)
             with SafePoint(token, "clustering"):
                 logger.info("[SAGA] Step 2/5: Clustering courses...")
-                clusters = await self._stage1_clustering(job_id, data, token)
+                if tracker:
+                    tracker.start_stage('clustering', total_items=len(data['courses']))
+                clusters = await self._stage1_clustering(job_id, data, token, tracker)
                 self.stage_completed['clustering'] = True
+                if tracker:
+                    tracker.complete_stage()
             
             # STEP 3: CP-SAT solving (CANCELABLE between clusters only)
             with SafePoint(token, "cpsat_solving"):
                 logger.info("[SAGA] Step 3/5: CP-SAT solving...")
-                initial_solution = await self._stage2_cpsat(job_id, data, clusters, token)
+                if tracker:
+                    tracker.start_stage('cpsat_solving', total_items=len(clusters))
+                initial_solution = await self._stage2_cpsat(job_id, data, clusters, token, tracker)
                 self.stage_completed['cpsat'] = True
+                if tracker:
+                    tracker.complete_stage()
             
             # STEP 4: GA optimization (CANCELABLE between generations)
             with SafePoint(token, "ga_optimization"):
                 logger.info("[SAGA] Step 4/5: GA optimization...")
-                optimized_solution = await self._stage2b_ga(job_id, data, initial_solution, token)
+                if tracker:
+                    tracker.start_stage('ga_optimization')
+                optimized_solution = await self._stage2b_ga(job_id, data, initial_solution, token, tracker)
                 self.stage_completed['ga'] = True
+                if tracker:
+                    tracker.complete_stage()
             
             # STEP 5: RL refinement (CANCELABLE)
             with SafePoint(token, "rl_refinement"):
                 logger.info("[SAGA] Step 5/5: RL refinement...")
-                final_solution = await self._stage3_rl(job_id, data, optimized_solution, token)
+                if tracker:
+                    tracker.start_stage('rl_refinement')
+                final_solution = await self._stage3_rl(job_id, data, optimized_solution, token, tracker)
                 self.stage_completed['rl'] = True
+                if tracker:
+                    tracker.complete_stage()
             
             # STEP 6: Persistence (NON-CANCELABLE atomic section)
             # Industry pattern: Cancellation deferred during atomic DB write
@@ -144,6 +168,10 @@ class TimetableGenerationSaga:
                 # TODO: Save to database
                 self.stage_completed['persistence'] = True
                 pass
+            
+            # Mark as completed
+            if tracker:
+                tracker.mark_completed()
             
             # Clear cancellation flag on success
             clear_cancellation(job_id, self.redis_client)
@@ -163,6 +191,10 @@ class TimetableGenerationSaga:
             
         except CancellationError as e:
             logger.warning(f"[SAGA] ⚠️  Job {job_id} cancelled: {e}")
+            
+            # Mark as cancelled
+            if tracker:
+                tracker.mark_cancelled()
             
             # Google/Meta pattern: Distinguish CANCELLED vs PARTIAL_SUCCESS
             # If CP-SAT completed, we have a usable (though unoptimized) solution
@@ -195,10 +227,12 @@ class TimetableGenerationSaga:
             
         except Exception as e:
             logger.error(f"[SAGA] ❌ Workflow failed: {e}")
+            if tracker:
+                tracker.mark_failed(str(e))
             await self._compensate(job_id)
             raise
     
-    async def _load_data(self, job_id: str, request_data: dict) -> Dict:
+    async def _load_data(self, job_id: str, request_data: dict, tracker=None) -> Dict:
         """
         Load data from Django backend via database connection
         PRODUCTION: Direct database access for performance
@@ -251,7 +285,7 @@ class TimetableGenerationSaga:
             logger.error(traceback.format_exc())
             raise
     
-    async def _stage1_clustering(self, job_id: str, data: Dict, token: CancellationToken) -> List[List]:
+    async def _stage1_clustering(self, job_id: str, data: Dict, token: CancellationToken, tracker=None) -> List[List]:
         """
         Stage 1: Louvain clustering with cancellation support
         ✅ DESIGN FREEZE: CPU-only, deterministic clustering
@@ -278,7 +312,7 @@ class TimetableGenerationSaga:
             chunk_size = 10
             return [courses[i:i+chunk_size] for i in range(0, len(courses), chunk_size)]
     
-    async def _stage2_cpsat(self, job_id: str, data: Dict, clusters: List[List], token: CancellationToken) -> Dict:
+    async def _stage2_cpsat(self, job_id: str, data: Dict, clusters: List[List], token: CancellationToken, tracker=None) -> Dict:
         """
         Stage 2: CP-SAT solving with cancellation between clusters
         ✅ DESIGN FREEZE: Deterministic, provably correct
@@ -296,6 +330,10 @@ class TimetableGenerationSaga:
             token.check_or_raise(f"cpsat_cluster_{cluster_id}")
             
             logger.info(f"[SAGA] Solving cluster {cluster_id+1}/{len(clusters)}...")
+            
+            # Update progress
+            if tracker:
+                tracker.update_stage_progress(cluster_id, len(clusters))
             
             solver = AdaptiveCPSATSolver(
                 courses=cluster,
@@ -325,7 +363,7 @@ class TimetableGenerationSaga:
         self.job_data['cpsat_solution'] = solution
         return solution
     
-    async def _stage2b_ga(self, job_id: str, data: Dict, initial_solution: Dict, token: CancellationToken) -> Dict:
+    async def _stage2b_ga(self, job_id: str, data: Dict, initial_solution: Dict, token: CancellationToken, tracker=None) -> Dict:
         """
         Stage 2B: Genetic algorithm optimization for soft constraints
         ✅ DESIGN FREEZE: CPU-only, single population, deterministic
@@ -358,7 +396,7 @@ class TimetableGenerationSaga:
             logger.error(f"[SAGA] GA failed: {e} - using initial solution")
             return initial_solution
     
-    async def _stage3_rl(self, job_id: str, data: Dict, solution: Dict, token: CancellationToken) -> Dict:
+    async def _stage3_rl(self, job_id: str, data: Dict, solution: Dict, token: CancellationToken, tracker=None) -> Dict:
         """
         Stage 3: RL conflict refinement (frozen policy, optional)
         ✅ DESIGN FREEZE: Tabular Q-learning, no runtime learning, local swaps only

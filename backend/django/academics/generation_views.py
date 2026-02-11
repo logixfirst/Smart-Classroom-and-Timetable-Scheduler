@@ -205,11 +205,6 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 }
             )
             
-            # CRITICAL FIX: Set Redis cache IMMEDIATELY after job creation
-            # This prevents race condition where frontend polls before cache exists
-            # Job initialization
-                cache.set(cache_key, initial_progress, timeout=3600)
-
             # Return IMMEDIATELY to frontend (don't wait for Celery/FastAPI)
             job_serializer = GenerationJobSerializer(job)
             response_data = {
