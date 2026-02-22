@@ -60,4 +60,3 @@ def setup_rate_limiting(app):
         app: FastAPI application instance
     """
     app.add_middleware(RateLimitMiddleware)
-    logger.info("Rate limiting middleware enabled (60 requests/minute per client)")

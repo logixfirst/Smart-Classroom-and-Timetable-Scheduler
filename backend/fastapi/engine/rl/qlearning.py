@@ -87,9 +87,7 @@ class SimpleTabularQLearning:
         # Audit logging
         self.decision_log: List[Dict] = []
         
-        logger.info(f"[RL-Simple] Tabular Q-learning initialized: LR={learning_rate}, γ={gamma}")
-        logger.info(f"[RL-Simple] Role: LOCAL swap selection (2-5 candidates)")
-        logger.info(f"[RL-Simple] Policy frozen: {frozen}")
+        logger.debug(f"[RL] Q-learning init: LR={learning_rate}, γ={gamma}, frozen={frozen}")
     
     def choose_best_swap(
         self,
@@ -271,8 +269,7 @@ class SimpleTabularQLearning:
         
         self.semester_version = semester_id
         
-        logger.info(f"[RL-Policy] Saved policy for semester {semester_id}")
-        logger.info(f"[RL-Policy] Q-table size: {len(self.q_table)}, \u03b5: {self.epsilon:.4f}")
+        logger.info(f"[RL-Policy] Saved policy for semester {semester_id} (Q-table: {len(self.q_table)} entries, \u03b5={self.epsilon:.4f})")
     
     def load_policy(self, semester_id: str, freeze_on_load: bool = True):
         """
@@ -306,9 +303,7 @@ class SimpleTabularQLearning:
             if freeze_on_load:
                 self.freeze_policy()
             
-            logger.info(f"[RL-Policy] Loaded policy for semester {semester_id}")
-            logger.info(f"[RL-Policy] Q-table size: {len(self.q_table)}, \u03b5: {self.epsilon:.4f}")
-            logger.info(f"[RL-Policy] Institutional memory: {len(self.q_table)} state-action pairs")
+            logger.info(f"[RL-Policy] Loaded policy for semester {semester_id} (Q-table: {len(self.q_table)} entries, \u03b5={self.epsilon:.4f})")
             
         except Exception as e:
             logger.error(f"[RL-Policy] Failed to load policy: {e}")
@@ -333,7 +328,7 @@ class SimpleTabularQLearning:
         semesters = [f.stem.replace('policy_', '') for f in policy_files]
         semesters.sort(reverse=True)  # Most recent first
         
-        logger.info(f"[RL-Policy] Available policies: {semesters}")
+        logger.debug(f"[RL-Policy] Available policies: {semesters}")
         return semesters
     
     def export_decision_log(self, output_file: str):
@@ -347,7 +342,7 @@ class SimpleTabularQLearning:
         with open(output_path, 'w') as f:
             json.dump(self.decision_log, f, indent=2)
         
-        logger.info(f"[RL-Audit] Exported {len(self.decision_log)} decisions to {output_file}")
+        logger.debug(f"[RL-Audit] Exported {len(self.decision_log)} decisions to {output_file}")
     
     def get_stats(self) -> Dict:
         """Get Q-learning statistics for monitoring"""

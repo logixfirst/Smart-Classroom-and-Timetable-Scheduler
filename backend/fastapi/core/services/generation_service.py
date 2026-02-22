@@ -28,7 +28,7 @@ class GenerationService:
         """
         self.redis = redis_client
         self.hardware_profile = hardware_profile
-        logger.info("Generation service initialized")
+        logger.debug("Generation service initialized")
     
     async def generate_timetable(
         self,
@@ -108,7 +108,7 @@ class GenerationService:
             
         finally:
             # Cleanup
-            logger.info(f"[JOB {job_id}] Cleaning up resources")
+            logger.debug(f"[JOB {job_id}] Cleaning up resources")
             await self._cleanup(job_id)
     
     async def _handle_timeout(self, job_id: str):

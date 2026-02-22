@@ -58,7 +58,9 @@ import {
   getProgressColor
 } from '@/hooks/useProgress'
 import { ProgressBarWithInfo } from '@/components/ui/progress-bar'
-import { useEffect } from 'react'
+import { fetchGenerationJobStatus } from '@/lib/api/timetable'
+import type { GenerationJob } from '@/types/timetable'
+import { useEffect, useState } from 'react'
 
 export default function TimetableStatusPage() {
   const params = useParams()
@@ -121,6 +123,46 @@ export default function TimetableStatusPage() {
     }
   }, [progress?.status, router])
 
+  // ─── REST polling fallback ────────────────────────────────────────────────
+  // If the SSE stream doesn't deliver any progress within 30 s (e.g. because
+  // the Django server hasn't started writing to Redis yet, or the SSE
+  // connection drops before reconnect succeeds), we fall back to polling the
+  // standard REST job-status endpoint every 5 s so the user can still see
+  // that the generation is alive.
+
+  const [sseTimedOut, setSseTimedOut] = useState(false)
+  const [polledJob, setPolledJob] = useState<GenerationJob | null>(null)
+
+  // Arm a 30-second one-shot timer.  Cleared immediately if SSE catches up.
+  useEffect(() => {
+    if (progress) {
+      setSseTimedOut(false) // SSE is healthy – cancel fallback if active
+      return
+    }
+    const timer = setTimeout(() => setSseTimedOut(true), 30_000)
+    return () => clearTimeout(timer)
+  }, [progress])
+
+  // Polling loop: active only while SSE has not delivered progress
+  useEffect(() => {
+    if (!sseTimedOut || progress) return
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const job = await fetchGenerationJobStatus(jobId)
+        if (!cancelled) setPolledJob(job)
+      } catch {
+        // swallow – next tick will retry
+      }
+    }
+    poll()
+    const id = setInterval(poll, 5_000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [sseTimedOut, progress, jobId])
+
   // Render connection error
   if (error && reconnectAttempt > 5) {
     return (
@@ -156,14 +198,20 @@ export default function TimetableStatusPage() {
     )
   }
 
-  // Render initial loading state
-  if (!progress && !error) {
+  // Render initial loading / reconnecting state.
+  // This catches three sub-cases:
+  //   a) First load, SSE not yet connected (no error)
+  //   b) SSE sent a named error event and is reconnecting (error && attempt <=5)
+  //   c) SSE timed out and we are showing REST-polled status
+  if (!progress) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center p-4">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 dark:border-indigo-800 border-t-indigo-600 dark:border-t-indigo-400 mb-4"></div>
           <p className="text-lg font-semibold text-[#2C2C2C] dark:text-white mb-2">
-            Connecting to generation service...
+            {error
+              ? `Reconnecting to generation service…`
+              : 'Connecting to generation service...'}
           </p>
           <p className="text-sm text-[#606060] dark:text-[#aaaaaa] font-mono">
             Job ID: {jobId}
@@ -171,6 +219,25 @@ export default function TimetableStatusPage() {
           {reconnectAttempt > 0 && (
             <p className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">
               Reconnecting... (attempt {reconnectAttempt}/5)
+            </p>
+          )}
+          {error && (
+            <p className="mt-2 text-xs text-red-500 dark:text-red-400 max-w-sm mx-auto">
+              Last error: {error}
+            </p>
+          )}
+          {polledJob && (
+            <div className="mt-4 text-sm text-[#606060] dark:text-[#aaaaaa] bg-white dark:bg-[#2C2C2C] rounded-lg px-4 py-2 inline-block shadow">
+              <span className="font-semibold">Job status (REST):</span>{' '}
+              <span className="capitalize">{polledJob.status}</span>
+              {polledJob.progress > 0 && (
+                <span className="ml-2">— {polledJob.progress}%</span>
+              )}
+            </div>
+          )}
+          {sseTimedOut && !polledJob && (
+            <p className="mt-3 text-xs text-yellow-600 dark:text-yellow-400">
+              SSE stream is slow — checking job status via REST…
             </p>
           )}
         </div>

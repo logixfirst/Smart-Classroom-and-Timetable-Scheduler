@@ -75,7 +75,7 @@ class ProgressTracker:
             'metadata': {}
         }
         self.redis.setex(self.key, 7200, json.dumps(initial_data))
-        logger.info(f"[PROGRESS] Initialized tracking for job {self.job_id}")
+        logger.debug(f"[PROGRESS] Initialized tracking for job {self.job_id}")
     
     def start_stage(self, stage: str, total_items: int = 0):
         """
@@ -107,7 +107,7 @@ class ProgressTracker:
             meta=metadata
         )
         
-        logger.info(f"[PROGRESS] Started stage: {stage} (progress: {overall}%)")
+        logger.debug(f"[PROGRESS] Started stage: {stage} (progress: {overall}%)")
     
     def update_stage_progress(self, completed_items: int, total_items: int):
         """
@@ -159,7 +159,7 @@ class ProgressTracker:
             overall_progress=overall
         )
         
-        logger.info(f"[PROGRESS] Completed stage: {self.current_stage} (progress: {overall}%)")
+        logger.debug(f"[PROGRESS] Completed stage: {self.current_stage} (progress: {overall}%)")
     
     def update(
         self,
@@ -342,6 +342,7 @@ class ProgressTracker:
     
     def mark_completed(self):
         """Mark job as successfully completed"""
+        now = int(time.time())
         data = {
             'job_id': self.job_id,
             'stage': 'completed',
@@ -350,45 +351,52 @@ class ProgressTracker:
             'status': 'completed',
             'eta_seconds': 0,
             'started_at': int(self.start_time),
-            'last_updated': int(time.time()),
-            'completed_at': int(time.time()),
+            'last_updated': now,
+            'completed_at': now,
             'metadata': {}
         }
-        
         self.redis.setex(self.key, 7200, json.dumps(data))
         logger.info(f"[PROGRESS] Job {self.job_id} marked as completed")
-    
+
     def mark_failed(self, error_message: str):
-        """Mark job as failed"""
+        """
+        Mark job as failed.
+
+        IMPORTANT: error is stored in metadata.error so the frontend
+        (progress.metadata?.error) can display it correctly.
+        """
+        now = int(time.time())
         data = {
             'job_id': self.job_id,
             'stage': 'failed',
             'stage_progress': 0.0,
             'overall_progress': 0.0,
             'status': 'failed',
-            'error': error_message,
+            'eta_seconds': None,          # Required by frontend ProgressData interface
             'started_at': int(self.start_time),
-            'last_updated': int(time.time()),
-            'failed_at': int(time.time()),
-            'metadata': {}
+            'last_updated': now,
+            'failed_at': now,
+            'metadata': {
+                'error': error_message,   # Frontend reads progress.metadata?.error
+            },
         }
-        
         self.redis.setex(self.key, 7200, json.dumps(data))
         logger.error(f"[PROGRESS] Job {self.job_id} marked as failed: {error_message}")
-    
+
     def mark_cancelled(self):
         """Mark job as cancelled by user"""
+        now = int(time.time())
         data = {
             'job_id': self.job_id,
             'stage': 'cancelled',
             'stage_progress': 0.0,
             'overall_progress': 0.0,
             'status': 'cancelled',
+            'eta_seconds': None,          # Required by frontend ProgressData interface
             'started_at': int(self.start_time),
-            'last_updated': int(time.time()),
-            'cancelled_at': int(time.time()),
+            'last_updated': now,
+            'cancelled_at': now,
             'metadata': {}
         }
-        
         self.redis.setex(self.key, 7200, json.dumps(data))
         logger.info(f"[PROGRESS] Job {self.job_id} marked as cancelled")

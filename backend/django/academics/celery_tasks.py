@@ -79,21 +79,42 @@ def generate_timetable_task(self, job_id, org_id, academic_year, semester):
             response = requests.post(
                 f"{fastapi_url}/api/generate_variants",
                 json=payload,
-                timeout=5  # FastAPI MUST respond in <5s (just queues the job)
+                # Increased from 5s: FastAPI queues the job in a background task,
+                # but on first call (cold start) or under load it may take up to 30s
+                # to return 200.  A Timeout here does NOT mean FastAPI missed the
+                # request — it may already be processing it.  See the Timeout handler
+                # below which intentionally avoids marking the job as failed.
+                timeout=30,
             )
             
             if response.status_code == 200:
                 logger.info(f"[CELERY] Job {job_id} queued in FastAPI successfully")
-                # FastAPI is now running generation in background
-                # FastAPI will update Redis with progress
-                # FastAPI will call fastapi_callback_task when done
+                # FastAPI is now running generation in background.
+                # It will update Redis with progress and call fastapi_callback_task
+                # when done.
+                if job:
+                    job.status = 'running'
+                    job.save(update_fields=['status'])
                 return {'status': 'queued', 'job_id': job_id}
             else:
                 raise Exception(f"FastAPI returned {response.status_code}: {response.text}")
                 
         except requests.exceptions.Timeout:
-            logger.error(f"[CELERY] FastAPI timeout for job {job_id}")
-            raise Exception("FastAPI took too long to respond (>5s). Service may be overloaded.")
+            # FastAPI did not respond within 30 s, but it may have already received
+            # the POST and started the generation pipeline (the response just got
+            # delayed).  Do NOT mark the job as failed — leave it in 'running' state
+            # so the FastAPI → Celery callback can finalise it when it completes.
+            logger.warning(
+                f"[CELERY] FastAPI POST timed out for job {job_id} (30 s). "
+                f"Generation may still be running inside FastAPI — leaving job "
+                f"status as 'running' so the completion callback can update it."
+            )
+            if job:
+                job.status = 'running'
+                job.error_message = None
+                job.save(update_fields=['status', 'error_message'])
+            return {'status': 'timeout_but_may_be_running', 'job_id': job_id}
+
         except requests.exceptions.ConnectionError:
             logger.error(f"[CELERY] Cannot connect to FastAPI for job {job_id}")
             raise Exception("FastAPI service unavailable. Check if FastAPI is running.")

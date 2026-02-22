@@ -71,7 +71,7 @@ class DjangoAPIClient:
             cursor.close()
             
             if row:
-                logger.info(f"[ORG] Resolved '{org_identifier}' -> {row['org_id']}")
+                logger.debug(f"[ORG] Resolved '{org_identifier}' -> {row['org_id']}")
                 return row['org_id']
             else:
                 logger.error(f"[ORG] Organization '{org_identifier}' not found")
@@ -99,7 +99,7 @@ class DjangoAPIClient:
         # Try cache first
         cached_config = await self.cache_manager.get('config', org_id)
         if cached_config:
-            logger.info(f"[CONFIG] Using cached config: {cached_config['working_days']} days, {cached_config['slots_per_day']} slots/day")
+            logger.debug(f"[CONFIG] Using cached config: {cached_config['working_days']} days, {cached_config['slots_per_day']} slots/day")
             return cached_config
         
         # Fetch from database
@@ -132,7 +132,7 @@ class DjangoAPIClient:
                 
                 # Cache for 24 hours
                 await self.cache_manager.set('config', org_id, config, ttl=86400)
-                logger.info(f"[CONFIG] Fetched from DB and cached: {config['working_days']} days, {config['slots_per_day']} slots/day")
+                logger.debug(f"[CONFIG] Fetched from DB and cached: {config['working_days']} days, {config['slots_per_day']} slots/day")
                 return config
             else:
                 logger.warning(f"[CONFIG] No config found for org {org_id}, using defaults")
@@ -182,7 +182,7 @@ class DjangoAPIClient:
         if cache_valid:
             cached_courses = await self.cache_manager.get('courses', org_id, semester=semester, department_id=department_id)
             if cached_courses:
-                logger.info(f"[CACHE] Using cached courses: {len(cached_courses)} courses")
+                logger.debug(f"[CACHE] Using cached courses: {len(cached_courses)} courses")
                 # Deserialize from dict back to Course objects, filtering out invalid faculty
                 valid_courses = []
                 skipped = 0
@@ -191,7 +191,6 @@ class DjangoAPIClient:
                         valid_courses.append(Course(**c))
                     else:
                         skipped += 1
-                        logger.warning(f"[CACHE] Skipping cached course {c.get('course_id')} with invalid faculty_id: {c.get('faculty_id')}")
                 if skipped > 0:
                     logger.warning(f"[CACHE] Filtered out {skipped} courses with invalid faculty from cache")
                 return valid_courses
@@ -210,7 +209,7 @@ class DjangoAPIClient:
                 orgs = cursor.fetchall()
                 logger.error(f"Available organizations: {[o['org_name'] for o in orgs]}")
                 return []
-            logger.info(f"Found organization: {org_row['org_name']} (ID: {org_id})")
+            logger.debug(f"Found organization: {org_row['org_name']} (ID: {org_id})")
             
             # CRITICAL: Use subquery to avoid ARRAY_AGG duplicates from join multiplication
             # Also fetch co_faculty_ids to split large courses into sections
@@ -252,11 +251,10 @@ class DjangoAPIClient:
             
             import time
             start_time = time.time()
-            logger.info(f"Executing course query with org_id={org_id}, semester_type={semester_type}")
             cursor.execute(query, params)
             rows = cursor.fetchall()
             query_time = time.time() - start_time
-            logger.info(f"Query returned {len(rows)} rows in {query_time:.2f}s")
+            logger.debug(f"Course query: {len(rows)} rows in {query_time:.2f}s (org={org_id}, sem={semester_type})")
             
             courses = []
             unique_students = set()  # Track unique students across all courses
@@ -310,7 +308,7 @@ class DjangoAPIClient:
                         students_per_section = len(student_ids) // num_sections
                         remainder = len(student_ids) % num_sections
                         
-                        logger.info(f"[PARALLEL SECTIONS] {row['course_code']}: {len(student_ids)} students -> {num_sections} sections (faculty: {len(available_faculty)})")
+                        logger.debug(f"[PARALLEL SECTIONS] {row['course_code']}: {len(student_ids)} students -> {num_sections} sections")
                         
                         start_idx = 0
                         for section_idx in range(num_sections):
@@ -324,7 +322,6 @@ class DjangoAPIClient:
                             section_faculty_id = available_faculty[section_idx % len(available_faculty)]
                             
                             # Double-check faculty validity before creating course
-                            logger.warning(f"[PARALLEL SECTION CHECK] Course {row['course_code']} sec{section_idx}: faculty_id={repr(section_faculty_id)}, valid={_is_valid_uuid(section_faculty_id)}")
                             if not _is_valid_uuid(section_faculty_id):
                                 logger.error(f"[PARALLEL SECTION] Course {row['course_code']} section {section_idx} has invalid faculty_id: {section_faculty_id}, skipping this section")
                                 continue
@@ -397,47 +394,9 @@ class DjangoAPIClient:
             parallel_sections = sum(1 for c in courses if '_sec' in c.course_id)
             original_offerings = len(set(c.course_id.split('_off_')[1].split('_sec')[0] for c in courses if '_off_' in c.course_id))
             
-            logger.info(f"[COURSE LOAD] Total: {len(courses)} sections from {original_offerings} offerings | Parallel sections: {parallel_sections}")
-            logger.info(f"[STUDENTS] Database: {total_students} | In courses: {len(unique_students)} | Enrollments: min={min(enrollment_counts) if enrollment_counts else 0}, max={max(enrollment_counts) if enrollment_counts else 0}, avg={sum(enrollment_counts)/len(enrollment_counts) if enrollment_counts else 0:.1f}")
-            
-            # Debug: Check enrollments for ODD semester offerings
-            cursor.execute("""
-                SELECT COUNT(DISTINCT ce.student_id) as odd_students,
-                       COUNT(DISTINCT co.offering_id) as odd_offerings,
-                       COUNT(*) as total_enrollments
-                FROM course_offerings co
-                LEFT JOIN course_enrollments ce ON co.offering_id = ce.offering_id AND ce.is_active = true
-                WHERE co.org_id = %s AND co.semester_type = %s AND co.is_active = true
-            """, (org_id, semester_type))
-            debug_row = cursor.fetchone()
-            logger.info(f"ODD semester DB stats: {debug_row['odd_offerings']} offerings, {debug_row['odd_students']} students, {debug_row['total_enrollments']} enrollments")
-            
-            # Log enrollment distribution
-            if enrollment_counts:
-                avg_enrollment = sum(enrollment_counts) / len(enrollment_counts)
-                max_enrollment = max(enrollment_counts)
-                offerings_with_students = sum(1 for c in enrollment_counts if c > 0)
-                logger.info(f"Enrollment distribution: avg={avg_enrollment:.1f}, max={max_enrollment}, {offerings_with_students}/{len(enrollment_counts)} offerings have students")
-                
-                # Debug: Show sample offerings with student counts
-                cursor.execute("""
-                    SELECT co.offering_id, c.course_code, COUNT(ce.student_id) as student_count
-                    FROM course_offerings co
-                    INNER JOIN courses c ON co.course_id = c.course_id
-                    LEFT JOIN course_enrollments ce ON co.offering_id = ce.offering_id AND ce.is_active = true
-                    WHERE co.org_id = %s AND co.semester_type = %s AND co.is_active = true
-                    GROUP BY co.offering_id, c.course_code
-                    ORDER BY student_count DESC
-                    LIMIT 10
-                """, (org_id, semester_type))
-                sample_offerings = cursor.fetchall()
-                logger.info(f"Top 10 offerings by enrollment: {[(r['course_code'], r['student_count']) for r in sample_offerings]}")
+            logger.info(f"[COURSE LOAD] {len(courses)} sections ({original_offerings} offerings, {parallel_sections} parallel) | students={len(unique_students)}/{total_students}")
             
             cursor.close()
-            sections_created = len(courses) - len(rows)
-            logger.info(f"Fetched {len(rows)} course offerings from database")
-            logger.info(f"Created {len(courses)} course sections ({sections_created} extra sections from splitting large courses)")
-            logger.info(f"Total unique students: {len(unique_students)} (System total: {total_students})")
             
             # Cache courses for 30 minutes (convert to dict for JSON serialization)
             courses_dict = [c.dict() for c in courses]
@@ -459,7 +418,7 @@ class DjangoAPIClient:
                 except Exception as e:
                     logger.warning(f"[CACHE] Version storage error: {e}")
             
-            logger.info(f"[CACHE] Cached {len(courses)} courses")
+            logger.debug(f"[CACHE] Cached {len(courses)} courses")
             
             return courses
 
@@ -474,7 +433,7 @@ class DjangoAPIClient:
         # Try cache first
         cached_faculty = await self.cache_manager.get('faculty', org_id)
         if cached_faculty:
-            logger.info(f"[CACHE] Using cached faculty: {len(cached_faculty)} faculty members")
+            logger.debug(f"[CACHE] Using cached faculty: {len(cached_faculty)} faculty members")
             # Deserialize from dict back to Faculty objects
             return {fid: Faculty(**fdata) for fid, fdata in cached_faculty.items()}
         
@@ -515,12 +474,11 @@ class DjangoAPIClient:
                     continue
             
             cursor.close()
-            logger.info(f"Fetched {len(faculty_dict)} faculty from database")
+            logger.debug(f"Fetched {len(faculty_dict)} faculty from database")
             
             # Cache faculty for 1 hour (convert to dict for JSON serialization)
             faculty_cache = {fid: fac.dict() for fid, fac in faculty_dict.items()}
             await self.cache_manager.set('faculty', org_id, faculty_cache, ttl=3600)
-            logger.info(f"[CACHE] Cached {len(faculty_dict)} faculty members")
             
             return faculty_dict
 
@@ -535,7 +493,7 @@ class DjangoAPIClient:
         # Try cache first
         cached_rooms = await self.cache_manager.get('rooms', org_id)
         if cached_rooms:
-            logger.info(f"[CACHE] Using cached rooms: {len(cached_rooms)} rooms")
+            logger.debug(f"[CACHE] Using cached rooms: {len(cached_rooms)} rooms")
             # Deserialize from dict back to Room objects
             return [Room(**r) for r in cached_rooms]
         
@@ -605,12 +563,11 @@ class DjangoAPIClient:
                     continue
             
             cursor.close()
-            logger.info(f"Fetched {len(rooms)} rooms from database")
+            logger.debug(f"Fetched {len(rooms)} rooms from database")
             
             # Cache rooms for 1 hour (convert to dict for JSON serialization)
             rooms_cache = [r.dict() for r in rooms]
             await self.cache_manager.set('rooms', org_id, rooms_cache, ttl=3600)
-            logger.info(f"[CACHE] Cached {len(rooms)} rooms")
             
             return rooms
 
@@ -639,7 +596,7 @@ class DjangoAPIClient:
             List of 54 universal TimeSlot objects (shared by all departments)
         """
         try:
-            logger.info(f"[NEP 2020] Generating UNIVERSAL time slots (no department filtering)")
+            logger.debug(f"[NEP 2020] Generating UNIVERSAL time slots (no department filtering)")
             from datetime import datetime, timedelta
             
             # Use time_config if provided, otherwise use defaults
@@ -652,7 +609,7 @@ class DjangoAPIClient:
                 lunch_break_enabled = time_config.get('lunch_break_enabled', True)
                 lunch_break_start = time_config.get('lunch_break_start', '12:00')
                 lunch_break_end = time_config.get('lunch_break_end', '13:00')
-                logger.info(f"[TIME_SLOTS] Using config: {working_days} days, {slots_per_day} slots/day, {start_time_str}-{end_time_str}")
+                logger.debug(f"[TIME_SLOTS] Using config: {working_days} days, {slots_per_day} slots/day, {start_time_str}-{end_time_str}")
             else:
                 # Default configuration (matches old behavior)
                 working_days = 6
@@ -722,10 +679,7 @@ class DjangoAPIClient:
                     period_idx += 1
                     global_slot_id += 1
             
-            logger.info(f"[NEP 2020] Generated {len(time_slots)} UNIVERSAL time slots (shared by ALL departments)")
-            logger.info(f"[NEP 2020] {working_days} days x {len(time_slots)//working_days} slots/day = {len(time_slots)} total")
-            if lunch_break_enabled:
-                logger.info(f"   Lunch break: {lunch_break_start}-{lunch_break_end}")
+            logger.info(f"[NEP 2020] Generated {len(time_slots)} time slots ({working_days}d x {len(time_slots)//working_days if working_days else 0} slots/day)")
             
             return time_slots
 
@@ -740,7 +694,7 @@ class DjangoAPIClient:
         # Try cache first
         cached_students = await self.cache_manager.get('students', org_id)
         if cached_students:
-            logger.info(f"[CACHE] Using cached students: {len(cached_students)} students")
+            logger.debug(f"[CACHE] Using cached students: {len(cached_students)} students")
             # Deserialize from dict back to Student objects
             return {sid: Student(**sdata) for sid, sdata in cached_students.items()}
         
@@ -781,12 +735,11 @@ class DjangoAPIClient:
                     continue
             
             cursor.close()
-            logger.info(f"Fetched {len(students_dict)} students from database")
+            logger.debug(f"Fetched {len(students_dict)} students from database")
             
             # Cache students for 30 minutes (convert to dict for JSON serialization)
             students_cache = {sid: stud.dict() for sid, stud in students_dict.items()}
             await self.cache_manager.set('students', org_id, students_cache, ttl=1800)
-            logger.info(f"[CACHE] Cached {len(students_dict)} students")
             
             return students_dict
 
@@ -834,7 +787,7 @@ class DjangoAPIClient:
                     continue
             
             cursor.close()
-            logger.info(f"Fetched {len(batches_dict)} batches from database")
+            logger.debug(f"Fetched {len(batches_dict)} batches from database")
             return batches_dict
 
         except Exception as e:

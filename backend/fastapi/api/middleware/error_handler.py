@@ -50,4 +50,3 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
 def setup_error_handler(app):
     """Add error handler middleware to FastAPI app"""
     app.add_middleware(ErrorHandlerMiddleware)
-    logger.info("Error handler middleware configured")

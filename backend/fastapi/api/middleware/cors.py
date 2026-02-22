@@ -32,4 +32,4 @@ def setup_cors(app: FastAPI):
         allow_headers=["*"],
     )
     
-    logger.info(f"CORS configured with {len(origins)} allowed origins")
+    logger.debug(f"CORS configured with {len(origins)} allowed origins")

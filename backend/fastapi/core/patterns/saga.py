@@ -336,11 +336,7 @@ class TimetableGenerationSaga:
             token.check_or_raise(f"cpsat_cluster_{cluster_id}")
             
             logger.info(f"[SAGA] Solving cluster {cluster_id+1}/{len(clusters)}...")
-            
-            # Update progress
-            if tracker:
-                tracker.update_stage_progress(cluster_id, len(clusters))
-            
+
             solver = AdaptiveCPSATSolver(
                 courses=cluster,
                 rooms=data['rooms'],
@@ -351,8 +347,13 @@ class TimetableGenerationSaga:
                 cluster_id=cluster_id,
                 total_clusters=len(clusters)
             )
-            
+
             cluster_solution = solver.solve_cluster(cluster)
+
+            # Update progress AFTER solving so completed_items is accurate
+            # (cluster_id is 0-indexed; add 1 for completed count)
+            if tracker:
+                tracker.update_stage_progress(cluster_id + 1, len(clusters))
             
             if cluster_solution:
                 solution.update(cluster_solution)

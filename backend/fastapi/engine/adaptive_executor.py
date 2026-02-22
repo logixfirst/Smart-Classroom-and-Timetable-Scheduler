@@ -53,8 +53,6 @@ class AdaptiveExecutor:
         
     async def initialize(self, force_hardware_refresh: bool = False):
         """Initialize executor with hardware detection"""
-        logger.info("Initializing Adaptive Executor...")
-        
         # Detect hardware
         self.hardware_profile = get_hardware_profile(force_hardware_refresh)
         self.config = get_optimal_config(self.hardware_profile)
@@ -62,7 +60,7 @@ class AdaptiveExecutor:
         # Initialize appropriate executors
         await self._initialize_executors()
         
-        logger.info(f"Adaptive Executor initialized with strategy: {self.hardware_profile.optimal_strategy.value}")
+        logger.info(f"Adaptive Executor initialized: {self.hardware_profile.optimal_strategy.value}")
         
     async def _initialize_executors(self):
         """Initialize executors based on hardware profile"""
@@ -81,7 +79,7 @@ class AdaptiveExecutor:
             try:
                 self.distributed_executor = DistributedExecutor(self.config)
                 await self.distributed_executor.initialize()
-                logger.info("Distributed executor initialized")
+                logger.debug("Distributed executor initialized")
             except Exception as e:
                 logger.warning(f"Distributed executor initialization failed: {e}")
                 self.distributed_executor = None

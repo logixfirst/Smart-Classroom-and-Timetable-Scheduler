@@ -60,108 +60,103 @@ export function useProgress(
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reconnectAttempt, setReconnectAttempt] = useState(0)
-  
+
   const eventSourceRef = useRef<EventSource | null>(null)
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  // Use a ref for the actual reconnect count so the onerror closure never
+  // reads a stale value from the React state.  The state copy is only for
+  // display purposes and is NOT included in the useEffect deps array.
+  const reconnectCountRef = useRef(0)
 
   useEffect(() => {
-    if (!jobId) {
-      return
-    }
+    if (!jobId) return
 
     let isMounted = true
 
     const connect = () => {
       try {
-        // Close existing connection
         if (eventSourceRef.current) {
           eventSourceRef.current.close()
         }
 
-        // Create SSE connection
         const url = `${DJANGO_API_BASE}/generation/stream/${jobId}/`
         const eventSource = new EventSource(url)
         eventSourceRef.current = eventSource
 
-        // Connection opened
+        // Connection opened — reset counters for display, but do NOT call
+        // setReconnectAttempt inside the effect deps (it would re-run the
+        // effect and immediately kill this freshly-opened connection).
         eventSource.addEventListener('connected', () => {
-          if (isMounted) {
-            setIsConnected(true)
-            setError(null)
-            setReconnectAttempt(0)
-            console.log(`[SSE] Connected to job ${jobId}`)
-          }
+          if (!isMounted) return
+          reconnectCountRef.current = 0
+          setReconnectAttempt(0)   // display-only; not a dep → no re-run
+          setIsConnected(true)
+          setError(null)
+          console.log(`[SSE] Connected to job ${jobId}`)
         })
 
         // Progress update received
         eventSource.addEventListener('progress', (event) => {
-          if (isMounted) {
-            try {
-              const data: ProgressData = JSON.parse(event.data)
-              setProgress(data)
-              console.log(`[SSE] Progress: ${data.overall_progress}% - ${data.stage}`)
-            } catch (err) {
-              console.error('[SSE] Failed to parse progress data:', err)
-            }
+          if (!isMounted) return
+          try {
+            const data: ProgressData = JSON.parse(event.data)
+            setProgress(data)
+            console.log(`[SSE] Progress: ${data.overall_progress}% - ${data.stage}`)
+          } catch (err) {
+            console.error('[SSE] Failed to parse progress data:', err)
           }
         })
 
         // Job completed
         eventSource.addEventListener('done', (event) => {
-          if (isMounted) {
-            const data = JSON.parse(event.data)
-            console.log(`[SSE] Job done: ${data.status}`)
-            
-            if (data.status === 'completed' && onComplete && progress) {
-              onComplete(progress)
-            }
-            
-            eventSource.close()
-            setIsConnected(false)
+          if (!isMounted) return
+          const data = JSON.parse(event.data)
+          console.log(`[SSE] Job done: ${data.status}`)
+          if (data.status === 'completed' && onComplete && progress) {
+            onComplete(progress)
           }
+          eventSource.close()
+          setIsConnected(false)
         })
 
-        // Error event
+        // Named error event from server ("Job not found", etc.)
+        // Do NOT close the connection here — the server already closed it,
+        // which fires onerror below for the exponential-backoff reconnect.
         eventSource.addEventListener('error', (event: any) => {
-          if (isMounted) {
-            const errorMessage = event.data ? JSON.parse(event.data).message : 'Connection error'
-            console.error(`[SSE] Error: ${errorMessage}`)
+          if (!isMounted) return
+          try {
+            const errorMessage = event.data
+              ? JSON.parse(event.data).message
+              : 'Connection error'
+            console.error(`[SSE] Server error event: ${errorMessage}`)
             setError(errorMessage)
-            
-            if (onError) {
-              onError(errorMessage)
-            }
-            
-            eventSource.close()
+            setIsConnected(false)
+            if (onError) onError(errorMessage)
+          } catch {
             setIsConnected(false)
           }
         })
 
-        // Generic error (connection lost, server error)
+        // Generic connection error — exponential backoff reconnect.
+        // Uses reconnectCountRef (not state) to avoid stale-closure bugs.
         eventSource.onerror = () => {
-          if (isMounted) {
-            console.error('[SSE] Connection error')
-            setIsConnected(false)
-            
-            // Attempt reconnection with exponential backoff
-            const nextAttempt = reconnectAttempt + 1
-            const delay = Math.min(1000 * Math.pow(2, nextAttempt), 10000) // Max 10 seconds
-            
-            if (nextAttempt <= 5) {
-              console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${nextAttempt}/5)`)
-              setReconnectAttempt(nextAttempt)
-              
-              reconnectTimeoutRef.current = setTimeout(() => {
-                if (isMounted) {
-                  connect()
-                }
-              }, delay)
-            } else {
-              setError('Failed to connect after multiple attempts')
-              if (onError) {
-                onError('Connection failed')
-              }
-            }
+          if (!isMounted) return
+          setIsConnected(false)
+
+          const attempt = reconnectCountRef.current + 1
+          reconnectCountRef.current = attempt
+          setReconnectAttempt(attempt)  // display-only
+
+          if (attempt <= 5) {
+            const delay = Math.min(1000 * Math.pow(2, attempt), 10000)
+            console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${attempt}/5)`)
+            reconnectTimeoutRef.current = setTimeout(() => {
+              if (isMounted) connect()
+            }, delay)
+          } else {
+            console.error('[SSE] Max reconnect attempts reached')
+            setError('Failed to connect after multiple attempts')
+            if (onError) onError('Connection failed')
           }
         }
 
@@ -172,31 +167,24 @@ export function useProgress(
       }
     }
 
-    // Initial connection
+    reconnectCountRef.current = 0
     connect()
 
-    // Cleanup on unmount
     return () => {
       isMounted = false
-      
       if (eventSourceRef.current) {
         eventSourceRef.current.close()
         eventSourceRef.current = null
       }
-      
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
         reconnectTimeoutRef.current = null
       }
     }
-  }, [jobId, reconnectAttempt]) // Dependency on reconnectAttempt for reconnection logic
+  }, [jobId]) // ONLY jobId — reconnectAttempt intentionally excluded to prevent
+              // killing a live connection when the counter resets to 0 on success.
 
-  return {
-    progress,
-    isConnected,
-    error,
-    reconnectAttempt
-  }
+  return { progress, isConnected, error, reconnectAttempt }
 }
 
 /**

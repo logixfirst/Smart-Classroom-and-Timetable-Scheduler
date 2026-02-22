@@ -35,15 +35,20 @@ async def lifespan(app: FastAPI):
     try:
         # 1. Initialize Redis connection
         redis_url = settings.REDIS_URL
-        logger.info(f"Connecting to Redis: {redis_url}")
         
         try:
-            app.state.redis_client = redis.from_url(
-                redis_url,
-                decode_responses=False,
-                socket_connect_timeout=5,
-                ssl_cert_reqs=None  # For SSL connections (rediss://)
-            )
+            # decode_responses=True: values are strings (not bytes), matching
+            # Django's redis client.  ssl_cert_reqs="none" disables cert
+            # validation for Upstash TLS — same as Django settings.py.
+            redis_kwargs: dict = {
+                "decode_responses": True,
+                "socket_connect_timeout": 5,
+                "socket_timeout": 10,
+                "retry_on_timeout": True,
+            }
+            if redis_url.startswith("rediss://"):
+                redis_kwargs["ssl_cert_reqs"] = "none"
+            app.state.redis_client = redis.from_url(redis_url, **redis_kwargs)
             app.state.redis_client.ping()
             logger.info("✅ Redis connection established")
         except Exception as e:
@@ -52,17 +57,11 @@ async def lifespan(app: FastAPI):
             app.state.redis_client = None
         
         # 2. Detect hardware profile
-        logger.info("Detecting hardware...")
         from engine.hardware import get_hardware_profile
         app.state.hardware_profile = get_hardware_profile(force_refresh=True)
-        
         hw = app.state.hardware_profile
-        logger.info(f"✅ Hardware detected:")
-        logger.info(f"   CPU: {hw.cpu_cores} cores @ {hw.cpu_frequency:.1f}GHz")
-        logger.info(f"   RAM: {hw.total_ram_gb:.1f}GB (Available: {hw.available_ram_gb:.1f}GB)")
-        if hw.has_nvidia_gpu:
-            logger.info(f"   GPU: NVIDIA with {hw.gpu_memory_gb:.1f}GB VRAM")
-        logger.info(f"   Strategy: {hw.optimal_strategy.value}")
+        gpu_info = f", GPU: {hw.gpu_memory_gb:.0f}GB VRAM" if hw.has_nvidia_gpu else ""
+        logger.info(f"Hardware: {hw.cpu_cores} cores @ {hw.cpu_frequency:.1f}GHz, RAM {hw.total_ram_gb:.1f}GB{gpu_info}, strategy={hw.optimal_strategy.value}")
         
         # 3. Initialize adaptive executor
         from engine.adaptive_executor import get_adaptive_executor
@@ -80,7 +79,7 @@ async def lifespan(app: FastAPI):
             redis_client=app.state.redis_client,
             db_conn=None
         )
-        logger.info("✅ Cache manager initialized")
+
         
         # 6. Start memory monitoring (background thread)
         from core.memory_monitor import get_memory_monitor
@@ -93,11 +92,8 @@ async def lifespan(app: FastAPI):
         
         # Start monitoring
         app.state.memory_monitor.start()
-        logger.info("✅ Memory monitoring started (80% warning, 90% critical)")
         
-        logger.info("=" * 70)
-        logger.info("✅ Service ready to accept requests")
-        logger.info("=" * 70)
+        logger.info("\u2705 FastAPI Timetable Service ready")
         
     except Exception as e:
         logger.error(f"❌ Startup failed: {e}")
@@ -110,29 +106,18 @@ async def lifespan(app: FastAPI):
     logger.info("🛑 Shutting down FastAPI Timetable Generation Service")
     
     try:
-        # Stop memory monitoring
         if hasattr(app.state, "memory_monitor"):
             app.state.memory_monitor.stop()
-            logger.info("✅ Memory monitoring stopped")
         
-        # Close Redis connection
         if hasattr(app.state, "redis_client") and app.state.redis_client:
             app.state.redis_client.close()
-            logger.info("✅ Redis connection closed")
         
-        # Shutdown resource isolation
         if hasattr(app.state, "resource_isolation"):
             app.state.resource_isolation.shutdown(wait=True)
-            logger.info("✅ Resource isolation shutdown complete")
         
-        # Final memory cleanup
         import gc
         gc.collect()
-        logger.info("✅ Memory cleanup complete")
-        
-        logger.info("=" * 70)
-        logger.info("✅ Shutdown complete")
-        logger.info("=" * 70)
+        logger.info("FastAPI Timetable Service stopped")
         
     except Exception as e:
-        logger.error(f"⚠️  Shutdown error: {e}")
+        logger.error(f"Shutdown error: {e}")

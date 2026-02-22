@@ -36,7 +36,6 @@ class CacheManager:
             'config': 86400,      # 24 hours
             'departments': 7200,  # 2 hours
         }
-        logger.info("[CACHE] Cache manager initialized")
     
     def _generate_cache_key(self, resource_type: str, org_id: str, **kwargs) -> str:
         """Generate unique cache key with hash for complex parameters"""
@@ -153,14 +152,13 @@ class CacheManager:
         if self.redis_client:
             try:
                 self.redis_client.delete(cache_key)
-                logger.info(f"[CACHE] Redis INVALIDATE: {cache_key}")
+                logger.debug(f"[CACHE] Redis INVALIDATE: {cache_key}")
             except Exception as e:
                 logger.warning(f"[CACHE] Redis delete error: {e}")
         
         # Remove from memory cache
         if cache_key in self.memory_cache:
             del self.memory_cache[cache_key]
-            logger.info(f"[CACHE] Memory INVALIDATE: {cache_key}")
     
     async def invalidate_pattern(self, pattern: str):
         """
@@ -175,7 +173,7 @@ class CacheManager:
                 keys = self.redis_client.keys(pattern)
                 if keys:
                     self.redis_client.delete(*keys)
-                    logger.info(f"[CACHE] Redis INVALIDATE PATTERN: {pattern} ({len(keys)} keys)")
+                    logger.debug(f"[CACHE] Redis INVALIDATE PATTERN: {pattern} ({len(keys)} keys)")
             except Exception as e:
                 logger.warning(f"[CACHE] Redis pattern delete error: {e}")
         
@@ -185,7 +183,7 @@ class CacheManager:
             del self.memory_cache[key]
         
         if matching_keys:
-            logger.info(f"[CACHE] Memory INVALIDATE PATTERN: {pattern} ({len(matching_keys)} keys)")
+            logger.debug(f"[CACHE] Memory INVALIDATE PATTERN: {pattern} ({len(matching_keys)} keys)")
     
     def _matches_pattern(self, key: str, pattern: str) -> bool:
         """Check if key matches pattern (simple * wildcard support)"""
@@ -210,7 +208,7 @@ class CacheManager:
             # Fetch and cache departments
             departments = await self._fetch_and_cache_departments(org_id, client)
             
-            logger.info(f"[CACHE] Cache warmed: config={bool(config)}, departments={len(departments) if departments else 0}")
+            logger.debug(f"[CACHE] Cache warmed: config={bool(config)}, departments={len(departments) if departments else 0}")
             
             return {
                 'config': config,
@@ -252,7 +250,7 @@ class CacheManager:
                 
                 # Cache for 24 hours
                 await self.set('config', org_id, config, ttl=86400)
-                logger.info(f"[CACHE] Cached config: {config['working_days']} days, {config['slots_per_day']} slots/day")
+                logger.debug(f"[CACHE] Cached config: {config['working_days']} days, {config['slots_per_day']} slots/day")
                 return config
             
             logger.warning(f"[CACHE] No config found for org {org_id}")
@@ -281,7 +279,7 @@ class CacheManager:
             
             # Cache for 2 hours
             await self.set('departments', org_id, departments, ttl=7200)
-            logger.info(f"[CACHE] Cached {len(departments)} departments")
+            logger.debug(f"[CACHE] Cached {len(departments)} departments")
             return departments
             
         except Exception as e:
@@ -357,7 +355,7 @@ class CacheManager:
                         self.redis_client.delete(*keys)
                         keys_deleted += len(keys)
                 
-                logger.info(f"[CACHE] Cleared {keys_deleted} Redis keys")
+                logger.debug(f"[CACHE] Cleared {keys_deleted} Redis keys")
                 # Rough estimate: assume 10KB per key
                 total_freed += keys_deleted * 10 * 1024
             except Exception as e:

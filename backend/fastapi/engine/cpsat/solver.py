@@ -12,7 +12,7 @@ from ortools.sat.python import cp_model
 
 from models.timetable_models import Course, Room, TimeSlot, Faculty
 from .strategies import STRATEGIES
-from .progress import update_progress, log_cluster_start, log_cluster_success
+from .progress import log_cluster_start, log_cluster_success
 from .constraints import (
     add_faculty_constraints,
     add_room_constraints,
