@@ -1,0 +1,397 @@
+# Smart Classroom & Timetable Scheduler — Full Project Walkthrough
+
+## Overview
+
+A full-stack, AI-powered academic scheduling platform that automatically generates optimal timetables for universities using constraint-solving and machine-learning algorithms.
+
+```mermaid
+graph LR
+    FE["🖥️ Next.js 14\nFrontend :3000"]
+    DJ["🐍 Django REST API\n:8000"]
+    FA["⚡ FastAPI AI Engine\n:8001"]
+    DB[("🐘 PostgreSQL")]
+    RD[("🔴 Redis\nCache + Queue")]
+    CL["🌿 Celery\nWorker"]
+
+    FE -- "HTTP + HttpOnly Cookies" --> DJ
+    DJ -- "JWT Auth / ORM" --> DB
+    DJ -- "Publish Job" --> RD
+    RD -- "Consume" --> CL
+    CL -- "Generate Timetable" --> FA
+    FA -- "Read Org Data" --> DJ
+    FA -- "Progress Updates" --> RD
+    DJ -- "Poll Redis" --> RD
+```
+
+---
+
+## 1. Repository Layout
+
+```
+Smart-Classroom-and-Timetable-Scheduler/
+├── backend/
+│   ├── .env                   # Shared env vars for both backends
+│   ├── django/                # REST API + DB + Auth
+│   └── fastapi/               # AI timetable generation engine
+└── frontend/                  # Next.js 14 app
+```
+
+---
+
+## 2. Django Backend (`backend/django/`)
+
+**Purpose:** REST API, Database ORM, Authentication, Business Logic
+
+### 2.1 Project Config — `erp/`
+
+| File | Role |
+|------|------|
+| `settings.py` | All Django settings: DB, Redis, JWT, Celery, CORS, logging |
+| `urls.py` | Root URL router (mounts `/api/` → academics app) |
+| `celery.py` | Celery app instance |
+| `security.py` | HTTPS, HSTS, security headers for production |
+
+**Key settings:**
+- **Database:** PostgreSQL (via `dj_database_url`, connection pool 600s)
+- **Cache:** Redis with `django_redis`, 5 min TTL, Upstash TLS support
+- **Auth:** Custom `JWTCookieAuthentication` + `simplejwt`, tokens in **HttpOnly Secure cookies**
+- **JWT Lifetime:** Access = 1 hour, Refresh = 7 days (rotating + blacklisted)
+- **Password Hashing:** Argon2 (most secure) → PBKDF2 → BCrypt fallback
+- **Celery:** Uses same Redis broker, 30-min task time limit
+
+---
+
+### 2.2 Data Models (`academics/models/`)
+
+#### Hierarchy
+```
+Organization (University)
+ ├── Building → Room (classrooms/labs)
+ ├── School
+ │    └── Department
+ │         ├── Program → Batch → Student
+ │         ├── Faculty
+ │         └── Course → CourseOffering ← Faculty
+ │                        └── CourseEnrollment ← Student
+ └── Timetable ← GenerationJob
+      └── TimetableSlot (Course + Faculty + Room + TimeSlot)
+```
+
+#### Model Details
+
+| Model | File | Key Fields |
+|-------|------|-----------|
+| `Organization` | `base.py` | `org_id` (UUID PK), `org_type`, `nep2020_enabled`, `semester_system` |
+| `Building` | `base.py` | `building_id`, `org` FK, `building_code`, GPS coords |
+| `User` | `user.py` | UUID PK, extends `AbstractUser`, `role` (super_admin/org_admin/dean/hod/faculty/student) |
+| `School` | `academic_structure.py` | `school_id`, `org` FK, `dean_faculty_id` |
+| `Department` | `academic_structure.py` | `dept_id`, `school` FK, `hod_faculty_id` |
+| `Program` | `academic_structure.py` | NEP 2020 credits (core/elective/minor/open-elective), `duration_years` |
+| `Faculty` | `faculty.py` | `faculty_id`, designation choices, `max_hours_per_week=18`, `can_teach_cross_department` |
+| `Course` | `course.py` | `course_id`, credits breakdown (theory/practical), `room_type_required`, `session_pattern` |
+| `CourseOffering` | `course.py` | Links Course + Faculty per semester, `co_faculty_ids` (JSON) |
+| `CourseEnrollment` | `course.py` | Student ↔ CourseOffering many-to-many, grade tracking |
+| `Room` | `room.py` | `room_id`, building FK, `room_type`, `seating_capacity`, `features` (JSON), accessibility flags |
+| `Batch` | `student.py` | `batch_id`, department FK, `current_semester`, `section` |
+| `Student` | `student.py` | `student_id`, program/department FKs, `academic_status`, `cgpa`, `pursuing_minor` |
+| `TimeSlot` | `timetable.py` | 36 slots/week (Mon–Sat), `is_break`, `is_lunch` |
+| `GenerationJob` | `timetable.py` | Status: `pending/running/completed/failed`, `progress` 0–100, `timetable_data` (JSON blob) |
+| `Timetable` | `timetable.py` | Output timetable, linked to `GenerationJob` |
+| `TimetableSlot` | `timetable.py` | Individual slot: Course + Faculty + Room + day + time |
+
+---
+
+### 2.3 API Views (`academics/views/`)
+
+#### Auth (`auth_views.py`)
+- `POST /auth/login/` — Authenticates with username/email+password, issues JWT in **HttpOnly cookies** (no tokens in response body)
+- `POST /auth/logout/` — Blacklists refresh token, clears cookies
+- `GET /auth/me/` — Returns current user info
+- `POST /auth/refresh/` — Rotates refresh token, issues new access token
+
+#### URL Router (`urls.py` — 106 lines)
+All routes under `/api/`:
+
+| Endpoint Group | ViewSet |
+|---------------|---------|
+| `users/` | `UserViewSet` |
+| `departments/`, `schools/`, `programs/`, `batches/` | Academic ViewSets |
+| `courses/`, `subjects/` | `CourseViewSet` (subjects = alias) |
+| `faculty/`, `students/` | CRUD ViewSets |
+| `rooms/`, `classrooms/`, `labs/`, `buildings/` | Room ViewSets |
+| `timetables/`, `timetable-slots/` | Timetable ViewSets |
+| `generation-jobs/` | `GenerationJobViewSet` |
+| `timetable-configs/` | `TimetableConfigurationViewSet` |
+| `conflicts/` | `ConflictViewSet` |
+| `fast/faculty/`, `fast/departments/`, etc. | Ultra-fast raw SQL endpoints |
+| `timetable/department/<id>/` | Role-gated department timetable |
+| `timetable/faculty/me/` | Faculty's personal schedule |
+| `timetable/student/me/` | Student's personal timetable |
+
+#### Generation Views (`generation_views.py` — 547 lines)
+`GenerationJobViewSet` key actions:
+- `POST /generation-jobs/generate/` — Creates DB job record, **returns immediately**, queues async via Celery thread
+  - Reads config from: ① request form data → ② DB `TimetableConfiguration` → ③ hardcoded defaults
+- `GET /generation-jobs/<id>/status/` — Polls job progress
+- `POST /generation-jobs/<id>/cancel/` — Sets `cancel:job:<id>` flag in Redis, notifies FastAPI
+- `POST /generation-jobs/<id>/approve/` — Admin-only; publishes timetable
+- `GET /generation-jobs/<id>/result/` — Returns completed timetable data
+
+---
+
+### 2.4 Core App (`core/`)
+
+| File | Purpose |
+|------|---------|
+| `authentication.py` | `JWTCookieAuthentication` — reads JWT from cookies |
+| `permissions.py` | DRF permissions: `IsAdmin`, `IsFaculty`, `IsStudent`, role-based |
+| `rbac.py` | Role-Based Access Control rules |
+| `middleware.py` | Request/response logging + API metrics middleware |
+| `cache_service.py` | Redis caching helpers |
+| `audit_logging.py` | User action audit trails |
+| `hardware_detector.py` | Detects CPU/RAM for adaptive algorithm tuning |
+| `health_checks.py` | Health check endpoints for DB, Redis, queue |
+
+---
+
+## 3. FastAPI AI Engine (`backend/fastapi/`)
+
+**Purpose:** AI-powered timetable generation engine (runs on port `8001`)
+
+### 3.1 Entry Point (`main.py`)
+
+```python
+app = FastAPI(title="Enterprise Timetable Generation Service", version="2.0.0")
+# Middleware: CORS, error handler, rate limiting
+# Routers: generation, health, cache, conflicts, websocket
+```
+
+### 3.2 Configuration (`config.py`)
+
+All parameters tunable via `backend/.env`:
+
+| Category | Setting |
+|----------|---------|
+| **Stage 1: Clustering** | `ALPHA_FACULTY=10`, `ALPHA_STUDENT=10`, `ALPHA_ROOM=3`, `MAX_CLUSTER_SIZE=15` |
+| **Stage 2A: CP-SAT** | `CPSAT_TIMEOUT_SECONDS=30`, auto-scaled workers |
+| **Stage 2B: Genetic Algorithm** | `GA_POPULATION_SIZE=15`, `GA_GENERATIONS=25`, `GA_MUTATION_RATE=0.20` |
+| **Soft Constraint Weights** | Compactness 25%, Workload Balance 20%, Faculty Pref 20%, Room Util 15%, Peak Spread 10%, Continuity 10% |
+| **Stage 3: Q-Learning** | `RL_LEARNING_RATE=0.15`, `RL_MAX_ITERATIONS=250` |
+| **Optimization** | Early termination at 80% quality threshold, 8-gen no-improvement limit |
+
+### 3.3 Engine Structure (`engine/`)
+
+```
+engine/
+├── stage1_clustering.py    # Louvain graph clustering — groups related courses
+├── adaptive_executor.py    # Chooses CP-SAT vs GA based on hardware + dataset size
+├── cpsat/                  # Google OR-Tools CP-SAT constraint solver
+├── ga/                     # Genetic Algorithm
+├── rl/                     # Q-Learning reinforcement learning (experimental)
+├── hardware/               # Hardware detection, CPU/RAM adaptive scaling
+└── context/                # Multi-dimensional context engine
+```
+
+#### 3-Stage Pipeline:
+```
+Stage 1: Louvain Clustering
+         (group courses by shared faculty, student overlap, room competition)
+         ↓
+Stage 2: CP-SAT Solver (exact solution, small clusters) OR
+         Genetic Algorithm (heuristic, large clusters)
+         ↓
+Stage 3: Q-Learning Refinement
+         (optimize soft constraints: faculty preferences, compactness, gaps)
+```
+
+### 3.4 API Routers (`api/routers/`)
+- **Generation router** — `POST /api/generate_variants` (main entry point from Celery)
+- **Health router** — `GET /api/health`
+- **Cache router** — clear/inspect cache
+- **Conflicts router** — real-time conflict detection
+- **WebSocket router** — live progress streaming
+
+### 3.5 Utilities (`utils/`)
+
+| File | Purpose |
+|------|---------|
+| `django_client.py` | HTTP client to fetch org data from Django API |
+| `cache_manager.py` | Redis caching for generation results |
+| `progress_tracker.py` | Real-time progress updates via Redis |
+| `metrics.py` | Performance metrics (timing, memory) |
+
+---
+
+## 4. `Frontend — Next.js 14 (`frontend/`)
+
+**Purpose:** Role-based UI for Admin, Faculty, Student
+
+### 4.1 App Structure (`src/app/`)
+
+```
+app/
+├── (auth)/login/page.tsx        # Login page → HttpOnly cookie auth
+├── admin/
+│   ├── layout.tsx               # Admin sidebar + nav
+│   ├── dashboard/               # Stats, charts, activity feed
+│   ├── admins/                  # Admin user management
+│   ├── faculty/                 # Faculty CRUD
+│   ├── students/                # Student CRUD + bulk import
+│   ├── academic/
+│   │   ├── schools/             # School CRUD
+│   │   ├── departments/         # Department CRUD
+│   │   ├── programs/            # Program CRUD
+│   │   ├── batches/             # Batch CRUD
+│   │   ├── courses/             # Course CRUD
+│   │   ├── buildings/           # Building CRUD
+│   │   └── rooms/               # Room CRUD
+│   ├── timetables/
+│   │   ├── page.tsx             # Timetable list
+│   │   ├── new/page.tsx         # Multi-step generation wizard
+│   │   ├── [timetableId]/       # Timetable detail view
+│   │   ├── compare/             # Compare timetables
+│   │   └── status/              # Generation job status tracker
+│   ├── approvals/               # Approval workflow
+│   └── logs/                    # Audit logs
+├── faculty/
+│   ├── dashboard/               # Faculty dashboard
+│   ├── schedule/                # Personal schedule view
+│   └── preferences/             # Teaching preferences + availability
+└── student/
+    ├── dashboard/               # Student dashboard
+    └── timetable/               # Personal timetable view
+```
+
+### 4.2 API Client (`src/lib/api.ts` — 449 lines)
+
+`ApiClient` singleton class using native `fetch` with:
+- `credentials: 'include'` — sends HttpOnly JWT cookies automatically
+- **Auto refresh** — on 401, calls `/auth/refresh/` and retries
+- All CRUD methods for: Users, Departments, Courses, Faculty, Students, Rooms, Labs, Timetables, Generation Jobs
+
+### 4.3 Key Frontend Libraries
+
+| Library | Purpose |
+|---------|---------|
+| `next 14.0.0` | App Router, SSR, RSC |
+| `TypeScript 5` | Static typing |
+| `Tailwind CSS 3` + `Radix UI` | Styling + accessible components |
+| `Zod` + `react-hook-form` | Form validation |
+| `recharts` | Dashboard charts |
+| `socket.io-client` | WebSocket for live progress |
+| `jspdf` + `html2canvas` | PDF export |
+| `xlsx` | Excel export |
+| `zustand` | State management |
+| `swr` | API data fetching with caching |
+| `@sentry/nextjs` | Error monitoring |
+
+---
+
+## 5. Key Workflows
+
+### 5.1 Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User (Browser)
+    participant FE as Next.js
+    participant DJ as Django
+
+    U->>FE: Enter credentials
+    FE->>DJ: POST /api/auth/login/ (JSON body)
+    DJ->>DJ: authenticate() + generate JWT
+    DJ-->>FE: 200 OK + Set-Cookie: access_token, refresh_token (HttpOnly)
+    FE->>FE: Store user info ← response body (no token)
+    FE-->>U: Redirect to role-based dashboard
+```
+
+### 5.2 Timetable Generation Flow
+
+```mermaid
+sequenceDiagram
+    participant A as Admin
+    participant FE as Next.js
+    participant DJ as Django
+    participant RD as Redis
+    participant CL as Celery
+    participant FA as FastAPI
+
+    A->>FE: Fill generation wizard
+    FE->>DJ: POST /api/generation-jobs/generate/
+    DJ->>DJ: Create GenerationJob (status=running)
+    DJ-->>FE: 201 CREATED {job_id} ← IMMEDIATE RESPONSE
+    DJ->>RD: Queue job (background thread)
+    RD->>CL: generate_timetable_task
+    CL->>FA: POST /api/generate_variants
+    FA->>DJ: GET org data (faculty, courses, rooms)
+    FA->>FA: Stage 1: Cluster → Stage 2: CP-SAT/GA → Stage 3: RL
+    FA->>RD: Update progress (0→100%)
+    FE->>DJ: Poll /api/generation-jobs/{id}/status/
+    DJ->>RD: Read progress
+    DJ-->>FE: {status, progress}
+    FA->>DJ: Callback: save timetable_data
+    A->>FE: Review & Approve
+    FE->>DJ: POST /api/generation-jobs/{id}/approve/
+    DJ->>DJ: Publish timetable (status=approved)
+```
+
+### 5.3 View Role-Based Data
+
+| Role | Can See |
+|------|---------|
+| `super_admin` | All organizations |
+| `org_admin` | Own organization |
+| `dean` | All schools in org |
+| `hod` | Own department |
+| `faculty` | Own schedule (`/timetable/faculty/me/`) |
+| `student` | Own timetable (`/timetable/student/me/`) |
+
+---
+
+## 6. Conflict Detection (`conflict_service.py`)
+
+Detects in real-time:
+- Faculty double-booking
+- Room conflicts
+- Student batch conflicts
+- Room capacity violations
+- Time constraint violations
+
+---
+
+## 7. Running the Project
+
+```bash
+# Django Backend (port 8000)
+cd backend/django
+python manage.py migrate
+python manage.py runserver
+
+# Celery Worker
+celery -A erp worker -l info
+
+# FastAPI Engine (port 8001)
+cd backend/fastapi
+uvicorn main:app --reload --port 8001
+
+# Frontend (port 3000)
+cd frontend
+npm install && npm run dev
+```
+
+### Environment Variables (`backend/.env`)
+```env
+DATABASE_URL=postgresql://user:pass@host:5432/db
+REDIS_URL=redis://localhost:6379/0
+SECRET_KEY=your-secret-key
+FASTAPI_URL=http://localhost:8001
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+```
+
+### Frontend `.env`
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
+NEXT_PUBLIC_FASTAPI_URL=http://localhost:8001
+```

@@ -1,0 +1,387 @@
+# FastAPI Engine — Deep Analysis vs SIH Requirements
+
+> **Scope**: Every file in `backend/fastapi/` read line-by-line.  
+> **Standard**: SIH 2024 Problem Statement — Smart Classroom & Timetable Scheduler
+
+---
+
+## Files Read
+| File | Lines | Status |
+|------|-------|--------|
+| `api/routers/generation.py` | 244 | ✅ Read |
+| `engine/stage1_clustering.py` | 256 | ✅ Read |
+| `engine/cpsat/solver.py` | 238 | ✅ Read |
+| `engine/cpsat/constraints.py` | 111 | ✅ Read |
+| `engine/cpsat/strategies.py` | 83 | ✅ Read |
+| `engine/ga/optimizer.py` | 144 | ✅ Read |
+| `engine/ga/fitness.py` | 125 | ✅ Read |
+| `engine/ga/operators.py` | ~100 | ✅ Read |
+| `engine/rl/qlearning.py` | 365 | ✅ Read |
+| `engine/rl/reward_calculator.py` | ~80 | ✅ Read |
+| `engine/adaptive_executor.py` | 527 | ✅ Read |
+| `core/services/generation_service.py` | 148 | ✅ Read |
+| `models/timetable_models.py` | 269 | ✅ Read |
+| `utils/django_client.py` | 834 | ✅ Read |
+| `config.py` | 106 | ✅ Read |
+| `main.py` | 79 | ✅ Read |
+
+---
+
+## 🔴 CRITICAL BUGS (Will break the engine entirely)
+
+### BUG 1 — Student Conflict Constraints Are 100% Skipped
+
+**File**: `engine/cpsat/constraints.py` — lines 81–111
+
+```python
+def add_student_constraints(...):
+    if student_priority == "CRITICAL":
+        # TODO: Implement critical student detection
+        logger.info("Skipping student constraints (not yet critical students detected)")
+        return 0
+    else:
+        logger.info(f"Skipping student constraints (priority: {student_priority})")
+        return 0
+```
+
+**Problem**: This function **always returns 0 and does nothing**. Both branches skip all logic. There is a `TODO` comment that was never implemented.
+
+**Impact**: Students **can be double-booked** — two of their enrolled courses can be assigned to the same time slot. The SIH requirement demands:
+> "Minimized workload on students" → student conflicts must be zero.
+
+**Fix needed**: Implement the student conflict loop:
+```python
+# Group vars by (student_id, t_slot_id)
+student_schedule = defaultdict(list)
+for (c_id, s_idx, t_slot_id, r_id), var in variables.items():
+    for student_id in students_of_course.get(c_id, set()):
+        student_schedule[(student_id, t_slot_id)].append(var)
+for vars_list in student_schedule.values():
+    if len(vars_list) > 1:
+        model.Add(sum(vars_list) <= 1)
+```
+
+---
+
+### BUG 2 — Faculty Workload Constraints Completely Removed
+
+**File**: `engine/cpsat/constraints.py` — line 74–78
+
+```python
+# REMOVED: Faculty workload constraints (moved to pre-clustering)
+# add_workload_constraints() was causing O(N²) performance issues.
+```
+
+**File**: `engine/adaptive_executor.py` line 147:
+```python
+# REMOVED: Faculty workload constraints (moved to pre-clustering)
+```
+
+**Problem**: Workload was "moved to pre-clustering" but no code exists in `stage1_clustering.py` to enforce workload. The entire constraint is absent from the system.
+
+**Impact**: A faculty member could be assigned 40+ hours/week when `max_hours_per_week=18`. SIH requirement:
+> "Minimized workload on faculty members"
+
+**Fix needed**: Add workload check either in CP-SAT as a soft/hard constraint or as a pre-filter that caps the number of course sessions assigned per faculty.
+
+---
+
+### BUG 3 — GA Fitness Function Ignores Student Conflicts
+
+**File**: `engine/ga/fitness.py` — lines 16–46
+
+```python
+def evaluate_fitness_simple(...):
+    # Metric 1: Faculty preferences (40%)
+    # Metric 2: Room utilization (30%)
+    # Metric 3: Peak spreading (30%)
+    # NO feasibility checking - CP-SAT already guaranteed feasibility
+```
+
+**Problem**: The comment says "CP-SAT guaranteed feasibility", but since **BUG 1** shows student constraints were never added to CP-SAT, GA has no chance to detect or penalize student conflicts either.
+
+**Impact**: GA optimizes a schedule that is already broken — it will produce a refined version of an infeasible schedule.
+
+---
+
+### BUG 4 — Room Features Never Fetched From Database
+
+**File**: `utils/django_client.py` — lines 563–578
+
+```python
+room = Room(
+    room_id=str(row['room_id']),
+    ...
+    features=[],        # ← HARDCODED EMPTY LIST
+    ...
+)
+```
+
+**Problem**: The `features` field is always an empty list `[]`, regardless of what is stored in the database `rooms.features` column.
+
+**Impact**: The CP-SAT domain filter in `solver.py` (line 205) checks:
+```python
+all(f in (getattr(room, 'features', []) or []) for f in required_features)
+```
+Since `room.features` is always `[]`, any course with `required_features` (e.g., lab projector, server lab) will **never match any room** → it gets fallen into the unconstrained fallback, potentially assigned to a wrong room type.
+
+---
+
+### BUG 5 — Room Capacity Filter is Too Tight (90%–150% Range)
+
+**File**: `engine/cpsat/solver.py` — lines 193–207
+
+```python
+candidate_rooms = [
+    room for room in self.rooms
+    if (
+        room.capacity >= enrolled * 0.9 and     # minimum
+        room.capacity <= enrolled * 1.5 and     # maximum
+        room.room_type.upper() == required_type.upper() and
+        ...
+    )
+]
+```
+
+**Problem**: If no room lies within 90–150% of enrolled count, the fallback is any room with `capacity >= enrolled * 0.9`, **ignoring room type entirely**. This means a lab session could end up in a lecture hall and vice versa.
+
+---
+
+### BUG 6 — Faculty Preferred Slots Never Read From Database
+
+**File**: `utils/django_client.py` — lines 492–515
+
+```python
+fac = Faculty(
+    ...
+    available_slots=[],        # ← HARDCODED EMPTY
+    preferred_slots={}         # ← HARDCODED EMPTY
+)
+```
+
+**Problem**: Faculty availability and preferred time slots are stored in the database (`faculty.preferred_time_slot`, `faculty.research_day`) but never fetched. GA fitness metric 1 (Faculty preferences, 40%) then computes:
+
+```python
+# fitness.py line 61-68
+slot_of_day = t_slot_id % 10   # ← assumes numeric IDs, slot_id is string UUID!
+if slot_of_day < 2:  # Before 9am
+    score -= 5.0
+```
+
+**Double bug**: `slot_id` is a **string** (e.g. `"0"`, `"1"`, `"54"`), not an integer. `t_slot_id % 10` will **throw a TypeError at runtime** since you can't modulo a string.
+
+---
+
+### BUG 7 — TimeSlot IDs Are Strings But Used as Integers in Fitness
+
+**File**: `engine/ga/fitness.py` — lines 49–70
+
+```python
+t_slot_id, _ = solution[key]
+slot_of_day = t_slot_id % 10   # ← t_slot_id is str("0"), str("5"), etc.
+```
+
+**File**: `models/timetable_models.py` line 71:
+```python
+slot_id: str   # ← declared as string
+```
+
+**Problem**: `"5" % 10` in Python 3 raises `TypeError: unsupported operand type(s) for %: 'str' and 'int'`.
+
+**Impact**: GA fitness evaluation will crash for every individual in every generation.
+
+---
+
+### BUG 8 — `course.duration` Mapped From `lecture_hours_per_week` (Not Credits)
+
+**File**: `utils/django_client.py` — lines 338–340
+
+```python
+credits=row.get('lecture_hours_per_week', 3) or 3,
+duration=row.get('lecture_hours_per_week', 3) or 3,   # ← sessions per week
+```
+
+**Problem**: `course.duration` is labelled "Sessions per week" in the Pydantic model but is populated from `lecture_hours_per_week`. If a course has 4 lectures/week but 3 credits, this creates an incorrect number of CP-SAT variables.
+
+**Bigger issue**: `lecture_hours_per_week` can be `NULL` in the database (field allows null), and the fallback is `3`. So all `NULL` courses get `duration=3` regardless of actual requirement.
+
+---
+
+## 🟠 MAJOR MISSING FEATURES (Required by SIH)
+
+### MISSING 1 — No Multiple Timetable Options Generated
+
+**SIH Requirement**:
+> "Multiple options of optimized timetables to choose from"
+
+**Current code**: `GenerationJobViewSet.generate_timetable()` generates **one timetable** per job. The `variants` API endpoint just reads from Redis `result:job:{job_id}`, but the saga/executor never writes multiple variants — it writes a single result.
+
+**Fix needed**: Run the GA with different random seeds or constraint relaxations to produce 2–3 distinct timetable variants.
+
+---
+
+### MISSING 2 — No Special/Fixed Slots Support
+
+**SIH Requirement**:
+> "Special classes that have fixed slots in timetable"
+
+**Current code**: There is no concept of pre-fixed time slots in any model or constraint. The CP-SAT model treats every slot as freely assignable.
+
+**Fix needed**: 
+- Add a `fixed_slot` field to `CourseOffering` model
+- Add a hard constraint: `model.Add(variable[(course_id, session, fixed_t_slot, any_room)] == 1)` before solving
+
+---
+
+### MISSING 3 — Faculty Leave Statistics Not Used
+
+**SIH Requirement**:
+> "Average number of leaves a faculty member takes in a month"
+
+**Current code**: No leave data is fetched or modelled. Faculty availability is `available_slots=[]` (always empty). No leave reduction is applied to `max_hours_per_week`.
+
+**Fix needed**: Fetch average leave days and reduce effective available slots accordingly.
+
+---
+
+### MISSING 4 — Multi-Shift Scheduling Not Supported
+
+**SIH Requirement**:
+> "Support for multi-department and multi-shift scheduling"
+
+**Current code**: A single universal time grid is generated once. There is no concept of morning/evening shifts or shift-based timetable generation.
+
+---
+
+### MISSING 5 — Suggestions for Rearrangements Not Implemented
+
+**SIH Requirement**:
+> "Suggestions for suitable rearrangements when optimal solutions are not available"
+
+**Current code**: When CP-SAT hits "All strategies failed" it logs a warning and returns `None`. The greedy fallback doesn't produce human-readable rearrangement suggestions.
+
+---
+
+### MISSING 6 — Number of Sessions Per Day Not Constrained
+
+**SIH Requirement**:
+> "Maximum number of classes per day" (key parameter)
+
+**Current code**: No per-day limit constraint exists in CP-SAT or as a filter. A course could theoretically be scheduled every session on Monday.
+
+**Fix needed**: Add a CP-SAT constraint:
+```python
+# For each course and each day, limit sessions to max_per_day
+for course in cluster:
+    for day in range(working_days):
+        day_vars = [v for (c, s, t, r), v in variables.items()
+                    if c == course.course_id and get_day(t) == day]
+        model.Add(sum(day_vars) <= max_sessions_per_day)
+```
+
+---
+
+## 🟡 DESIGN/LOGIC ISSUES
+
+### ISSUE 1 — RL Q-Learning Is Frozen (No Learning Happens)
+
+**File**: `engine/adaptive_executor.py` line 313:
+```python
+resolver = SimpleTabularQLearning(..., frozen=True)
+```
+
+**File**: `engine/rl/qlearning.py` line 155:
+```python
+if self.frozen:
+    logger.debug("[RL-Q] Policy frozen, skipping Q-value update")
+    return
+```
+
+**Issue**: The Q-table starts empty (no pre-trained policy), and learning is frozen at runtime. So the RL stage effectively does random swaps (ε-greedy with an empty Q-table defaults to always random).
+
+There is a `save_policy()` / `load_policy()` system but nobody calls `load_policy()` before runtime. The Q-learning stage provides zero benefit in the current state.
+
+---
+
+### ISSUE 2 — GA Population is Hard-Capped Very Low
+
+**File**: `engine/ga/optimizer.py` lines 49–50
+
+```python
+self.population_size = min(population_size, 20)  # Cap at 20
+self.generations = min(generations, 25)          # Cap at 25
+```
+
+For a university with 500+ courses, a pop=20, gen=25 GA will barely explore the solution space. The soft constraint optimization (the purpose of GA) will be weak.
+
+---
+
+### ISSUE 3 — django_client Uses Synchronous psycopg2 in async Context
+
+**File**: `utils/django_client.py` — all `fetch_*` methods
+
+```python
+cursor = self.db_conn.cursor()      # Synchronous call
+cursor.execute(query, params)       # Blocks the event loop
+```
+
+These are `async` functions but use blocking `psycopg2` calls with no `asyncio.run_in_executor`. This **blocks the FastAPI event loop** during data loading, which defeats async performance entirely.
+
+---
+
+### ISSUE 4 — Course Deduplication ID is Fragile
+
+**File**: `utils/django_client.py` line 356:
+
+```python
+course_id=f"{row['course_id']}_off_{row['offering_id']}"
+```
+
+If the same offering appears twice (e.g. due to a query join artifact), two `Course` objects get the same `course_id`. The CP-SAT variable dictionary will silently overwrite the first assignment.
+
+---
+
+### ISSUE 5 — Stage 3 (RL) Result Never Saved Back to Django DB
+
+**File**: `core/services/generation_service.py` — `generate_timetable()` calls `saga.execute()` but the saga result structure is not shown saving to Django's `GenerationJob.timetable_data`.
+
+Looking at `generation_views.py` (Django side), the `timetable_callback` is at `POST /timetable/callback/`, but the FastAPI saga never calls this endpoint — progress updates go to Redis but the final result write-back to Django is not implemented in any visible saga code.
+
+---
+
+## 📋 Summary Table
+
+| # | Issue | Severity | File | Status |
+|---|-------|----------|------|--------|
+| BUG 1 | Student constraints completely skipped (TODO) | 🔴 Critical | `constraints.py` | Never implemented |
+| BUG 2 | Faculty workload constraints removed, never replaced | 🔴 Critical | `constraints.py` | Deleted, missing |
+| BUG 3 | GA fitness ignores student conflicts | 🔴 Critical | `fitness.py` | Design flaw |
+| BUG 4 | Room features always `[]` (never fetched from DB) | 🔴 Critical | `django_client.py` | Hardcoded |
+| BUG 5 | Room fallback ignores room_type | 🟠 Major | `solver.py` | Logic gap |
+| BUG 6 | Faculty preferred_slots always `{}` | 🟠 Major | `django_client.py` | Hardcoded |
+| BUG 7 | `t_slot_id % 10` crashes (str % int TypeError) | 🔴 Critical | `fitness.py` | Runtime crash |
+| BUG 8 | `duration` from nullable `lecture_hours_per_week` | 🟡 Medium | `django_client.py` | Data quality |
+| MISS 1 | No multiple timetable variants generated | 🟠 Major | `generation_views.py` | SIH req missing |
+| MISS 2 | Fixed slots not supported | 🟠 Major | All | SIH req missing |
+| MISS 3 | Faculty leave data not used | 🟡 Medium | `django_client.py` | SIH req missing |
+| MISS 4 | Multi-shift scheduling absent | 🟡 Medium | All | SIH req missing |
+| MISS 5 | No rearrangement suggestions | 🟡 Medium | All | SIH req missing |
+| MISS 6 | Max classes per day not constrained | 🟠 Major | `constraints.py` | SIH req missing |
+| ISS 1 | RL Q-table empty + frozen = random swaps | 🟡 Medium | `qlearning.py` | Ineffective |
+| ISS 2 | GA pop=20, gen=25 (too low for 500+ courses) | 🟡 Medium | `optimizer.py` | Weak optimization |
+| ISS 3 | Sync DB calls block async event loop | 🟡 Medium | `django_client.py` | Performance bug |
+| ISS 4 | Course ID duplication risk | 🟡 Medium | `django_client.py` | Correctness risk |
+| ISS 5 | Final result never saved back to Django DB | 🔴 Critical | `generation_service.py` | Incomplete |
+
+---
+
+## Priority Fix Order
+
+1. **Fix BUG 7 first** (runtime crash) — cast `t_slot_id` to `int` in `fitness.py`
+2. **Fix BUG 1** (student conflicts) — implement the student constraint loop
+3. **Fix BUG 2** (faculty workload) — re-add workload constraint
+4. **Fix BUG 4** (room features) — fetch `features` from DB in `django_client.py`  
+5. **Fix ISS 5** (result save-back) — ensure saga callbacks Django with final timetable
+6. **Add MISS 6** (max classes/day) — critical SIH parameter  
+7. **Add MISS 1** (multiple variants) — core SIH feature  
+8. **Add MISS 2** (fixed slots) — SIH requirement  

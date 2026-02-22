@@ -550,29 +550,56 @@ class DjangoAPIClient:
                 logger.warning(f"Organization ID '{org_id}' not found")
                 return []
             
+            # BUG 4 FIX: fetch features and allow_cross_department_usage from DB
             cursor.execute("""
-                SELECT room_id, room_code, room_number, room_type, 
-                       seating_capacity, building_id, dept_id
-                FROM rooms 
+                SELECT room_id, room_code, room_number, room_type,
+                       seating_capacity, building_id, dept_id,
+                       features, allow_cross_department_usage
+                FROM rooms
                 WHERE org_id = %s AND is_active = true
             """, (org_id,))
-            
+
             rows = cursor.fetchall()
             rooms = []
-            
+
             for row in rows:
                 try:
+                    # Parse features: PostgreSQL array column → Python list
+                    raw_features = row.get('features')
+                    if raw_features is None:
+                        features_list = []
+                    elif isinstance(raw_features, list):
+                        features_list = [str(f) for f in raw_features if f]
+                    elif isinstance(raw_features, str):
+                        # PostgreSQL text array e.g. "{projector,whiteboard}"
+                        cleaned = raw_features.strip('{}')
+                        features_list = [
+                            f.strip().strip('"')
+                            for f in cleaned.split(',')
+                            if f.strip()
+                        ] if cleaned else []
+                    else:
+                        features_list = []
+
                     room = Room(
                         room_id=str(row['room_id']),
                         room_code=row.get('room_code', ''),
                         room_name=row.get('room_number', ''),
                         room_type=row.get('room_type', 'classroom') or 'classroom',
                         capacity=row.get('seating_capacity', 60) or 60,
-                        features=[],
-                        dept_id=str(row['dept_id']),
-                        department_id=str(row['dept_id'])
+                        features=features_list,
+                        dept_id=str(row['dept_id']) if row.get('dept_id') else None,
+                        department_id=str(row['dept_id']) if row.get('dept_id') else None,
                     )
+                    # Store cross-department flag as a dynamic attribute
+                    # (Room model doesn't have this field; solver reads via getattr)
+                    object.__setattr__(room, 'allow_cross_department_usage',
+                                       bool(row.get('allow_cross_department_usage', True)))
                     rooms.append(room)
+                    logger.debug(
+                        f"Room {room.room_code}: type={room.room_type}, "
+                        f"cap={room.capacity}, features={features_list}"
+                    )
                 except Exception as e:
                     logger.warning(f"Skipping room {row.get('room_code')}: {e}")
                     continue

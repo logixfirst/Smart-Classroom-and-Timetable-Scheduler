@@ -1,37 +1,56 @@
 """
 CP-SAT Solver Strategies
-Progressive relaxation strategies for timetable solving
-Following Google/Meta standards: One file = strategy configuration
+Progressive relaxation — each strategy layer adds constraints.
+Updated to include new constraint flags for BUG 1/2 and MISS 6 fixes.
 """
 from typing import List, Dict
 
 
-# Strategy definitions for progressive relaxation
+# Strategy 0: Full constraints — all hard constraints active
+# Strategy 1: Relax student (CRITICAL only) + skip workload
+# Strategy 2: Minimum — faculty + room only, no per-day or workload
 STRATEGIES: List[Dict] = [
     {
-        "name": "Fast Solve with Priority Students",
-        "student_priority": "CRITICAL",  # Only critical students (5+ courses)
+        "name": "Full Constraints",
+        "student_priority": "ALL",          # HC4: all student conflicts
+        "faculty_conflicts": True,           # HC1
+        "room_capacity": True,               # HC2
+        "workload_constraints": True,        # HC3 (BUG 2 FIX)
+        "max_sessions_per_day": True,        # HC5 (MISS 6 FIX)
+        "timeout": 60,
+        "max_constraints": 10000,
+        "student_limit": None
+    },
+    {
+        "name": "Relaxed Student (Critical Only)",
+        "student_priority": "CRITICAL",     # HC4: only students in 5+ courses
         "faculty_conflicts": True,
         "room_capacity": True,
-        "timeout": 60,  # Increased: model building alone takes 200s, need time for solving
-        "max_constraints": 10000,
+        "workload_constraints": True,        # HC3 still enforced
+        "max_sessions_per_day": True,        # HC5 still enforced
+        "timeout": 60,
+        "max_constraints": 8000,
         "student_limit": 500
     },
     {
         "name": "Faculty + Room Only",
-        "student_priority": None,  # No student constraints for speed
+        "student_priority": "NONE",         # HC4: skip (performance mode)
         "faculty_conflicts": True,
         "room_capacity": True,
-        "timeout": 45,  # Increased to allow time for solving after model construction
+        "workload_constraints": False,       # Relax workload
+        "max_sessions_per_day": False,       # Relax per-day limit
+        "timeout": 45,
         "max_constraints": 5000,
         "student_limit": 0
     },
     {
         "name": "Minimal Hard Constraints Only",
-        "student_priority": None,
-        "faculty_conflicts": True,  # Only faculty conflicts
-        "room_capacity": False,  # Relax room capacity
-        "timeout": 30,  # Increased for last resort attempt
+        "student_priority": "NONE",
+        "faculty_conflicts": True,           # HC1 always enforced
+        "room_capacity": False,              # Relax room
+        "workload_constraints": False,
+        "max_sessions_per_day": False,
+        "timeout": 30,
         "max_constraints": 1000,
         "student_limit": 0
     }
@@ -39,20 +58,14 @@ STRATEGIES: List[Dict] = [
 
 
 def get_strategy_by_index(index: int) -> Dict:
-    """
-    Get strategy by index with bounds checking
-    Returns strategy dict or raises IndexError
-    """
+    """Get strategy by index with bounds checking."""
     if 0 <= index < len(STRATEGIES):
         return STRATEGIES[index]
     raise IndexError(f"Strategy index {index} out of range (0-{len(STRATEGIES)-1})")
 
 
 def get_strategy_by_name(name: str) -> Dict:
-    """
-    Get strategy by name
-    Returns strategy dict or None if not found
-    """
+    """Get strategy by name. Returns None if not found."""
     for strategy in STRATEGIES:
         if strategy["name"] == name:
             return strategy
@@ -61,12 +74,14 @@ def get_strategy_by_name(name: str) -> Dict:
 
 def select_strategy_for_cluster_size(cluster_size: int) -> Dict:
     """
-    Select appropriate strategy based on cluster size
-    Smaller clusters can use more complex strategies
+    Select appropriate starting strategy based on cluster size.
+    Smaller clusters can afford full constraints; larger ones start relaxed.
     """
     if cluster_size <= 10:
-        return STRATEGIES[0]  # Full constraints
+        return STRATEGIES[0]   # Full constraints
+    elif cluster_size <= 20:
+        return STRATEGIES[1]   # Relaxed student
     elif cluster_size <= 30:
-        return STRATEGIES[1]  # Faculty + Room
+        return STRATEGIES[2]   # Faculty + Room
     else:
-        return STRATEGIES[2]  # Minimal constraints
+        return STRATEGIES[3]   # Minimal

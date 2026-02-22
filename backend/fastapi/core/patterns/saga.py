@@ -162,12 +162,18 @@ class TimetableGenerationSaga:
                     tracker.complete_stage()
             
             # STEP 6: Persistence (NON-CANCELABLE atomic section)
-            # Industry pattern: Cancellation deferred during atomic DB write
+            # ISS 5 FIX: Previously this was a TODO/pass — timetable was never saved.
+            # Now writes the final timetable to Django's GenerationJob record and
+            # stores all variants in Redis for the variants API endpoint.
             with AtomicSection(token, "persistence"):
                 logger.info("[SAGA] Persisting results (atomic - non-cancelable)...")
-                # TODO: Save to database
+                await self._persist_results(
+                    job_id,
+                    final_solution,
+                    data,
+                    self.job_data.get('variants', [])
+                )
                 self.stage_completed['persistence'] = True
-                pass
             
             # Mark as completed
             if tracker:
@@ -363,38 +369,81 @@ class TimetableGenerationSaga:
         self.job_data['cpsat_solution'] = solution
         return solution
     
-    async def _stage2b_ga(self, job_id: str, data: Dict, initial_solution: Dict, token: CancellationToken, tracker=None) -> Dict:
+    async def _stage2b_ga(
+        self, job_id: str, data: Dict, initial_solution: Dict,
+        token: CancellationToken, tracker=None
+    ) -> Dict:
         """
-        Stage 2B: Genetic algorithm optimization for soft constraints
-        ✅ DESIGN FREEZE: CPU-only, single population, deterministic
+        Stage 2B: Genetic algorithm optimization for soft constraints.
+
+        MISS 1 FIX: Runs GA 3× with different seeds to generate multiple
+        timetable variants the admin can choose from.
+        ✅ DESIGN FREEZE: CPU-only, single population, deterministic per seed.
         """
         from engine.ga.optimizer import GeneticAlgorithmOptimizer
-        
+        import copy
+        import random
+
         if not initial_solution:
             logger.warning("[SAGA] No initial solution - skipping GA")
             return initial_solution
-        
-        try:
-            optimizer = GeneticAlgorithmOptimizer(
-                courses=data['courses'],
-                rooms=data['rooms'],
-                time_slots=data['time_slots'],
-                faculty=data['faculty'],
-                students=data['students'],
-                initial_solution=initial_solution,
-                population_size=15,
-                generations=20
-            )
-            
-            optimized = optimizer.optimize()
-            logger.info("[SAGA] GA optimization complete")
-            # Store for fallback
-            self.job_data['ga_solution'] = optimized
-            return optimized
-            
-        except Exception as e:
-            logger.error(f"[SAGA] GA failed: {e} - using initial solution")
-            return initial_solution
+
+        NUM_VARIANTS = 3  # SIH requirement: multiple options to choose from
+        variants = []
+        best_solution = initial_solution
+        best_fitness = float('-inf')
+
+        for variant_idx in range(NUM_VARIANTS):
+            try:
+                # Use a different random seed per variant for diversity
+                variant_seed = 42 + variant_idx * 13
+                random.seed(variant_seed)
+
+                optimizer = GeneticAlgorithmOptimizer(
+                    courses=data['courses'],
+                    rooms=data['rooms'],
+                    time_slots=data['time_slots'],
+                    faculty=data['faculty'],
+                    students=data['students'],
+                    initial_solution=copy.deepcopy(initial_solution),
+                    population_size=15,
+                    generations=20
+                )
+
+                optimized = optimizer.optimize()
+                fitness = optimizer.fitness(optimized)
+
+                variant_record = {
+                    'variant_id': variant_idx + 1,
+                    'seed': variant_seed,
+                    'fitness': round(fitness, 4),
+                    'solution': optimized,
+                    'label': f'Timetable Option {variant_idx + 1}'
+                }
+                variants.append(variant_record)
+
+                if fitness > best_fitness:
+                    best_fitness = fitness
+                    best_solution = optimized
+
+                logger.info(
+                    f"[SAGA] GA variant {variant_idx + 1}/{NUM_VARIANTS} "
+                    f"fitness={fitness:.4f} (seed={variant_seed})"
+                )
+
+            except Exception as e:
+                logger.error(f"[SAGA] GA variant {variant_idx + 1} failed: {e} - skipping")
+                continue
+
+        # Store all variants for the variants API endpoint and admin UI
+        self.job_data['variants'] = variants
+        self.job_data['ga_solution'] = best_solution
+
+        logger.info(
+            f"[SAGA] GA complete: {len(variants)} variants generated, "
+            f"best fitness={best_fitness:.4f}"
+        )
+        return best_solution
     
     async def _stage3_rl(self, job_id: str, data: Dict, solution: Dict, token: CancellationToken, tracker=None) -> Dict:
         """
@@ -432,18 +481,223 @@ class TimetableGenerationSaga:
             logger.error(f"[SAGA] RL failed: {e} - using GA solution")
             return solution
     
+    async def _persist_results(
+        self,
+        job_id: str,
+        final_solution: Dict,
+        data: Dict,
+        variants: list
+    ):
+        """
+        ISS 5 FIX: Persist the final timetable to Django's database.
+
+        Previously this was a TODO/pass — the saga produced a result in memory
+        but never wrote it back to Django, leaving the GenerationJob stuck.
+
+        This method:
+        1. Converts the internal solution dict into TimetableEntry JSON records
+        2. Writes them into Django's `generation_jobs` table (timetable_data column)
+        3. Sets job status to 'completed' so Django's polling endpoint sees it
+        4. Stores all variants in Redis for the variants API endpoint
+        """
+        import json
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        from datetime import datetime, timezone
+
+        logger.info(f"[SAGA-PERSIST] Writing timetable for job {job_id}")
+
+        # ------------------------------------------------------------------
+        # Step 1: Build structured timetable_data from the internal solution
+        # ------------------------------------------------------------------
+        courses_by_id = {c.course_id: c for c in data.get('courses', [])}
+        slot_by_id = {str(ts.slot_id): ts for ts in data.get('time_slots', [])}
+        rooms_by_id = {r.room_id: r for r in data.get('rooms', [])}
+
+        timetable_entries = []
+        for (course_id, session), (t_slot_id, room_id) in final_solution.items():
+            course = courses_by_id.get(course_id)
+            slot = slot_by_id.get(str(t_slot_id))
+            room = rooms_by_id.get(room_id)
+
+            if not (course and slot and room):
+                continue
+
+            entry = {
+                'course_id': course_id,
+                'course_code': getattr(course, 'course_code', ''),
+                'course_name': getattr(course, 'course_name', ''),
+                'faculty_id': getattr(course, 'faculty_id', ''),
+                'room_id': room_id,
+                'room_code': getattr(room, 'room_code', ''),
+                'time_slot_id': str(t_slot_id),
+                'day': slot.day,
+                'day_of_week': slot.day_of_week,
+                'start_time': slot.start_time,
+                'end_time': slot.end_time,
+                'session_number': session,
+                'student_ids': list(getattr(course, 'student_ids', [])),
+                'batch_ids': list(getattr(course, 'batch_ids', [])),
+            }
+            timetable_entries.append(entry)
+
+        # Build the full result payload
+        result_payload = {
+            'timetable_entries': timetable_entries,
+            'total_sessions_scheduled': len(timetable_entries),
+            'total_courses': len(courses_by_id),
+            'variants_count': len(variants),
+            'variants': [
+                {
+                    'variant_id': v['variant_id'],
+                    'label': v['label'],
+                    'fitness': v['fitness'],
+                }
+                for v in variants
+            ],
+            'generated_at': datetime.now(timezone.utc).isoformat(),
+        }
+
+        # ------------------------------------------------------------------
+        # Step 2: Store all variants in Redis (for /api/variants/{job_id})
+        # ------------------------------------------------------------------
+        if self.redis_client:
+            try:
+                redis_result = {
+                    'timetable': result_payload,
+                    'variants': variants,
+                    'metadata': {
+                        'job_id': job_id,
+                        'org_id': data.get('organization_id'),
+                        'semester': data.get('semester'),
+                        'generated_at': result_payload['generated_at'],
+                    }
+                }
+                self.redis_client.setex(
+                    f"result:job:{job_id}",
+                    3600 * 24,  # 24h TTL
+                    json.dumps(redis_result, default=str)
+                )
+                logger.info(f"[SAGA-PERSIST] Stored {len(variants)} variants in Redis")
+            except Exception as redis_err:
+                logger.error(f"[SAGA-PERSIST] Redis store failed: {redis_err}")
+
+        # ------------------------------------------------------------------
+        # Step 3: Write back to Django's generation_jobs table
+        # ------------------------------------------------------------------
+        db_conn = None
+        try:
+            db_url = os.getenv(
+                'DATABASE_URL',
+                'postgresql://postgres:postgres@localhost:5432/sih28'
+            )
+            db_conn = psycopg2.connect(
+                db_url,
+                cursor_factory=RealDictCursor,
+                connect_timeout=10
+            )
+            db_conn.autocommit = False
+
+            with db_conn.cursor() as cur:
+                timetable_json = json.dumps(result_payload, default=str)
+                cur.execute(
+                    """
+                    UPDATE generation_jobs
+                    SET
+                        status            = 'completed',
+                        progress          = 100,
+                        timetable_data    = %s::jsonb,
+                        completed_at      = %s,
+                        updated_at        = %s
+                    WHERE job_id = %s
+                    """,
+                    (
+                        timetable_json,
+                        datetime.now(timezone.utc),
+                        datetime.now(timezone.utc),
+                        job_id,
+                    )
+                )
+                rows_updated = cur.rowcount
+
+            db_conn.commit()
+
+            if rows_updated == 0:
+                logger.warning(
+                    f"[SAGA-PERSIST] No rows updated for job {job_id}. "
+                    f"The job may not exist in generation_jobs table."
+                )
+            else:
+                logger.info(
+                    f"[SAGA-PERSIST] ✅ Job {job_id} updated: "
+                    f"{len(timetable_entries)} entries, status=completed"
+                )
+
+        except Exception as db_err:
+            logger.error(f"[SAGA-PERSIST] DB write failed: {db_err}")
+            if db_conn:
+                db_conn.rollback()
+            # Non-fatal: result is still in Redis — Django can read from there
+            logger.warning(
+                "[SAGA-PERSIST] Falling back to Redis-only result. "
+                "Django must poll Redis for this job."
+            )
+        finally:
+            if db_conn:
+                db_conn.close()
+
     async def _compensate(self, job_id: str):
         """
-        Compensation logic for failure rollback
-        Clean up partial work (e.g., delete temporary data, notify failure)
+        Compensation logic for failure/cancellation rollback.
+        Marks the GenerationJob as failed/cancelled in Django's DB.
         """
+        import json
+        import os
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        from datetime import datetime, timezone
+
         logger.warning(f"[SAGA] Compensating for job {job_id}")
-        
-        # TODO: Implement compensation logic
-        # - Clear Redis cache for job
-        # - Notify Django backend of failure
-        # - Clean up any temporary files
-        
+
+        # Clear Redis flags
+        if self.redis_client:
+            try:
+                self.redis_client.delete(f"cancel:job:{job_id}")
+            except Exception:
+                pass
+
+        # Mark job as failed in Django DB
+        db_conn = None
+        try:
+            db_url = os.getenv(
+                'DATABASE_URL',
+                'postgresql://postgres:postgres@localhost:5432/sih28'
+            )
+            db_conn = psycopg2.connect(
+                db_url,
+                cursor_factory=RealDictCursor,
+                connect_timeout=10
+            )
+            db_conn.autocommit = False
+            with db_conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE generation_jobs
+                    SET status = 'failed', updated_at = %s
+                    WHERE job_id = %s AND status NOT IN ('completed', 'approved')
+                    """,
+                    (datetime.now(timezone.utc), job_id)
+                )
+            db_conn.commit()
+        except Exception as e:
+            logger.error(f"[SAGA] Compensation DB write failed: {e}")
+            if db_conn:
+                db_conn.rollback()
+        finally:
+            if db_conn:
+                db_conn.close()
+
         self.completed_steps.clear()
         self.job_data.clear()
 
