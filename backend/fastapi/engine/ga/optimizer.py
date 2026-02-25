@@ -36,7 +36,8 @@ class GeneticAlgorithmOptimizer:
         generations: int = 20,
         mutation_rate: float = 0.15,
         crossover_rate: float = 0.7,
-        elitism_rate: float = 0.2
+        elitism_rate: float = 0.2,
+        fitness_weights: Dict = None
     ):
         self.courses = courses
         self.rooms = rooms
@@ -51,6 +52,7 @@ class GeneticAlgorithmOptimizer:
         self.mutation_rate = mutation_rate
         self.crossover_rate = crossover_rate
         self.elitism_rate = elitism_rate
+        self.fitness_weights = fitness_weights  # None = use evaluate_fitness_simple defaults
         
         logger.info(f"[GA] CPU-only mode: pop={self.population_size}, gen={self.generations}")
     
@@ -77,7 +79,10 @@ class GeneticAlgorithmOptimizer:
         for generation in range(self.generations):
             # Evaluate fitness for all individuals
             fitness_scores = [
-                evaluate_fitness_simple(ind, self.courses, self.faculty, self.time_slots, self.rooms)
+                evaluate_fitness_simple(
+                    ind, self.courses, self.faculty, self.time_slots, self.rooms,
+                    weights=self.fitness_weights
+                )
                 for ind in population
             ]
             
@@ -136,7 +141,10 @@ class GeneticAlgorithmOptimizer:
     
     def fitness(self, solution: Dict) -> float:
         """Evaluate single solution (for external callers)"""
-        return evaluate_fitness_simple(solution, self.courses, self.faculty, self.time_slots, self.rooms)
+        return evaluate_fitness_simple(
+            solution, self.courses, self.faculty, self.time_slots, self.rooms,
+            weights=self.fitness_weights
+        )
     
     def evolve(self, job_id: str = None) -> Dict:
         """Alias for optimize() for backward compatibility"""

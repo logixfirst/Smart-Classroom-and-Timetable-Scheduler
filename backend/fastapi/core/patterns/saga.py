@@ -394,10 +394,31 @@ class TimetableGenerationSaga:
         best_solution = initial_solution
         best_fitness = float('-inf')
 
+        # Semantic diversity: each variant optimises a different objective.
+        # Different weights drive evolution towards genuinely different local optima.
+        VARIANT_CONFIGS = [
+            {
+                'seed': 42,
+                'label': 'Faculty-Friendly',
+                'weights': {'faculty': 0.55, 'room': 0.20, 'spread': 0.15, 'student': 0.10},
+            },
+            {
+                'seed': 55,
+                'label': 'Room-Efficient',
+                'weights': {'faculty': 0.20, 'room': 0.55, 'spread': 0.15, 'student': 0.10},
+            },
+            {
+                'seed': 68,
+                'label': 'Student-Spread',
+                'weights': {'faculty': 0.20, 'room': 0.20, 'spread': 0.45, 'student': 0.15},
+            },
+        ]
+
         for variant_idx in range(NUM_VARIANTS):
             try:
                 # Use a different random seed per variant for diversity
-                variant_seed = 42 + variant_idx * 13
+                config = VARIANT_CONFIGS[variant_idx]
+                variant_seed = config['seed']
                 random.seed(variant_seed)
 
                 optimizer = GeneticAlgorithmOptimizer(
@@ -408,7 +429,8 @@ class TimetableGenerationSaga:
                     students=data['students'],
                     initial_solution=copy.deepcopy(initial_solution),
                     population_size=15,
-                    generations=20
+                    generations=20,
+                    fitness_weights=config['weights']
                 )
 
                 optimized = optimizer.optimize()
@@ -419,7 +441,8 @@ class TimetableGenerationSaga:
                     'seed': variant_seed,
                     'fitness': round(fitness, 4),
                     'solution': optimized,
-                    'label': f'Timetable Option {variant_idx + 1}'
+                    'label': config['label'],
+                    'weights': config['weights'],
                 }
                 variants.append(variant_record)
 
@@ -611,7 +634,7 @@ class TimetableGenerationSaga:
                         timetable_data    = %s::jsonb,
                         completed_at      = %s,
                         updated_at        = %s
-                    WHERE job_id = %s
+                    WHERE id = %s
                     """,
                     (
                         timetable_json,
@@ -686,7 +709,7 @@ class TimetableGenerationSaga:
                     """
                     UPDATE generation_jobs
                     SET status = 'failed', updated_at = %s
-                    WHERE job_id = %s AND status NOT IN ('completed', 'approved')
+                    WHERE id = %s AND status NOT IN ('completed', 'approved')
                     """,
                     (datetime.now(timezone.utc), job_id)
                 )

@@ -21,7 +21,8 @@ def evaluate_fitness_simple(
     courses: List[Course],
     faculty: Dict[str, Faculty],
     time_slots: List[TimeSlot],
-    rooms: List[Room]
+    rooms: List[Room],
+    weights: Dict = None
 ) -> float:
     """
     Fitness evaluation with 4 metrics.
@@ -36,28 +37,33 @@ def evaluate_fitness_simple(
     try:
         score = 0.0
 
+        # Merge caller-supplied weights with defaults
+        _w = {'faculty': 0.35, 'room': 0.25, 'spread': 0.25, 'student': 0.15}
+        if weights:
+            _w.update(weights)
+
         # Build lookup maps once (avoids repeated list scans)
         slot_by_id: Dict[str, TimeSlot] = {str(ts.slot_id): ts for ts in time_slots}
         room_capacity_map: Dict[str, int] = {r.room_id: r.capacity for r in rooms}
 
-        # Metric 1: Faculty preferences (35% weight)
+        # Metric 1: Faculty preferences
         faculty_score = _evaluate_faculty_preferences(solution, courses, slot_by_id)
-        score += 0.35 * faculty_score
+        score += _w['faculty'] * faculty_score
 
-        # Metric 2: Room utilization (25% weight)
+        # Metric 2: Room utilization
         room_score = _evaluate_room_utilization(solution, courses, room_capacity_map)
-        score += 0.25 * room_score
+        score += _w['room'] * room_score
 
-        # Metric 3: Peak spreading (25% weight)
+        # Metric 3: Peak spreading
         spread_score = _evaluate_peak_spreading(solution, courses)
-        score += 0.25 * spread_score
+        score += _w['spread'] * spread_score
 
-        # Metric 4: Student conflict penalty (15% weight)
+        # Metric 4: Student conflict penalty
         # Even though CP-SAT enforces HC4, GA mutations can temporarily violate it.
         # This metric penalises any violations GA introduces so evolution pressure
         # steers away from student double-booking.
         student_score = _evaluate_student_conflicts(solution, courses)
-        score += 0.15 * student_score
+        score += _w['student'] * student_score
 
         return score
 

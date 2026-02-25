@@ -4,10 +4,12 @@ Adaptive solver with progressive relaxation.
 Wires in: faculty, room, student (BUG 1 FIX), workload (BUG 2 FIX),
           max-sessions-per-day (MISS 6 FIX), fixed-slots (MISS 2 FIX).
 """
+import gc
 import logging
 import time
 from typing import List, Dict, Optional, Tuple
 from collections import defaultdict
+import psutil
 from ortools.sat.python import cp_model
 
 from models.timetable_models import Course, Room, TimeSlot, Faculty
@@ -204,6 +206,16 @@ class AdaptiveCPSATSolver:
             # ------------------------------------------------------------------
             add_fixed_slot_constraints(model, variables, cluster)
 
+            # Reduce workers under memory pressure before solving
+            mem_percent = psutil.virtual_memory().percent
+            if mem_percent > 85:
+                reduced_workers = max(2, self.num_workers // 2)
+                solver.parameters.num_search_workers = reduced_workers
+                logger.warning(
+                    f"[MEMORY] RAM {mem_percent:.1f}% — reducing CP-SAT workers "
+                    f"{self.num_workers} → {reduced_workers}"
+                )
+
             # Solve
             logger.info(f"[CP-SAT] Starting solver with timeout {strategy['timeout']}s...")
             status = solver.Solve(model)
@@ -214,14 +226,41 @@ class AdaptiveCPSATSolver:
                     if solver.Value(var):
                         solution[(course_id, session)] = (t_slot_id, room_id)
 
-                logger.info(f"[CP-SAT] Solution found: {len(solution)} assignments")
+                n_assignments = len(solution)
+
+                # Explicit C++ memory release — OR-Tools allocates native heap.
+                # Python GC cannot see these objects; must delete explicitly.
+                # Do this BEFORE logging to free memory as early as possible.
+                del solver
+                del model
+                del variables
+                gc.collect()
+
+                logger.info(f"[CP-SAT] Solution found: {n_assignments} assignments")
                 return solution
 
             logger.warning(f"[CP-SAT] No solution with strategy: {strategy['name']}")
+
+            # Release on failure too — accumulation across failed strategies wastes RAM
+            del solver
+            del model
+            del variables
+            gc.collect()
+
             return None
 
         except Exception as e:
             logger.error(f"[CP-SAT] Strategy failed: {e}")
+            # Best-effort cleanup on exception path
+            try:
+                del solver
+            except NameError:
+                pass
+            try:
+                del model
+            except NameError:
+                pass
+            gc.collect()
             return None
 
     def _precompute_valid_domains(self, cluster: List[Course]) -> Dict:

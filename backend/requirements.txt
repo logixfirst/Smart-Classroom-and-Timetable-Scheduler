@@ -10,8 +10,10 @@ django-redis==5.4.0
 django-filter==24.3
 django-ratelimit==4.1.0
 django-otp==1.3.0
+django-csp>=4.0  # Content Security Policy headers
 psycopg2-binary>=2.9.0  # PostgreSQL adapter
 argon2-cffi==23.1.0
+cryptography>=41.0.0  # Required by PyJWT for RS256 JWT signing (HS256 fallback works without it)
 gunicorn==23.0.0
 python-decouple==3.8
 dj-database-url==2.2.0

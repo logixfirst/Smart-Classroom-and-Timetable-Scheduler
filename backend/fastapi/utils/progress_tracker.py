@@ -61,6 +61,16 @@ class ProgressTracker:
         # Initialize progress in Redis
         self._initialize_progress()
     
+    def _write_to_redis(self, data: dict) -> None:
+        """Single Redis write point — non-fatal on connection errors."""
+        try:
+            self.redis.setex(self.key, 7200, json.dumps(data))
+        except Exception as e:
+            logger.warning(
+                "[PROGRESS] Redis write failed — job continues, progress invisible",
+                extra={"job_id": self.job_id, "error": str(e)}
+            )
+
     def _initialize_progress(self):
         """Set initial progress state in Redis"""
         initial_data = {
@@ -74,7 +84,7 @@ class ProgressTracker:
             'last_updated': int(time.time()),
             'metadata': {}
         }
-        self.redis.setex(self.key, 7200, json.dumps(initial_data))
+        self._write_to_redis(initial_data)
         logger.debug(f"[PROGRESS] Initialized tracking for job {self.job_id}")
     
     def start_stage(self, stage: str, total_items: int = 0):
@@ -204,7 +214,7 @@ class ProgressTracker:
             }
             
             # Store in Redis with 2-hour TTL
-            self.redis.setex(self.key, 7200, json.dumps(data))
+            self._write_to_redis(data)
             
             logger.debug(
                 f"[PROGRESS] {self.job_id}: {clamped_overall:.2f}% "
@@ -355,7 +365,7 @@ class ProgressTracker:
             'completed_at': now,
             'metadata': {}
         }
-        self.redis.setex(self.key, 7200, json.dumps(data))
+        self._write_to_redis(data)
         logger.info(f"[PROGRESS] Job {self.job_id} marked as completed")
 
     def mark_failed(self, error_message: str):
@@ -380,7 +390,7 @@ class ProgressTracker:
                 'error': error_message,   # Frontend reads progress.metadata?.error
             },
         }
-        self.redis.setex(self.key, 7200, json.dumps(data))
+        self._write_to_redis(data)
         logger.error(f"[PROGRESS] Job {self.job_id} marked as failed: {error_message}")
 
     def mark_cancelled(self):
@@ -398,5 +408,5 @@ class ProgressTracker:
             'cancelled_at': now,
             'metadata': {}
         }
-        self.redis.setex(self.key, 7200, json.dumps(data))
+        self._write_to_redis(data)
         logger.info(f"[PROGRESS] Job {self.job_id} marked as cancelled")

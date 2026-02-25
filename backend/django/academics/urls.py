@@ -42,6 +42,13 @@ from .views import (
     logout_view,
     refresh_token_view,
 )
+from .views.auth_views import (
+    password_reset_request_view,
+    password_reset_confirm_view,
+    password_change_view,
+    list_sessions_view,
+    revoke_session_view,
+)
 
 router = DefaultRouter()
 router.register(r"users", UserViewSet)
@@ -91,6 +98,13 @@ urlpatterns = [
     path("auth/refresh", refresh_token_view, name="refresh-token-no-slash"),
     path("auth/me/", current_user_view, name="current-user"),
     path("auth/me", current_user_view, name="current-user-no-slash"),
+    # Password reset & change
+    path("auth/password-reset/request/", password_reset_request_view, name="password-reset-request"),
+    path("auth/password-reset/confirm/", password_reset_confirm_view, name="password-reset-confirm"),
+    path("auth/password-change/", password_change_view, name="password-change"),
+    # Session management (FIX 1)
+    path("auth/sessions/", list_sessions_view, name="session-list"),
+    path("auth/sessions/<str:jti>/", revoke_session_view, name="session-revoke"),
     # Dashboard stats
     path("dashboard/stats/", dashboard_stats, name="dashboard-stats"),
     # PERFORMANCE: Ultra-fast endpoints

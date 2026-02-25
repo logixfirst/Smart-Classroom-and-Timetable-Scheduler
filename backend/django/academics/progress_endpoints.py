@@ -11,7 +11,7 @@ import json
 import ssl as ssl_module
 import time
 import logging
-from django.http import StreamingHttpResponse, JsonResponse
+from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 from django.conf import settings
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
@@ -173,6 +173,21 @@ def stream_progress(request, job_id):
     hasn't been written yet.  The "Connecting..." spinner will resolve
     within DB_POLL_INTERVAL seconds in the worst case.
     """
+    # Authentication guard
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+
+    # Ownership guard — job must belong to the authenticated user's org
+    try:
+        from academics.models import GenerationJob
+        _job = GenerationJob.objects.only('organization_id').get(id=job_id)
+        if str(_job.organization_id) != str(getattr(request.user, 'organization_id', None)):
+            return HttpResponse(status=403)
+    except GenerationJob.DoesNotExist:
+        return HttpResponse(status=404)
+    except Exception:
+        pass  # Malformed UUID or DB error — let event_stream handle gracefully
+
     def event_stream():
         MAX_REDIS_RECONNECTS = 5
         REDIS_POLL_INTERVAL = 1   # seconds between Redis reads

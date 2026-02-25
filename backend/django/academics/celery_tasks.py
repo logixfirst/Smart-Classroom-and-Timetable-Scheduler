@@ -193,3 +193,25 @@ def cleanup_old_jobs():
     
     logger.info(f"Cleaned up {deleted[0]} old jobs")
     return deleted[0]
+
+@shared_task
+def cleanup_tokens_task(grace_days: int = 1) -> dict:
+    """
+    Celery wrapper around the cleanup_tokens management command logic.
+
+    Deletes OutstandingToken rows (and their cascade-deleted BlacklistedToken
+    entries) that expired more than *grace_days* days ago.
+
+    Called automatically by Celery beat (CELERY_BEAT_SCHEDULE in settings.py).
+    Can also be enqueued manually: cleanup_tokens_task.delay(grace_days=2)
+    """
+    from datetime import timedelta
+    from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+
+    cutoff = timezone.now() - timedelta(days=grace_days)
+    deleted, _ = OutstandingToken.objects.filter(expires_at__lt=cutoff).delete()
+    logger.info(
+        "cleanup_tokens_task completed",
+        extra={"deleted": deleted, "cutoff": cutoff.isoformat(), "grace_days": grace_days},
+    )
+    return {"deleted": deleted, "cutoff": cutoff.isoformat()}

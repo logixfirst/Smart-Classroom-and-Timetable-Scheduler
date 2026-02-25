@@ -73,6 +73,8 @@ class GenerationJob(models.Model):
             ("running", "Running"),
             ("completed", "Completed"),
             ("failed", "Failed"),
+            ("cancelling", "Cancelling"),
+            ("cancelled", "Cancelled"),
         ],
         default="pending",
     )

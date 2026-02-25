@@ -407,15 +407,9 @@ class ApiClient {
   // Get the latest approved timetable for a department/batch
   async getLatestApprovedTimetable(departmentId?: string, batchId?: string) {
     try {
-      // For students, directly get timetables instead of generation jobs
-      const user = typeof window !== 'undefined' ? 
-        JSON.parse(localStorage.getItem('user') || '{}') : {};
-      
-      if (user.role === 'student') {
-        // Students should get timetables directly
-        return this.getTimetables();
-      }
-      
+      // 🔐 SECURITY: Never read role from localStorage for branching decisions.
+      // The backend enforces per-role access. Students have no approved generation
+      // jobs, so the fallback to getTimetables() below triggers automatically.
       const response = await this.getGenerationJobs();
       if (response.data && response.data.results) {
         // Find the latest approved job
@@ -435,7 +429,10 @@ class ApiClient {
           return this.getGenerationResult(latestJob.job_id);
         }
       }
-      return { data: null, error: 'No approved timetable found' };
+      // No approved generation jobs found — fall back to direct timetables.
+      // This path is correct for students (who never own generation jobs) and
+      // for any user whose role the server has not granted generation-job access.
+      return this.getTimetables();
     } catch (error) {
       return { data: null, error: 'Failed to fetch timetable' };
     }

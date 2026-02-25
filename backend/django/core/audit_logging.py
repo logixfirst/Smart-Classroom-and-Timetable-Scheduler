@@ -287,3 +287,76 @@ def log_timetable_export(user, organization_id: str, job_id: str, export_format:
         status="success",
         changes={"export_format": export_format},
     )
+
+
+# =============================================================================
+# SECURITY EVENT LOG  (separate from business AuditLog)
+# Different consumer: SIEM / security team; different retention policy
+# =============================================================================
+
+def _get_client_ip_core(request) -> str:
+    """Extract real client IP from request (X-Forwarded-For → REMOTE_ADDR)."""
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    return xff.split(",")[0].strip() if xff else request.META.get("REMOTE_ADDR", "")
+
+
+class SecurityEvent(models.Model):
+    """Immutable security event stream for auth, access, and session events."""
+
+    EVENT_CHOICES = [
+        ("login_success", "Login Success"),
+        ("login_failure", "Login Failure"),
+        ("login_locked", "Account Locked"),
+        ("token_refresh", "Token Refreshed"),
+        ("token_mismatch", "Device Fingerprint Mismatch"),
+        ("token_revoked", "Session Revoked"),
+        ("permission_denied", "Permission Denied"),
+        ("logout", "Logout"),
+        ("password_changed", "Password Changed"),
+        ("password_reset", "Password Reset Requested"),
+    ]
+
+    event_type = models.CharField(max_length=30, choices=EVENT_CHOICES, db_index=True)
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True
+    )  # null for pre-auth failures
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    metadata = models.JSONField(default=dict)  # event-specific context
+    timestamp = models.DateTimeField(auto_now_add=True, db_index=True)
+    organization = models.ForeignKey(
+        "academics.Organization",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        db_column="org_id",
+    )
+
+    class Meta:
+        db_table = "security_events"
+        indexes = [
+            models.Index(fields=["event_type", "timestamp"], name="sec_event_type_ts_idx"),
+            models.Index(fields=["user", "timestamp"], name="sec_event_user_ts_idx"),
+            models.Index(fields=["organization", "timestamp"], name="sec_event_org_ts_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.event_type} — {self.user} — {self.timestamp}"
+
+
+def log_security_event(event_type: str, request, user=None, metadata: dict = None) -> None:
+    """
+    Fire-and-forget security event write.
+    Swallows DB errors to never interrupt the auth flow on a logging failure.
+    """
+    try:
+        SecurityEvent.objects.create(
+            event_type=event_type,
+            user=user,
+            ip_address=_get_client_ip_core(request),
+            user_agent=request.META.get("HTTP_USER_AGENT", "")[:255],
+            metadata=metadata or {},
+            organization=getattr(user, "organization", None),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.error("log_security_event failed: %s", exc, exc_info=True)

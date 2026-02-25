@@ -84,6 +84,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "corsheaders",
     "django_filters",
+    "csp",  # Content Security Policy (django-csp 4.x)
     # Local apps
     "core",
     "academics",
@@ -93,6 +94,7 @@ MIDDLEWARE = [
     "django.middleware.gzip.GZipMiddleware",  # PERFORMANCE: Compress responses
     "django.middleware.http.ConditionalGetMiddleware",  # PERFORMANCE: ETag support
     "django.middleware.security.SecurityMiddleware",
+    "csp.middleware.CSPMiddleware",  # SECURITY: Content-Security-Policy header
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -233,6 +235,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "1000/hour",
         "user": "10000/hour",
+        "login": "5/minute",  # Brute-force protection on login endpoint
     },
 }
 
@@ -345,6 +348,17 @@ CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
     'retry_on_timeout': True,
 }
 
+# Celery Beat — periodic task schedule
+# cleanup_tokens runs daily at 03:00 UTC (off-peak for BHU, UTC+5:30 = 08:30 IST)
+# This prevents the token_blacklist tables from growing unboundedly.
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    "cleanup-expired-jwt-tokens": {
+        "task": "academics.celery_tasks.cleanup_tokens_task",
+        "schedule": crontab(hour=3, minute=0),  # 03:00 UTC daily
+    },
+}
+
 # SSL configuration for Upstash Redis (rediss://)
 if REDIS_USE_TLS:
     CELERY_BROKER_USE_SSL = {
@@ -430,6 +444,46 @@ LOGGING = {
 
 # JWT Settings
 from datetime import timedelta
+from django.core.exceptions import ImproperlyConfigured
+
+# =============================
+# JWT SIGNING KEY RESOLUTION
+# =============================
+# RS256 (asymmetric): Private key signs — only auth server holds it.
+#                     Public key verifies — safe to share with any service.
+# HS256 (symmetric):  One key does both — only safe for single-service dev.
+#
+# Priority:
+#   1. JWT_PRIVATE_KEY + JWT_PUBLIC_KEY env vars set → RS256 (production)
+#   2. Not set + DEBUG=True                         → HS256 fallback (dev only)
+#   3. Not set + DEBUG=False                        → hard startup failure
+#
+# Generate keys once:
+#   openssl genrsa -out private.pem 2048
+#   openssl rsa -in private.pem -pubout -out public.pem
+# Then set env vars (multi-line value, preserve newlines):
+#   JWT_PRIVATE_KEY="$(cat private.pem)"
+#   JWT_PUBLIC_KEY="$(cat public.pem)"
+
+_jwt_private_key = os.getenv("JWT_PRIVATE_KEY", "").strip()
+_jwt_public_key = os.getenv("JWT_PUBLIC_KEY", "").strip()
+
+if _jwt_private_key and _jwt_public_key:
+    _JWT_ALGORITHM = "RS256"
+    _JWT_SIGNING_KEY = _jwt_private_key
+    _JWT_VERIFYING_KEY = _jwt_public_key
+elif not DEBUG:
+    raise ImproperlyConfigured(
+        "JWT_PRIVATE_KEY and JWT_PUBLIC_KEY must be set in production. "
+        "Generate with: openssl genrsa -out private.pem 2048 && "
+        "openssl rsa -in private.pem -pubout -out public.pem"
+    )
+else:
+    # Local development only — HS256 with SECRET_KEY is acceptable when
+    # the server is not reachable from the internet.
+    _JWT_ALGORITHM = "HS256"
+    _JWT_SIGNING_KEY = SECRET_KEY
+    _JWT_VERIFYING_KEY = None
 
 SIMPLE_JWT = {
     # Token Lifetimes - Google-like security (shorter refresh, auto-rotate)
@@ -442,9 +496,9 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,
     
     # Encryption & Signing
-    "ALGORITHM": "HS256",
-    "SIGNING_KEY": SECRET_KEY,
-    "VERIFYING_KEY": None,
+    "ALGORITHM": _JWT_ALGORITHM,      # RS256 in prod; HS256 in dev
+    "SIGNING_KEY": _JWT_SIGNING_KEY,  # RSA private key (prod) or SECRET_KEY (dev)
+    "VERIFYING_KEY": _JWT_VERIFYING_KEY,  # RSA public key (prod) or None (dev)
     "AUDIENCE": None,
     "ISSUER": None,
     
@@ -497,7 +551,9 @@ JWT_AUTH_COOKIE = "access_token"  # Cookie name for access token
 JWT_AUTH_REFRESH_COOKIE = "refresh_token"  # Cookie name for refresh token
 JWT_AUTH_SECURE = not DEBUG  # HTTPS only in production
 JWT_AUTH_HTTPONLY = True  # JavaScript cannot access (prevents XSS)
-JWT_AUTH_SAMESITE = "Lax"  # CSRF protection (Lax allows GET from external sites)
+JWT_AUTH_SAMESITE = "Lax"  # CSRF protection on access token (Lax allows GET from external sites)
+# Refresh token is scoped to its one endpoint — never sent to /api/timetable/, /api/users/, etc.
+JWT_AUTH_REFRESH_COOKIE_PATH = "/api/auth/refresh/"  # Restrict refresh cookie scope
 JWT_AUTH_COOKIE_USE_CSRF = True  # Require CSRF token for cookie-based auth
 JWT_AUTH_COOKIE_ENFORCE_CSRF_ON_UNAUTHENTICATED = False  # Don't require CSRF for login
 
@@ -526,3 +582,30 @@ PASSWORD_HASHERS = [
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB max upload size
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB max file upload
 SECURE_REFERRER_POLICY = "same-origin"  # Control referrer information
+
+# =============================
+# CONTENT SECURITY POLICY (django-csp 4.x)
+# =============================
+# Requires: pip install django-csp
+# Middleware already added: csp.middleware.CSPMiddleware
+#
+# Decisions:
+#   script-src 'self'          — no inline scripts, no CDN (XSS hardening)
+#   style-src  'self' 'unsafe-inline' — Next.js injects inline styles at runtime
+#   img-src    'self' data:    — base64 data URIs used for avatars/thumbnails
+#   connect-src 'self'         — fetch/XHR only to same origin (admin & API docs)
+#   font-src   'self'          — no external font CDNs
+#   frame-ancestors 'none'     — belt-and-suspenders with X_FRAME_OPTIONS = DENY
+#   form-action 'self'         — prevents form hijacking to third-party URLs
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": ["'self'"],
+        "script-src": ["'self'"],
+        "style-src": ["'self'", "'unsafe-inline'"],
+        "img-src": ["'self'", "data:"],
+        "connect-src": ["'self'"],
+        "font-src": ["'self'"],
+        "frame-ancestors": ["'none'"],
+        "form-action": ["'self'"],
+    }
+}

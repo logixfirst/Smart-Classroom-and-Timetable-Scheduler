@@ -61,7 +61,7 @@ from .timetable import (
 )
 
 # User model
-from .user import User
+from .user import User, UserSession
 
 # Export all models for backward compatibility
 __all__ = [
@@ -94,4 +94,5 @@ __all__ = [
     'TimetableSlot',
     # User
     'User',
+    'UserSession',
 ]
