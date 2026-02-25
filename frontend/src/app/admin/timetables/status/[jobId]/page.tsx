@@ -295,6 +295,7 @@ export default function TimetableStatusPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
   const [countdown, setCountdown] = useState(3)
+  const [copied, setCopied] = useState(false)
 
   // ── REST polling fallback (functional — hidden from UI) ──────────────────────
   const [sseTimedOut, setSseTimedOut] = useState(false)
@@ -653,7 +654,7 @@ export default function TimetableStatusPage() {
 
         {/* Footer: connection dot + cancel */}
         <div className="flex items-center justify-between flex-wrap gap-3 fu-500">
-          {/* Tiny connection indicator */}
+          {/* Tiny connection indicator + job reference chip */}
           <div className="flex items-center gap-2">
             <div
               className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? 'status-dot-live' : reconnectAttempt > 0 ? 'status-dot-warn' : 'status-dot-err'}`}
@@ -661,6 +662,30 @@ export default function TimetableStatusPage() {
             <span className="text-[11px] text-[#64748B]">
               {isConnected ? 'Live' : reconnectAttempt > 0 ? 'Reconnecting...' : 'Offline'}
             </span>
+            <span className="text-[#CBD5E1] text-[11px] select-none">&middot;</span>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(jobId)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+              title={`Job ID: ${jobId}\nClick to copy full ID`}
+              className={`flex items-center gap-1 text-[11px] font-mono transition-colors ${
+                copied ? 'text-[#2563EB]' : 'text-[#94A3B8] hover:text-[#475569]'
+              }`}
+            >
+              {copied ? (
+                <span className="flex items-center gap-1">
+                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3"><path d="M2 6l3 3 5-5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  Copied
+                </span>
+              ) : (
+                <>
+                  #{jobId.slice(0, 8).toUpperCase()}
+                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" className="w-3 h-3 opacity-50"><rect x="4" y="4" width="7" height="7" rx="1.5"/><path d="M1 8V1h7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </>
+              )}
+            </button>
           </div>
 
           {/* Cancel / inline confirmation */}
