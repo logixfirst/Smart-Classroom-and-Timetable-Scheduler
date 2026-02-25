@@ -53,8 +53,9 @@ class ApiClient {
         // NOTE: useRouter() is a React hook and MUST NOT be called outside a
         // component or custom hook. Use window.location for imperative redirects
         // from non-React contexts such as this class method.
-        if (typeof window !== 'undefined') {
-          window.location.href = '/auth/signin';
+        // Guard against redirect loops: only redirect if not already on an auth page.
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
         }
       }
 
