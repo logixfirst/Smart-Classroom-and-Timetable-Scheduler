@@ -933,27 +933,49 @@ class TimetableGenerationSaga:
         }
 
         # ------------------------------------------------------------------
-        # Step 2: Store all variants in Redis (for /api/variants/{job_id})
-        # enriched_variants already has correct field names + computed metrics;
-        # strip timetable_entries before Redis to keep the key size small
-        # (entries are already persisted to DB via timetable_data).
+        # Step 2: Store variants summary in Redis (for /api/variants/{job_id})
+        #
+        # ROOT CAUSE OF PREVIOUS 26 MB OVERFLOW:
+        #   result_payload contained BOTH top-level timetable_entries (8279 rows)
+        #   AND enriched_variants — each with their own timetable_entries lists.
+        #   Combined ~16 k entries × ~1.6 KB = 26 MB >> Upstash 10 MB limit.
+        #
+        # Fix: Redis stores ONLY lightweight summaries — no entry rows at all.
+        #   Full entries live in Django's generation_jobs.timetable_data (Django DB).
+        #   Redis is a fast-read cache for job status + variant scores, NOT a
+        #   secondary DB for 8 k-row payloads.
         # ------------------------------------------------------------------
         if self.redis_client:
             try:
+                # Strip timetable_entries from each variant (keep scores / metrics)
                 redis_variants = [
                     {k: v2 for k, v2 in ev.items() if k != 'timetable_entries'}
                     for ev in enriched_variants
                 ]
+                # Strip timetable_entries + full variants from the timetable summary
+                # (variants block replaced by the lightweight redis_variants list)
+                redis_timetable_summary = {
+                    k: v2 for k, v2 in result_payload.items()
+                    if k not in ('timetable_entries', 'variants')
+                }
+                redis_timetable_summary['variants'] = redis_variants
+
                 redis_result = {
-                    'timetable': result_payload,
-                    'variants': redis_variants,
+                    'timetable': redis_timetable_summary,   # lightweight summary
+                    'variants': redis_variants,             # scores + metrics only
                     'metadata': {
                         'job_id': job_id,
                         'org_id': data.get('organization_id'),
                         'semester': data.get('semester'),
+                        'total_entries': len(timetable_entries),
                         'generated_at': result_payload['generated_at'],
                     }
                 }
+                payload_bytes = len(json.dumps(redis_result, default=str).encode())
+                logger.info(
+                    f"[SAGA-PERSIST] Redis payload size: {payload_bytes / 1024:.1f} KB "
+                    f"({len(enriched_variants)} variants, entries stored in DB only)"
+                )
                 self.redis_client.setex(
                     f"result:job:{job_id}",
                     3600 * 24,  # 24h TTL

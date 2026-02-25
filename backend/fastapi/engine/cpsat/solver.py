@@ -157,6 +157,38 @@ class AdaptiveCPSATSolver:
                 _start_strategy['name'], _start_idx
             )
 
+        # ------------------------------------------------------------------
+        # PRE-FLIGHT: faculty-overload detection
+        #
+        # If a faculty member has more sessions assigned (sum of course.duration)
+        # than the total number of distinct time slots, CP-SAT will immediately
+        # prove INFEASIBLE even under Strategy 4 (faculty-only constraints).
+        # Observed in logs: cluster 182 spent ~0.13 s on Strategy 4 before failing,
+        # while ~3 previous strategies wasted ~60-90 s total on the same infeasible
+        # problem.  Catching this here skips all CP-SAT work and goes straight to
+        # the greedy fallback, saving up to ~3 min per run across all such clusters.
+        # ------------------------------------------------------------------
+        _faculty_sessions: Dict[str, int] = defaultdict(int)
+        for _c in cluster:
+            _fid = getattr(_c, 'faculty_id', None)
+            if _fid:
+                _faculty_sessions[_fid] += getattr(_c, 'duration', 1) or 1
+
+        _total_slots = len(self.time_slots)
+        _overloaded_faculty = {
+            fid: cnt for fid, cnt in _faculty_sessions.items()
+            if cnt > _total_slots
+        }
+        if _overloaded_faculty:
+            logger.warning(
+                "[CP-SAT] PRE-FLIGHT FAIL: %d faculty member(s) have more sessions "
+                "than available time slots (%d slots). Faculty→sessions: %s. "
+                "Skipping all strategies → greedy fallback immediately.",
+                len(_overloaded_faculty), _total_slots,
+                ', '.join(f'{fid}:{cnt}' for fid, cnt in _overloaded_faculty.items())
+            )
+            return None
+
         for strategy_idx, strategy in enumerate(STRATEGIES):
             if strategy_idx < _start_idx:
                 continue
@@ -266,10 +298,20 @@ class AdaptiveCPSATSolver:
             if mem_percent > 85:
                 reduced_workers = max(2, self.num_workers // 2)
                 solver.parameters.num_search_workers = reduced_workers
-                logger.warning(
-                    f"[MEMORY] RAM {mem_percent:.1f}% — reducing CP-SAT workers "
-                    f"{self.num_workers} → {reduced_workers}"
-                )
+                if reduced_workers < self.num_workers:
+                    # Actually reducing — worth a WARNING so ops can see it
+                    logger.warning(
+                        f"[MEMORY] RAM {mem_percent:.1f}% — reducing CP-SAT workers "
+                        f"{self.num_workers} → {reduced_workers}"
+                    )
+                else:
+                    # Already at minimum (2→2): log at DEBUG to avoid log spam.
+                    # This fires every cluster when system RAM sits above 85% —
+                    # a WARNING here drowns out real signals in the log stream.
+                    logger.debug(
+                        f"[MEMORY] RAM {mem_percent:.1f}% — already at minimum "
+                        f"{reduced_workers} workers (no reduction possible)"
+                    )
 
             # Solve
             logger.info(f"[CP-SAT] Starting solver with timeout {strategy['timeout']}s...")
