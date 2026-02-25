@@ -73,10 +73,10 @@ class GenerationService:
                 'time_config': time_config
             }
             
-            # Execute Saga with 15-minute timeout
+            # Execute Saga with 60-minute timeout (BHU full university = ~27 min observed)
             results = await asyncio.wait_for(
                 saga.execute(job_id, request_data),
-                timeout=900  # 15 minutes
+                timeout=3600  # 60 minutes
             )
             
             logger.info(f"[JOB {job_id}] ✅ Generation completed successfully")
@@ -112,10 +112,56 @@ class GenerationService:
             await self._cleanup(job_id)
     
     async def _handle_timeout(self, job_id: str):
-        """Handle job timeout"""
+        """Handle job timeout — write failed status to Redis and DB so Django SSE terminates."""
+        import time, json, os
         if self.redis:
             self.redis.delete(f"cancel:job:{job_id}")
             self.redis.delete(f"start_time:job:{job_id}")
+            # Write failed status to progress key so Django SSE emits 'done' and stops
+            try:
+                key = f"progress:job:{job_id}"
+                existing_raw = self.redis.get(key)
+                existing = json.loads(existing_raw) if existing_raw else {}
+                now = int(time.time())
+                failed_data = {
+                    'job_id': job_id,
+                    'stage': 'failed',
+                    'stage_progress': existing.get('stage_progress', 0.0),
+                    'overall_progress': existing.get('overall_progress', 0.0),
+                    'status': 'failed',
+                    'eta_seconds': None,
+                    'started_at': existing.get('started_at', now),
+                    'last_updated': now,
+                    'failed_at': now,
+                    'metadata': {'error': 'Generation timed out (60-minute limit exceeded)'},
+                }
+                self.redis.setex(key, 7200, json.dumps(failed_data))
+                logger.info(f"[JOB {job_id}] Wrote failed status to Redis")
+            except Exception as e:
+                logger.warning(f"[JOB {job_id}] Could not write failed status to Redis: {e}")
+        # Also update the Django DB directly
+        try:
+            import psycopg2
+            from datetime import datetime, timezone
+            db_url = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/sih28')
+            db_conn = psycopg2.connect(db_url, connect_timeout=5)
+            db_conn.autocommit = False
+            with db_conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE generation_jobs
+                    SET status = 'failed',
+                        error_message = 'Generation timed out (60-minute limit exceeded)',
+                        updated_at = %s
+                    WHERE id = %s AND status NOT IN ('completed', 'approved', 'cancelled')
+                    """,
+                    (datetime.now(timezone.utc), job_id)
+                )
+            db_conn.commit()
+            db_conn.close()
+            logger.info(f"[JOB {job_id}] Marked as failed in DB (timeout)")
+        except Exception as db_err:
+            logger.warning(f"[JOB {job_id}] Could not update DB on timeout: {db_err}")
     
     async def _handle_cancellation(self, job_id: str):
         """Handle job cancellation"""
