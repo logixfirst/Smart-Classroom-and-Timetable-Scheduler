@@ -5,31 +5,44 @@
 @tailwind utilities;
 
 /* ── Material-Design indeterminate spinner (Play Store / Google Files style) ─ */
-/* The arc continuously expands and contracts while the whole ring rotates.     */
-/* Two animations run on the same duration so the arc appears to chase itself.  */
+/* Exact technique: stroke-dasharray + stroke-dashoffset animate together       */
+/* producing the genuine arc-expand → arc-contract → sweep-away effect.         */
 
-/* 1. Continuous ring rotation */
+/* 1. Continuous full rotation of the SVG ring (2 s linear) */
 @keyframes gsp-rotate {
-  to { transform: rotate(360deg); }
+  100% { transform: rotate(360deg); }
 }
 
-/* 2. Arc grow → shrink cycle (stroke-dashoffset on a circle with r=20, c≈125.66) */
-@keyframes gsp-arc {
-  0%   { stroke-dashoffset: 113; }   /* ~10 % of arc visible  — short tail  */
-  50%  { stroke-dashoffset: 12;  }   /* ~90 % of arc visible  — near-full   */
-  100% { stroke-dashoffset: 113; }   /* back to short tail                  */
+/* 2. Arc expand → contract → sweep away                                        */
+/*    dasharray:   1,200  → 100,200  controls arc LENGTH (grow/shrink)          */
+/*    dashoffset:  0      → -15 → -125  moves the arc START POINT forward       */
+/*    Together they create the genuine "chasing tail" illusion.                  */
+@keyframes gsp-dash {
+  0% {
+    stroke-dasharray:  1, 200;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray:  100, 200;
+    stroke-dashoffset: -15;
+  }
+  100% {
+    stroke-dasharray:  100, 200;
+    stroke-dashoffset: -125;
+  }
 }
 
-/* Applied to the <svg> wrapper */
+/* Applied to the <svg> wrapper — keeps rotation separate from arc animation */
 .gsp-rotate {
-  animation: gsp-rotate 1.4s linear infinite;
+  animation: gsp-rotate 2s linear infinite;
   transform-origin: center;
 }
 /* Applied to the <circle> arc element */
 .gsp-arc {
-  animation: gsp-arc 1.4s ease-in-out infinite;
+  animation: gsp-dash 1.5s cubic-bezier(0.4, 0.0, 0.2, 1) infinite;
 }
 /* ─────────────────────────────────────────────────────────────────────────── */
+
 
 
 @layer base {
