@@ -28,8 +28,12 @@ def crossover(
     offspring1 = {}
     offspring2 = {}
     
-    # Get all course IDs
-    course_ids = list(set(c_id for c_id, _ in parent1.keys()))
+    # Get all course IDs — guard against non-2-tuple keys defensively
+    course_ids = []
+    for _k in parent1.keys():
+        if isinstance(_k, tuple) and len(_k) == 2:
+            course_ids.append(_k[0])
+    course_ids = list(set(course_ids))
     if not course_ids:
         return copy.deepcopy(parent1), copy.deepcopy(parent2)
     
@@ -37,9 +41,11 @@ def crossover(
     crossover_point = random.randint(0, len(course_ids))
     split_courses = set(course_ids[:crossover_point])
     
-    # Build offspring
+    # Build offspring — skip any non-canonical keys
     for key in parent1.keys():
-        c_id, session = key
+        if not (isinstance(key, tuple) and len(key) == 2):
+            continue
+        c_id, _ = key
         if c_id in split_courses:
             offspring1[key] = parent1[key]
             offspring2[key] = parent2[key] if key in parent2 else parent1[key]

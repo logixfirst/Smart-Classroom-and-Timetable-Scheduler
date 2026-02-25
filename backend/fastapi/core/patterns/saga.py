@@ -59,6 +59,12 @@ from core.cancellation import (
 )
 from utils.progress_tracker import ProgressTracker
 
+# Sentinel used when CP-SAT cannot schedule a course's cluster and greedy
+# fallback must insert a placeholder entry.  Downstream code (persist, conflict
+# checkers) can detect this value and treat the course as unscheduled instead
+# of accidentally blocking a real room/slot with a dummy assignment.
+_GREEDY_FALLBACK_SENTINEL = '__UNSCHEDULED__'
+
 logger = logging.getLogger(__name__)
 
 
@@ -454,30 +460,40 @@ class TimetableGenerationSaga:
                                     f"[SAGA-PARALLEL] Cluster {result_cid} error: "
                                     f"{error_msg[:300]}"
                                 )
-                                # Error isolation: greedy fallback for this cluster
+                                # Error isolation: greedy fallback for this cluster.
+                                # Use the sentinel slot-id so persist skips these
+                                # entries cleanly rather than blocking real slots.
+                                logger.warning(
+                                    "[CPSAT] GREEDY FALLBACK triggered — "
+                                    "cluster %d error: %s",
+                                    result_cid, error_msg[:200]
+                                )
+                                _fb_room = (
+                                    data['rooms'][0].room_id
+                                    if data['rooms'] else None
+                                )
                                 for course in clusters[result_cid]:
-                                    solution[course.course_id] = {
-                                        'time_slot': 0,
-                                        'room': (
-                                            data['rooms'][0].room_id
-                                            if data['rooms'] else None
-                                        ),
-                                    }
+                                    for _sess in range(max(course.duration, 1)):
+                                        solution[(course.course_id, _sess)] = (
+                                            _GREEDY_FALLBACK_SENTINEL, _fb_room
+                                        )
                             elif cluster_solution:
                                 solution.update(cluster_solution)
                             else:
                                 logger.warning(
-                                    f"[SAGA-PARALLEL] Cluster {result_cid} returned "
-                                    f"no solution — applying greedy fallback"
+                                    "[CPSAT] GREEDY FALLBACK triggered — "
+                                    "cluster %d returned no solution",
+                                    result_cid
+                                )
+                                _fb_room = (
+                                    data['rooms'][0].room_id
+                                    if data['rooms'] else None
                                 )
                                 for course in clusters[result_cid]:
-                                    solution[course.course_id] = {
-                                        'time_slot': 0,
-                                        'room': (
-                                            data['rooms'][0].room_id
-                                            if data['rooms'] else None
-                                        ),
-                                    }
+                                    for _sess in range(max(course.duration, 1)):
+                                        solution[(course.course_id, _sess)] = (
+                                            _GREEDY_FALLBACK_SENTINEL, _fb_room
+                                        )
 
                             # Progress update after each cluster completes
                             if tracker:
@@ -549,15 +565,18 @@ class TimetableGenerationSaga:
                     solution.update(cluster_solution)
                 else:
                     logger.warning(
-                        f"[SAGA] Cluster {cluster_id} failed — using greedy fallback"
+                        "[CPSAT] GREEDY FALLBACK triggered — "
+                        "cluster %d failed, %d courses unscheduled",
+                        cluster_id, len(cluster)
+                    )
+                    _fb_room = (
+                        data['rooms'][0].room_id if data['rooms'] else None
                     )
                     for course in cluster:
-                        solution[course.course_id] = {
-                            'time_slot': 0,
-                            'room': (
-                                data['rooms'][0].room_id if data['rooms'] else None
-                            ),
-                        }
+                        for _sess in range(max(course.duration, 1)):
+                            solution[(course.course_id, _sess)] = (
+                                _GREEDY_FALLBACK_SENTINEL, _fb_room
+                            )
 
         logger.info(f"[SAGA] CP-SAT complete: {len(solution)} assignments")
         # Store for PARTIAL_SUCCESS recovery (Google/Meta pattern)
@@ -734,7 +753,33 @@ class TimetableGenerationSaga:
         rooms_by_id = {r.room_id: r for r in data.get('rooms', [])}
 
         timetable_entries = []
-        for (course_id, session), (t_slot_id, room_id) in final_solution.items():
+        _malformed_keys: list = []   # programming-error entries (wrong format)
+        _unscheduled_count: int = 0  # greedy-sentinel entries (CP-SAT failure)
+
+        for _key, _value in final_solution.items():
+            # ── Guard 1: key/value must be 2-tuples ──────────────────────────
+            try:
+                (course_id, session) = _key
+                (t_slot_id, room_id) = _value
+            except (TypeError, ValueError):
+                _malformed_keys.append(_key)
+                logger.error(
+                    "[SAGA-PERSIST] Malformed solution entry — "
+                    "key=%r value=%r (expected 2-tuple: 2-tuple format)",
+                    _key, _value
+                )
+                continue
+
+            # ── Guard 2: greedy-fallback sentinel → course is unscheduled ────
+            if t_slot_id == _GREEDY_FALLBACK_SENTINEL:
+                _unscheduled_count += 1
+                logger.debug(
+                    "[SAGA-PERSIST] Course %s session %s is unscheduled "
+                    "(greedy fallback sentinel)",
+                    course_id, session
+                )
+                continue
+
             course = courses_by_id.get(course_id)
             slot = slot_by_id.get(str(t_slot_id))
             room = rooms_by_id.get(room_id)
@@ -759,6 +804,30 @@ class TimetableGenerationSaga:
                 'batch_ids': list(getattr(course, 'batch_ids', [])),
             }
             timetable_entries.append(entry)
+
+        # ── Post-loop diagnostics ─────────────────────────────────────────────
+        total = len(final_solution)
+        if _unscheduled_count:
+            logger.warning(
+                "[SAGA-PERSIST] %d/%d entries are unscheduled (greedy fallback) — "
+                "those courses will be absent from the generated timetable",
+                _unscheduled_count, total
+            )
+        if _malformed_keys:
+            pct = len(_malformed_keys) / max(total, 1)
+            logger.error(
+                "[SAGA-PERSIST] %d/%d entries have malformed keys (%.1f%%) — "
+                "job_id=%s",
+                len(_malformed_keys), total, pct * 100, job_id
+            )
+            # Abort if more than 5% of the solution is corrupt — saving a
+            # heavily incomplete timetable gives a false 'completed' signal.
+            if pct > 0.05:
+                raise ValueError(
+                    f"[SAGA-PERSIST] Aborting: {len(_malformed_keys)}/{total} "
+                    f"({pct:.1%}) solution entries are malformed. "
+                    f"Saving would produce a severely incomplete timetable."
+                )
 
         # Build the full result payload
         result_payload = {
