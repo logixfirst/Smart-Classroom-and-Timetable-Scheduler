@@ -3,6 +3,7 @@
  * Provides multiple export options for timetable data
  */
 import { useState } from 'react'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import {
   exportTimetableToPDF,
   exportTimetableToExcel,
@@ -110,7 +111,7 @@ export default function ExportButton({
       >
         {isExporting ? (
           <div className="flex items-center">
-            <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+            <GoogleSpinner size={16} className="mr-2" />
             Exporting...
           </div>
         ) : (

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { authenticatedFetch } from '@/lib/auth'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
 interface Variant {
   id: string
@@ -80,7 +81,7 @@ export default function CompareVariantsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+        <GoogleSpinner size={48} className="mx-auto" />
       </div>
     )
   }

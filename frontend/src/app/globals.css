@@ -4,6 +4,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Material-Design indeterminate spinner (Play Store / Google Files style) ─ */
+/* The arc continuously expands and contracts while the whole ring rotates.     */
+/* Two animations run on the same duration so the arc appears to chase itself.  */
+
+/* 1. Continuous ring rotation */
+@keyframes gsp-rotate {
+  to { transform: rotate(360deg); }
+}
+
+/* 2. Arc grow → shrink cycle (stroke-dashoffset on a circle with r=20, c≈125.66) */
+@keyframes gsp-arc {
+  0%   { stroke-dashoffset: 113; }   /* ~10 % of arc visible  — short tail  */
+  50%  { stroke-dashoffset: 12;  }   /* ~90 % of arc visible  — near-full   */
+  100% { stroke-dashoffset: 113; }   /* back to short tail                  */
+}
+
+/* Applied to the <svg> wrapper */
+.gsp-rotate {
+  animation: gsp-rotate 1.4s linear infinite;
+  transform-origin: center;
+}
+/* Applied to the <circle> arc element */
+.gsp-arc {
+  animation: gsp-arc 1.4s ease-in-out infinite;
+}
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
@@ -218,13 +246,27 @@
     @apply text-sm text-gray-500 dark:text-gray-400 mt-1;
   }
 
+  /* ── Material-Design indeterminate spinner — CSS class helper ──────────── */
+  /* For border-based divs: .loading-spinner .loading-spinner-dark            */
+  /* Single blue accent — no color transitions.                               */
+
   /* Loading States */
   .loading-spinner {
-    @apply animate-spin rounded-full border-2 border-gray-200 dark:border-gray-600 border-t-blue-600 dark:border-t-blue-400;
+    display: inline-block;
+    border-radius: 9999px;
+    border-style: solid;
+    border-color: rgba(37, 99, 235, 0.18);   /* #2563EB at 18 % opacity — faint track */
+    border-top-color: #2563EB;               /* project blue accent                   */
+    animation: gsp-rotate 1.4s linear infinite;
   }
 
   .loading-spinner-dark {
-    @apply animate-spin rounded-full border-2 border-gray-600 border-t-white;
+    display: inline-block;
+    border-radius: 9999px;
+    border-style: solid;
+    border-color: rgba(255, 255, 255, 0.15);
+    border-top-color: #2563EB;
+    animation: gsp-rotate 1.4s linear infinite;
   }
 
   .loading-skeleton {

@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { simpleStudentSchema, SimpleStudentInput } from '@/lib/validations'
 import { FormField, SelectField } from '@/components/FormFields'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
 interface AddEditStudentModalProps {
   isOpen: boolean
@@ -217,7 +218,7 @@ export default function AddEditStudentModal({ isOpen, onClose, student, onSave }
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <GoogleSpinner size={16} singleColor="white" />
                   Saving...
                 </span>
               ) : (

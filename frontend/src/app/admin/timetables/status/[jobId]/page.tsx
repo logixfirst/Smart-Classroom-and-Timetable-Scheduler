@@ -54,6 +54,7 @@ import { fetchGenerationJobStatus } from '@/lib/api/timetable'
 import type { GenerationJob } from '@/types/timetable'
 import { useEffect, useRef, useState, ReactNode } from 'react'
 import { DM_Serif_Display, DM_Sans, JetBrains_Mono } from 'next/font/google'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
 const dmSerifDisplay = DM_Serif_Display({ subsets: ['latin'], weight: '400' })
 const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
@@ -114,8 +115,6 @@ const CSS_KEYFRAMES = `
 /* SVG icon sizes */
 .stage-icon { width: 14px; height: 14px; }
 .small-icon { width: 12px; height: 12px; }
-/* Connecting spinner border */
-.spinner { border-color: #E2E8F0; border-top-color: #2563EB; }
 /* Connecting screen centre */
 .center-fade { text-align: center; animation: fadeUp 400ms ease-out 100ms both; }
 /* Checkmark SVG path draw-on animation */
@@ -430,7 +429,7 @@ export default function TimetableStatusPage() {
     return (
       <div className={`page-bg ${dmSans.className}`}>
         <div className="center-fade">
-          <div className="w-12 h-12 rounded-full border-4 animate-spin mx-auto mb-6 spinner" />
+          <GoogleSpinner size={48} className="mx-auto mb-6" />
           <p className="text-[#0F172A] font-semibold text-[17px] mb-1">
             {reconnectAttempt > 0 ? 'Reconnecting...' : 'Connecting...'}
           </p>

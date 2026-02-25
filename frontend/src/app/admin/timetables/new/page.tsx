@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { authenticatedFetch } from '@/lib/auth'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
 export default function CreateTimetablePage() {
   const router = useRouter()
@@ -83,7 +84,7 @@ export default function CreateTimetablePage() {
         >
           {isGenerating ? (
             <>
-              <span className="inline-block animate-spin mr-2">⏳</span>
+              <GoogleSpinner size={16} singleColor="white" className="mr-2" />
               Generating...
             </>
           ) : (

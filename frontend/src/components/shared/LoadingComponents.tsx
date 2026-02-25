@@ -3,6 +3,8 @@
  * Reusable loading overlay for table containers
  */
 
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
+
 interface TableLoadingOverlayProps {
   isLoading: boolean
   message?: string
@@ -17,7 +19,7 @@ export const TableLoadingOverlay = ({
   return (
     <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
       <div className="flex flex-col items-center">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+        <GoogleSpinner size={32} className="mb-2" />
         <span className="text-sm text-gray-600 dark:text-gray-400">{message}</span>
       </div>
     </div>
@@ -52,7 +54,7 @@ export const PaginationButton = ({
     >
       {isLoading ? (
         <div className="flex items-center">
-          <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+          <GoogleSpinner size={16} className="mr-2" />
           {loadingText}
         </div>
       ) : (

@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import { useAuth } from '@/context/AuthContext'
 import { authenticatedFetch } from '@/lib/auth'
 import { useToast } from '@/components/Toast'
@@ -650,10 +651,7 @@ export default function TimetableReviewPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="text-center space-y-4">
-          <div className="relative w-16 h-16 mx-auto">
-            <div className="absolute inset-0 rounded-full border-4 border-blue-100 dark:border-blue-900" />
-            <div className="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent animate-spin" />
-          </div>
+          <GoogleSpinner size={64} className="mx-auto" />
           <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Loading timetable variants…</p>
         </div>
       </div>
@@ -875,7 +873,7 @@ export default function TimetableReviewPage() {
                     <div className="mt-auto flex gap-2">
                       {isLoading ? (
                         <div className="flex-1 flex items-center justify-center py-2">
-                          <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                          <GoogleSpinner size={16} />
                         </div>
                       ) : (
                         <>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const TIME_SLOTS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00']
@@ -95,7 +96,7 @@ export default function StudentTimetable() {
       <DashboardLayout role="student">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <GoogleSpinner size={32} className="mx-auto mb-4" />
             <p className="text-gray-600 dark:text-gray-400">Loading schedule...</p>
           </div>
         </div>
