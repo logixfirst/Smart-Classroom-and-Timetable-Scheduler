@@ -37,7 +37,8 @@ class GeneticAlgorithmOptimizer:
         mutation_rate: float = 0.15,
         crossover_rate: float = 0.7,
         elitism_rate: float = 0.2,
-        fitness_weights: Dict = None
+        fitness_weights: Dict = None,
+        progress_callback=None
     ):
         self.courses = courses
         self.rooms = rooms
@@ -47,12 +48,14 @@ class GeneticAlgorithmOptimizer:
         self.initial_solution = initial_solution
         
         # HARD CAPS (following MNC best practices)
-        self.population_size = min(population_size, 20)  # Cap at 20
-        self.generations = min(generations, 25)  # Cap at 25 for production
+        self.population_size = min(population_size, 25)  # Cap at 25
+        self.generations = min(generations, 35)  # Cap at 35 for production
         self.mutation_rate = mutation_rate
         self.crossover_rate = crossover_rate
         self.elitism_rate = elitism_rate
         self.fitness_weights = fitness_weights  # None = use evaluate_fitness_simple defaults
+        # Optional callable(generation: int, total: int, best_fitness: float) for SSE progress ticks
+        self.progress_callback = progress_callback
         
         logger.info(f"[GA] CPU-only mode: pop={self.population_size}, gen={self.generations}")
     
@@ -92,6 +95,13 @@ class GeneticAlgorithmOptimizer:
                 best_fitness = fitness_scores[max_idx]
                 best_solution = copy.deepcopy(population[max_idx])
                 logger.info(f"[GA] Gen {generation+1}: fitness={best_fitness:.2f}")
+            
+            # Emit per-generation progress tick (feeds SSE stream)
+            if self.progress_callback is not None:
+                try:
+                    self.progress_callback(generation + 1, self.generations, best_fitness)
+                except Exception:
+                    pass  # Never let callback failure abort GA
             
             # Build next generation
             population = self._evolve_generation(population, fitness_scores)

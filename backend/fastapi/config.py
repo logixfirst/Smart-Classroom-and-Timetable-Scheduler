@@ -51,8 +51,8 @@ class Settings:
     CPSAT_NUM_WORKERS: int = 1  # Auto-adjusted by hardware detector
 
     # Stage 2B: Genetic Algorithm (OPTIMIZED for base hardware)
-    GA_POPULATION_SIZE: int = 15  # Reduced from 30 (50% faster)
-    GA_GENERATIONS: int = 25  # Reduced from 50 (50% faster)
+    GA_POPULATION_SIZE: int = 20  # Increased from 15 — more seed diversity
+    GA_GENERATIONS: int = 30  # Increased from 25 — better convergence across seeds
     GA_MUTATION_RATE: float = 0.20  # Increased for faster exploration
     GA_CROSSOVER_RATE: float = 0.8
     GA_ELITISM_RATE: float = 0.20  # Keep more good solutions

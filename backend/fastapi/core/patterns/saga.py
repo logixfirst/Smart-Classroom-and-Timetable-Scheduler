@@ -627,12 +627,43 @@ class TimetableGenerationSaga:
             },
         ]
 
+        from config import settings as _ga_settings
+        _ga_pop = _ga_settings.GA_POPULATION_SIZE
+        _ga_gens = _ga_settings.GA_GENERATIONS
+        _ga_total_ticks = NUM_VARIANTS * _ga_gens  # total generation ticks across all variants
+        _ga_ticks_done = 0  # running counter for smooth progress 75%→90%
+
         for variant_idx in range(NUM_VARIANTS):
             try:
                 # Use a different random seed per variant for diversity
                 config = VARIANT_CONFIGS[variant_idx]
                 variant_seed = config['seed']
                 random.seed(variant_seed)
+
+                # Closure captures mutable counter via list wrapper
+                _ticks_ref = [_ga_ticks_done]
+
+                def _ga_progress_callback(gen: int, total_gens: int, best_fitness: float,
+                                          _ref=_ticks_ref, _tracker=tracker,
+                                          _total=_ga_total_ticks, _job_id=job_id):
+                    """Emit one SSE progress tick per GA generation (75%→90% range)."""
+                    _ref[0] += 1
+                    if _tracker is None:
+                        return
+                    # Map ticks into the GA stage's 75-90% window
+                    ga_start, ga_end = 75.0, 90.0
+                    fraction = min(_ref[0] / max(_total, 1), 1.0)
+                    overall = ga_start + fraction * (ga_end - ga_start)
+                    try:
+                        _tracker.update(
+                            stage='ga_optimization',
+                            stage_progress=round(fraction * 100, 1),
+                            overall_progress=round(overall, 2),
+                            meta={'variant': variant_idx + 1, 'generation': gen,
+                                  'best_fitness': round(best_fitness, 2)}
+                        )
+                    except Exception:
+                        pass  # Non-fatal
 
                 optimizer = GeneticAlgorithmOptimizer(
                     courses=data['courses'],
@@ -641,9 +672,10 @@ class TimetableGenerationSaga:
                     faculty=data['faculty'],
                     students=data['students'],
                     initial_solution=copy.deepcopy(initial_solution),
-                    population_size=15,
-                    generations=20,
-                    fitness_weights=config['weights']
+                    population_size=_ga_pop,
+                    generations=_ga_gens,
+                    fitness_weights=config['weights'],
+                    progress_callback=_ga_progress_callback
                 )
 
                 optimized = optimizer.optimize()
@@ -662,6 +694,9 @@ class TimetableGenerationSaga:
                 if fitness > best_fitness:
                     best_fitness = fitness
                     best_solution = optimized
+
+                # Advance the shared tick counter for the next variant
+                _ga_ticks_done = _ticks_ref[0]
 
                 logger.info(
                     f"[SAGA] GA variant {variant_idx + 1}/{NUM_VARIANTS} "
