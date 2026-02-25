@@ -207,23 +207,37 @@ class TimetableVariantViewSet(viewsets.ViewSet):
             job = GenerationJob.objects.only('id', 'organization_id', 'created_at', 'timetable_data').get(id=job_id)
             variants = (job.timetable_data or {}).get('variants', [])
             
-            # Minimal response - NO entry processing
-            result = [{
-                'id': f"{job_id}-variant-{idx+1}",
-                'job_id': str(job_id),
-                'variant_number': idx + 1,
-                'organization_id': str(job.organization_id),
-                'timetable_entries': [],  # Empty - load on demand
-                'statistics': {
-                    'total_classes': len(v.get('timetable_entries', [])),
-                    'total_conflicts': v.get('conflicts', 0)
-                },
-                'quality_metrics': {
-                    'overall_score': v.get('score', 0),
-                    'total_conflicts': v.get('conflicts', 0)
-                },
-                'generated_at': job.created_at.isoformat()
-            } for idx, v in enumerate(variants)]
+            result = []
+            for idx, v in enumerate(variants):
+                # Support both old format (fitness only) and new format (enriched)
+                # New format has 'score' (0-100 %), 'conflicts', 'room_utilization',
+                # 'quality_metrics', 'statistics' — all computed by FastAPI.
+                qm  = v.get('quality_metrics', {})
+                sta = v.get('statistics', {})
+
+                # Scores — prefer pre-computed blocks, fall back to top-level fields
+                overall_score  = qm.get('overall_score',          v.get('score',            0))
+                total_conflicts = qm.get('total_conflicts',        v.get('conflicts',         0))
+                room_util      = qm.get('room_utilization_score',  v.get('room_utilization',  0))
+                total_classes  = sta.get('total_classes',          len(v.get('timetable_entries', [])))
+
+                result.append({
+                    'id':              f"{job_id}-variant-{idx+1}",
+                    'job_id':          str(job_id),
+                    'variant_number':  idx + 1,
+                    'organization_id': str(job.organization_id),
+                    'timetable_entries': [],  # Empty - load on demand via /entries/
+                    'statistics': {
+                        'total_classes':   total_classes,
+                        'total_conflicts': total_conflicts,
+                    },
+                    'quality_metrics': {
+                        'overall_score':           overall_score,
+                        'total_conflicts':         total_conflicts,
+                        'room_utilization_score':  room_util,
+                    },
+                    'generated_at': job.created_at.isoformat(),
+                })
             
             cache.set(cache_key, result, 300)  # 5 min
             return Response(result)

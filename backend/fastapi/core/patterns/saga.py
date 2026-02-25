@@ -829,43 +829,124 @@ class TimetableGenerationSaga:
                     f"Saving would produce a severely incomplete timetable."
                 )
 
+        # ------------------------------------------------------------------
+        # Build per-variant metrics so Django's TimetableVariantViewSet.list()
+        # can return real numbers to the frontend.
+        #
+        # Broken chain before this fix:
+        #   FastAPI stored {variant_id, label, fitness}
+        #   Django reads   v.get('score', 0)          → 0  (field named 'fitness')
+        #                  v.get('conflicts', 0)       → 0  (field missing)
+        #                  len(v['timetable_entries']) → 0  (field missing)
+        #   Frontend shows Overall Score 0%, Conflicts 0, Total Classes 0
+        # ------------------------------------------------------------------
+        _max_fitness = max((v['fitness'] for v in variants), default=1.0) or 1.0
+        _total_rooms = max(len(rooms_by_id), 1)
+
+        def _build_variant_payload(v: dict) -> dict:
+            """Convert one GA variant → DB-ready dict with correct field names."""
+            sol = v.get('solution', {})
+
+            # ── Convert solution → entry list ────────────────────────────
+            v_entries: list = []
+            faculty_slot_usage: dict = {}   # (faculty_id, t_slot_id) → course_code
+            room_slot_usage: dict = {}      # (room_id,    t_slot_id) → course_code
+            rooms_used: set = set()
+            conflicts: int = 0
+
+            for _k, _val in sol.items():
+                try:
+                    (c_id, _sess) = _k
+                    (t_sid, r_id) = _val
+                except (TypeError, ValueError):
+                    continue
+                if t_sid == _GREEDY_FALLBACK_SENTINEL:
+                    continue
+
+                course = courses_by_id.get(c_id)
+                slot   = slot_by_id.get(str(t_sid))
+                room   = rooms_by_id.get(r_id)
+                if not (course and slot and room):
+                    continue
+
+                # Count faculty conflicts
+                fac_key = (getattr(course, 'faculty_id', ''), str(t_sid))
+                if fac_key[0]:
+                    if fac_key in faculty_slot_usage:
+                        conflicts += 1
+                    faculty_slot_usage[fac_key] = c_id
+
+                # Count room conflicts
+                room_key = (r_id, str(t_sid))
+                if room_key in room_slot_usage:
+                    conflicts += 1
+                room_slot_usage[room_key] = c_id
+                rooms_used.add(r_id)
+
+                v_entries.append({
+                    'course_code':  getattr(course, 'course_code', ''),
+                    'subject_name': getattr(course, 'course_name', ''),
+                    'faculty_id':   getattr(course, 'faculty_id', ''),
+                    'room_id':      r_id,
+                    'room_code':    getattr(room, 'room_code', ''),
+                    'time_slot_id': str(t_sid),
+                    'day':          slot.day,
+                    'start_time':   slot.start_time,
+                    'end_time':     slot.end_time,
+                })
+
+            # Normalise fitness to 0–100 relative to best variant in this run
+            score_pct = round((v['fitness'] / _max_fitness) * 100, 1)
+            room_util = round((len(rooms_used) / _total_rooms) * 100, 1)
+
+            return {
+                # Field names Django reads
+                'variant_id':        v['variant_id'],
+                'label':             v.get('label', ''),
+                'score':             score_pct,          # was: fitness (wrong name)
+                'fitness':           v['fitness'],       # keep raw for debugging
+                'conflicts':         conflicts,          # was: missing
+                'timetable_entries': v_entries,          # was: missing → total_classes=0
+                'room_utilization':  room_util,
+                # Quality metrics block (matches Django quality_metrics field names)
+                'quality_metrics': {
+                    'overall_score':            score_pct,
+                    'total_conflicts':          conflicts,
+                    'room_utilization_score':   room_util,
+                },
+                'statistics': {
+                    'total_classes':    len(v_entries),
+                    'total_conflicts':  conflicts,
+                },
+            }
+
+        enriched_variants = [_build_variant_payload(v) for v in variants]
+
         # Build the full result payload
         result_payload = {
             'timetable_entries': timetable_entries,
             'total_sessions_scheduled': len(timetable_entries),
             'total_courses': len(courses_by_id),
-            'variants_count': len(variants),
-            'variants': [
-                {
-                    'variant_id': v['variant_id'],
-                    'label': v['label'],
-                    'fitness': v['fitness'],
-                }
-                for v in variants
-            ],
+            'variants_count': len(enriched_variants),
+            'variants': enriched_variants,
             'generated_at': datetime.now(timezone.utc).isoformat(),
         }
 
         # ------------------------------------------------------------------
         # Step 2: Store all variants in Redis (for /api/variants/{job_id})
+        # enriched_variants already has correct field names + computed metrics;
+        # strip timetable_entries before Redis to keep the key size small
+        # (entries are already persisted to DB via timetable_data).
         # ------------------------------------------------------------------
         if self.redis_client:
             try:
-                # Strip raw solution dicts (contain tuple keys not serialisable
-                # as JSON) — the timetable has already been built from them.
-                serialisable_variants = [
-                    {
-                        'variant_id': v['variant_id'],
-                        'seed': v.get('seed'),
-                        'fitness': v['fitness'],
-                        'label': v.get('label', ''),
-                        'weights': v.get('weights', {}),
-                    }
-                    for v in variants
+                redis_variants = [
+                    {k: v2 for k, v2 in ev.items() if k != 'timetable_entries'}
+                    for ev in enriched_variants
                 ]
                 redis_result = {
                     'timetable': result_payload,
-                    'variants': serialisable_variants,
+                    'variants': redis_variants,
                     'metadata': {
                         'job_id': job_id,
                         'org_id': data.get('organization_id'),
@@ -878,7 +959,7 @@ class TimetableGenerationSaga:
                     3600 * 24,  # 24h TTL
                     json.dumps(redis_result, default=str)
                 )
-                logger.info(f"[SAGA-PERSIST] Stored {len(variants)} variants in Redis")
+                logger.info(f"[SAGA-PERSIST] Stored {len(enriched_variants)} variants in Redis")
             except Exception as redis_err:
                 logger.error(f"[SAGA-PERSIST] Redis store failed: {redis_err}")
 
