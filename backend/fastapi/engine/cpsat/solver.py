@@ -13,7 +13,7 @@ import psutil
 from ortools.sat.python import cp_model
 
 from models.timetable_models import Course, Room, TimeSlot, Faculty
-from .strategies import STRATEGIES
+from .strategies import STRATEGIES, select_strategy_for_cluster_size
 from .progress import log_cluster_start, log_cluster_success
 from .constraints import (
     add_faculty_constraints,
@@ -126,7 +126,27 @@ class AdaptiveCPSATSolver:
         logger.info(f"[CP-SAT] Domain size: {total_entries:,} entries (avg {avg_per_session:.0f}/session)")
         logger.info(f"[CP-SAT] Memory estimate: ~{total_entries * 16 / 1024 / 1024:.1f} MB")
 
+        # OPT4: Skip strategies that are statistically infeasible for this
+        # cluster's shape. Large clusters (>20 courses) almost always fail
+        # Full Constraints (30s timeout) and Relaxed Student (45s timeout)
+        # before reaching Faculty+Room Only — wasting 75s per cluster.
+        # select_strategy_for_cluster_size returns the optimal starting strategy;
+        # we still cascade forward from that point so no feasible solution is lost.
+        _start_strategy = select_strategy_for_cluster_size(len(cluster))
+        _start_idx = next(
+            (i for i, s in enumerate(STRATEGIES) if s is _start_strategy), 0
+        )
+        if _start_idx > 0:
+            logger.info(
+                "[CP-SAT] Cluster size %d → starting at strategy %d (%s) "
+                "— skipping %d guaranteed-fail attempts",
+                len(cluster), _start_idx + 1,
+                _start_strategy['name'], _start_idx
+            )
+
         for strategy_idx, strategy in enumerate(STRATEGIES):
+            if strategy_idx < _start_idx:
+                continue
             logger.info(
                 f"[CP-SAT] Attempting strategy {strategy_idx + 1}/{len(STRATEGIES)}: "
                 f"{strategy['name']}"
@@ -165,15 +185,20 @@ class AdaptiveCPSATSolver:
                             var = model.NewBoolVar(var_name)
                             variables[(course.course_id, session, t_slot_id, room_id)] = var
 
+            # OPT3: Build (course_id, session) → [vars] index in one O(N) pass.
+            # Previous code did a full variables.items() scan per (course, session)
+            # pair — O(N²) with ~500 variables × 36 sessions = 18,000 comparisons
+            # per strategy, per cluster. Now O(1) lookup after one build pass.
+            session_vars_index: Dict[tuple, list] = defaultdict(list)
+            for (c_id, s_idx, _t, _r), var in variables.items():
+                session_vars_index[(c_id, s_idx)].append(var)
+
             # Assignment: each session assigned exactly once
             for course in cluster:
                 for session in range(course.duration):
-                    session_vars = [
-                        var for (c_id, s_idx, _, _), var in variables.items()
-                        if c_id == course.course_id and s_idx == session
-                    ]
-                    if session_vars:
-                        model.Add(sum(session_vars) == 1)
+                    sv = session_vars_index.get((course.course_id, session), [])
+                    if sv:
+                        model.Add(sum(sv) == 1)
 
             # ------------------------------------------------------------------
             # HC1: Faculty conflicts

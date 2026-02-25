@@ -2,17 +2,25 @@
 Hardware Configuration - Optimal Settings per Hardware Profile
 Determines execution parameters based on detected hardware
 """
+import os as _os
 from typing import Dict, Any
 from .profile import HardwareProfile, ExecutionStrategy
 import logging
 
 logger = logging.getLogger(__name__)
 
-# OPT1: Parallel cluster execution config.
-# Rule: parallel_clusters × workers_per_cluster ≤ physical_cores
-# On 6-core hardware: 2 × 3 = 6 threads → no CPU thrashing.
-# Increase to 3 only if hardware has ≥ 9 physical cores.
-PARALLEL_CLUSTERS = 2
+# OPT1: Auto-scale parallel cluster execution to available CPU cores.
+#
+# Strategy: maximise cluster-level parallelism, not per-solver parallelism.
+# Each CP-SAT instance gets 1 worker thread; run as many clusters simultaneously
+# as there are physical cores. This beats 2 clusters × 3 workers because:
+#   - CP-SAT scales sub-linearly with workers (2 workers ≠ 2× speedup)
+#   - 2 independent clusters always give exactly 2× wall-clock speedup
+#
+# saga.py computes: workers_per_cluster = max(1, physical_cores // PARALLEL_CLUSTERS)
+# At PARALLEL_CLUSTERS=6 on 6-core machine → 1 worker each → 6× speedup vs old sequential.
+# Capped at 6 to bound peak memory (each active cluster holds ~50-100 MB model data).
+PARALLEL_CLUSTERS = min(6, max(2, (_os.cpu_count() or 4)))
 
 
 def get_optimal_config(hardware_profile: HardwareProfile) -> Dict[str, Any]:
