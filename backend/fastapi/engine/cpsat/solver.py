@@ -22,6 +22,7 @@ from .constraints import (
     add_workload_constraints,
     add_max_sessions_per_day_constraints,
     add_fixed_slot_constraints,
+    build_student_course_index,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,8 @@ class AdaptiveCPSATSolver:
         completed_clusters: int = 0,
         global_student_schedule: Dict[str, List[Tuple[int, int]]] = None,
         max_sessions_per_day: int = 2,
+        student_course_index: Dict[str, set] = None,
+        num_workers: int = None,
     ):
         self.courses = courses
         self.rooms = rooms
@@ -68,15 +71,23 @@ class AdaptiveCPSATSolver:
         self.completed_clusters = completed_clusters
         self.global_student_schedule = global_student_schedule or {}
         self.max_sessions_per_day = max_sessions_per_day
+        # OPT2: precomputed global index passed in from saga — avoids per-cluster rebuild.
+        # If None, falls back to per-cluster construction below (safe degradation).
+        self.student_course_index = student_course_index
 
         # Pre-build slot lookup (str → TimeSlot) used by MISS 6 constraint
         self.slot_by_id: Dict[str, TimeSlot] = {
             str(ts.slot_id): ts for ts in time_slots
         }
 
-        # Auto-detect CPU cores
+        # OPT1: accept explicit worker count for parallel execution (saga controls
+        # total thread budget: parallel_clusters × workers_per_cluster ≤ physical_cores).
+        # If None (sequential / direct call), auto-detect and cap at 8.
         import multiprocessing
-        self.num_workers = min(8, multiprocessing.cpu_count())
+        if num_workers is not None:
+            self.num_workers = max(1, num_workers)
+        else:
+            self.num_workers = min(8, multiprocessing.cpu_count())
         logger.info(f"[CP-SAT] Using {self.num_workers} CPU cores")
 
     def solve_cluster(self, cluster: List[Course], timeout: float = None) -> Optional[Dict]:
@@ -95,10 +106,17 @@ class AdaptiveCPSATSolver:
         # STEP 1: Build global indexes (O(N) once)
         self.course_by_id = {c.course_id: c for c in cluster}
         self.faculty_of_course = {c.course_id: c.faculty_id for c in cluster}
-        self.students_of_course = {
-            c.course_id: set(c.student_ids) if hasattr(c, 'student_ids') else set()
-            for c in cluster
-        }
+        # OPT2: use precomputed global index if available; otherwise build per-cluster.
+        if self.student_course_index is not None:
+            self.students_of_course = {
+                c.course_id: self.student_course_index.get(c.course_id, set())
+                for c in cluster
+            }
+        else:
+            self.students_of_course = {
+                c.course_id: set(c.student_ids) if hasattr(c, 'student_ids') else set()
+                for c in cluster
+            }
         logger.info(f"[CP-SAT] Built indexes for {len(cluster)} courses")
 
         # STEP 2: Precompute valid domains
@@ -187,7 +205,9 @@ class AdaptiveCPSATSolver:
             # ------------------------------------------------------------------
             student_priority = strategy.get('student_priority', 'ALL')
             add_student_constraints(
-                model, variables, cluster, student_priority, self.students_of_course
+                model, variables, cluster, student_priority,
+                self.students_of_course,
+                student_course_index=self.student_course_index,
             )
 
             # ------------------------------------------------------------------

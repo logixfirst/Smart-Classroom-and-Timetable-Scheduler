@@ -359,4 +359,45 @@
       background-position: -200% 0;
     }
   }
+
+}
+
+/* =============================================================================
+   Microsoft Fluent / WinUI Progress Bar Animations
+   OUTSIDE @layer — keyframe names resolve globally and are accessible from
+   React inline-style "animation:" properties on the JSX span elements.
+   (Pseudo-element approach removed; real <span> children used instead.)
+============================================================================= */
+
+/* Sweeping white highlight beam — the signature WinUI left-to-right shine */
+@keyframes progress-shine {
+  0%   { transform: translateX(-120%) skewX(-15deg); opacity: 0; }
+  15%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translateX(360%) skewX(-15deg); opacity: 0; }
+}
+
+/* Comet-tip pulse — glowing leading edge.
+   Uses filter:drop-shadow NOT box-shadow because overflow:hidden clips
+   box-shadow ink overflow.  filter:drop-shadow is NOT clipped — it is
+   applied AFTER the element is painted, outside the overflow boundary.  */
+@keyframes progress-comet-pulse {
+  0%, 100% {
+    opacity: 0.8;
+    filter: drop-shadow(0 0 3px rgba(255,255,255,0.6)) drop-shadow(0 0 6px rgba(255,255,255,0.4));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(255,255,255,0.95)) drop-shadow(0 0 12px rgba(255,255,255,0.7)) drop-shadow(0 0 20px rgba(255,255,255,0.4));
+  }
+}
+
+/* Gentle opacity breathe — signals active computation.
+   IMPORTANT: We use opacity (not filter:brightness) because filter on the
+   fill div creates a GPU compositing layer which breaks the overflow:hidden
+   clipping of the child shine span's translateX animation in Chrome/Safari.
+   Opacity does NOT create a compositing layer by itself (unless GPU-hinted). */
+@keyframes progress-fill-breathe {
+  0%, 100% { opacity: 0.92; }
+  50%       { opacity: 1; }
 }

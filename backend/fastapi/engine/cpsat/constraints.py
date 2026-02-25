@@ -12,6 +12,37 @@ from models.timetable_models import Course
 logger = logging.getLogger(__name__)
 
 
+def build_student_course_index(courses: List[Course]) -> Dict[str, set]:
+    """
+    Precompute {course_id: set(student_ids)} for ALL courses ONCE.
+
+    OPT2: Called once before the 216-cluster loop in saga.py.
+    Eliminates per-cluster rebuild of the same mapping from Course.student_ids.
+    Each cluster then slices its own courses from this shared index in O(1).
+
+    Args:
+        courses: All courses loaded for this generation job (all clusters).
+
+    Returns:
+        Dict mapping course_id → frozenset of student IDs enrolled.
+        Pure function — no DB calls, no side effects, independently testable.
+
+    Safe degradation: returns empty dict on any error so callers fall back
+    to per-cluster construction without crashing.
+    """
+    try:
+        return {
+            c.course_id: set(c.student_ids) if getattr(c, 'student_ids', None) else set()
+            for c in courses
+        }
+    except Exception as e:
+        logger.warning(
+            "[Constraints] build_student_course_index failed — falling back to per-cluster build",
+            extra={"error": str(e)},
+        )
+        return {}
+
+
 def add_faculty_constraints(
     model: cp_model.CpModel,
     variables: Dict,
@@ -129,7 +160,8 @@ def add_student_constraints(
     variables: Dict,
     cluster: List[Course],
     student_priority: str = "ALL",
-    students_of_course: Dict[str, set] = None
+    students_of_course: Dict[str, set] = None,
+    student_course_index: Dict[str, set] = None,
 ) -> int:
     """
     Add student conflict constraints (HC4).
@@ -147,12 +179,19 @@ def add_student_constraints(
             "ALL"      → constrain every student (default, correct)
             "CRITICAL" → only students enrolled in 5+ courses this cluster
             "NONE"     → skip (emergency performance mode only)
+        student_course_index:
+            OPT2: Global {course_id: set(student_ids)} precomputed once
+            before the 216-cluster loop. If provided, used in preference
+            to students_of_course (same data, no per-cluster rebuild).
+            If None → falls back to students_of_course (safe degradation).
 
     Returns:
         Number of constraints added
     """
     try:
-        students_of_course = students_of_course or {}
+        # OPT2: use precomputed global index when available; fall back to
+        # per-cluster dict so behaviour is identical if index is absent.
+        students_of_course = student_course_index if student_course_index is not None else (students_of_course or {})
 
         if student_priority == "NONE":
             logger.warning("[Constraints] Student constraints DISABLED (NONE mode)")

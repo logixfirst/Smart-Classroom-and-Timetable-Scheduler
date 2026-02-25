@@ -49,11 +49,12 @@ class ApiClient {
           // Retry original request after refresh
           return this.request<T>(endpoint, options);
         }
-        // Refresh failed, redirect to login using Next.js router
+        // Refresh failed — redirect to login.
+        // NOTE: useRouter() is a React hook and MUST NOT be called outside a
+        // component or custom hook. Use window.location for imperative redirects
+        // from non-React contexts such as this class method.
         if (typeof window !== 'undefined') {
-          const { useRouter } = await import('next/navigation');
-          const router = useRouter();
-          router.push('/auth/signin');
+          window.location.href = '/auth/signin';
         }
       }
 

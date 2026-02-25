@@ -30,7 +30,17 @@ def setup_logging():
     log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
     
     # Create console handler with UTF-8 encoding support
-    console_handler = logging.StreamHandler(sys.stdout)
+    # On Windows the default stdout codec is cp1252, which cannot encode
+    # emoji or other non-BMP characters.  Force UTF-8 so log messages that
+    # contain emojis (e.g. the startup banner) don't raise UnicodeEncodeError.
+    import io
+    utf8_stdout = io.TextIOWrapper(
+        sys.stdout.buffer if hasattr(sys.stdout, 'buffer') else sys.stdout,
+        encoding='utf-8',
+        errors='replace',  # replace un-encodable chars with ? instead of crashing
+        line_buffering=True,
+    )
+    console_handler = logging.StreamHandler(utf8_stdout)
     console_handler.setFormatter(logging.Formatter(log_format))
     
     # Create file handler with UTF-8 encoding

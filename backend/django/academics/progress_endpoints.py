@@ -17,11 +17,40 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
+from rest_framework.request import Request as DRFRequest
+from rest_framework.parsers import JSONParser
 from rest_framework.response import Response
 from rest_framework import status
 import redis
 
 logger = logging.getLogger(__name__)
+
+
+def _authenticate_plain_request(django_request):
+    """
+    Authenticate a plain Django view request using DRF's JWTCookieAuthentication.
+
+    Plain Django views (decorated with @csrf_exempt / @require_http_methods) are
+    NOT processed by DRF's authentication pipeline, so request.user is always
+    AnonymousUser even after a successful JWT login.  This helper wraps the
+    Django request in a DRF Request and runs the cookie authenticator explicitly.
+
+    Returns the authenticated User instance, or None if unauthenticated.
+    """
+    from core.authentication import JWTCookieAuthentication
+    drf_request = DRFRequest(django_request, parsers=[JSONParser()])
+    try:
+        result = JWTCookieAuthentication().authenticate(drf_request)
+    except Exception as auth_err:  # InvalidToken, AuthenticationFailed, etc.
+        logger.warning(
+            "[SSE] JWT authentication error",
+            extra={"error": str(auth_err)},
+        )
+        return None
+    if result is None:
+        return None
+    user, _token = result
+    return user
 
 
 def _get_redis_client() -> redis.Redis:
@@ -150,7 +179,9 @@ def _db_progress_snapshot(job_id: str) -> dict | None:
         }
     except Exception as db_err:
         logger.warning(f"[SSE] DB snapshot failed for job {job_id}: {db_err}")
-        return None
+        # Raise so callers can distinguish transient DB failure from a
+        # genuinely missing job (which returns None above).
+        raise
 
 
 @csrf_exempt
@@ -173,20 +204,34 @@ def stream_progress(request, job_id):
     hasn't been written yet.  The "Connecting..." spinner will resolve
     within DB_POLL_INTERVAL seconds in the worst case.
     """
-    # Authentication guard
-    if not request.user.is_authenticated:
+    # Authentication guard — plain Django views bypass DRF's authentication
+    # pipeline, so request.user is always AnonymousUser here.  We explicitly
+    # run JWTCookieAuthentication to validate the HttpOnly access_token cookie.
+    auth_user = _authenticate_plain_request(request)
+    if auth_user is None:
+        logger.warning(
+            "[SSE] Unauthenticated SSE request rejected",
+            extra={"job_id": job_id, "ip": request.META.get("REMOTE_ADDR")},
+        )
         return HttpResponse(status=401)
 
     # Ownership guard — job must belong to the authenticated user's org
     try:
         from academics.models import GenerationJob
         _job = GenerationJob.objects.only('organization_id').get(id=job_id)
-        if str(_job.organization_id) != str(getattr(request.user, 'organization_id', None)):
+        if str(_job.organization_id) != str(getattr(auth_user, 'organization_id', None)):
+            logger.warning(
+                "[SSE] Org mismatch — access denied",
+                extra={"job_id": job_id, "user_id": str(auth_user.id)},
+            )
             return HttpResponse(status=403)
     except GenerationJob.DoesNotExist:
         return HttpResponse(status=404)
-    except Exception:
-        pass  # Malformed UUID or DB error — let event_stream handle gracefully
+    except Exception as guard_err:
+        logger.warning(
+            "[SSE] Ownership check error — proceeding",
+            extra={"job_id": job_id, "error": str(guard_err)},
+        )
 
     def event_stream():
         MAX_REDIS_RECONNECTS = 5
@@ -264,6 +309,11 @@ def stream_progress(request, job_id):
                         yield f'event: progress\ndata: {redis_data}\n\n'
                         last_redis_data = redis_data
                         last_db_snapshot = None  # reset so DB doesn't re-emit stale data
+                        logger.info(
+                            f'[SSE] Redis hit emitted for job {job_id}: '
+                            f'status={progress_obj.get("status")} '
+                            f'progress={progress_obj.get("overall_progress")}%'
+                        )
 
                         if progress_obj.get('status') in TERMINAL:
                             yield (
@@ -280,10 +330,17 @@ def stream_progress(request, job_id):
                 now = time.time()
                 if now - last_db_check >= DB_POLL_INTERVAL:
                     last_db_check = now
-                    snapshot = _db_progress_snapshot(job_id)
+                    try:
+                        snapshot = _db_progress_snapshot(job_id)
+                    except Exception:
+                        # Transient DB connection failure (e.g. Neon SSL reset).
+                        # Do NOT close the stream — Redis or DB may recover on
+                        # the next tick.
+                        time.sleep(REDIS_POLL_INTERVAL)
+                        continue
 
                     if snapshot is None:
-                        # Job doesn't exist at all
+                        # Job genuinely doesn't exist at all
                         logger.warning(
                             f'[SSE] Job {job_id} not found in DB — closing stream'
                         )

@@ -37,9 +37,10 @@ def generate_timetable_task(self, job_id, org_id, academic_year, semester):
             logger.warning(f"Insufficient resources, retrying job {job_id}")
             raise self.retry(countdown=60, max_retries=3)
         
-        # Update job status
-        job.status = 'queued'
-        job.save()
+        # NOTE: job.status is already 'running' (set by generate view before queuing
+        # the Celery task). Do NOT overwrite it with 'queued' here — that creates a
+        # race condition where the SSE DB fallback streams status='queued' for up to
+        # 34 seconds while FastAPI is already receiving and processing the job.
         
         # Call FastAPI (fire-and-forget - FastAPI returns immediately)
         fastapi_url = getattr(settings, 'FASTAPI_URL', 'http://localhost:8001')
@@ -116,8 +117,23 @@ def generate_timetable_task(self, job_id, org_id, academic_year, semester):
             return {'status': 'timeout_but_may_be_running', 'job_id': job_id}
 
         except requests.exceptions.ConnectionError:
-            logger.error(f"[CELERY] Cannot connect to FastAPI for job {job_id}")
-            raise Exception("FastAPI service unavailable. Check if FastAPI is running.")
+            # ConnectionError can fire if FastAPI accepted the POST but the HTTP
+            # transport was reset before it sent the response back (e.g. server
+            # briefly crashed and restarted, or the OS forcibly closed the socket).
+            # In that case FastAPI may already be running the generation saga and
+            # writing progress to Redis.  Mirror the Timeout handling: leave the
+            # job as 'running' so the FastAPI → Celery completion callback can
+            # correctly update it, rather than prematurely marking it failed.
+            logger.warning(
+                f"[CELERY] FastAPI connection reset for job {job_id}. "
+                f"Generation may already be running inside FastAPI — leaving job "
+                f"status as 'running' so the completion callback can update it."
+            )
+            if job:
+                job.status = 'running'
+                job.error_message = None
+                job.save(update_fields=['status', 'error_message'])
+            return {'status': 'connection_reset_but_may_be_running', 'job_id': job_id}
             
     except Exception as e:
         logger.error(f"[CELERY] Job {job_id} failed: {str(e)}")

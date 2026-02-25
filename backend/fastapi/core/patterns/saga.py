@@ -43,6 +43,9 @@ to ensure schedule consistency."
 """
 import logging
 import asyncio
+import os
+import psutil
+from concurrent.futures import ProcessPoolExecutor
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
 
@@ -57,6 +60,52 @@ from core.cancellation import (
 from utils.progress_tracker import ProgressTracker
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# OPT1: Top-level worker for ProcessPoolExecutor.
+# MUST be module-level (not a method) so Python's pickle can find it.
+#
+# Intentionally excluded (not picklable / belong in main process):
+#   redis_client  — progress and cancellation handled in main async loop
+#   tracker       — same
+#   token         — same
+#   job_id        — not needed inside subprocess
+# ---------------------------------------------------------------------------
+def _solve_cluster_worker(
+    cluster_id: int,
+    cluster,
+    rooms,
+    time_slots,
+    faculty,
+    student_course_index,
+    total_clusters: int,
+    num_workers: int,
+):
+    """
+    Run one CP-SAT cluster inside a subprocess.
+    Returns (cluster_id, solution_or_None, error_msg_or_None).
+    """
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
+    try:
+        from engine.cpsat.solver import AdaptiveCPSATSolver
+        solver = AdaptiveCPSATSolver(
+            courses=cluster,
+            rooms=rooms,
+            time_slots=time_slots,
+            faculty=faculty,
+            cluster_id=cluster_id,
+            total_clusters=total_clusters,
+            student_course_index=student_course_index,
+            num_workers=num_workers,  # OPT1: controlled thread budget per cluster
+            # redis_client intentionally omitted — not picklable
+        )
+        solution = solver.solve_cluster(cluster)
+        return (cluster_id, solution, None)
+    except Exception as exc:  # noqa: BLE001
+        import traceback
+        return (cluster_id, None, f"{exc}\n{traceback.format_exc()}")
 
 
 class TimetableGenerationSaga:
@@ -324,47 +373,192 @@ class TimetableGenerationSaga:
         ✅ DESIGN FREEZE: Deterministic, provably correct
         """
         from engine.cpsat.solver import AdaptiveCPSATSolver
-        
+        from engine.cpsat.constraints import build_student_course_index
+
         if not clusters:
             logger.warning("[SAGA] No clusters to solve - returning empty solution")
             return {}
-        
-        solution = {}
-        
-        for cluster_id, cluster in enumerate(clusters):
-            # Check cancellation BETWEEN clusters (safe point)
-            token.check_or_raise(f"cpsat_cluster_{cluster_id}")
-            
-            logger.info(f"[SAGA] Solving cluster {cluster_id+1}/{len(clusters)}...")
 
-            solver = AdaptiveCPSATSolver(
-                courses=cluster,
-                rooms=data['rooms'],
-                time_slots=data['time_slots'],
-                faculty=data['faculty'],
-                job_id=job_id,
-                redis_client=self.redis_client,
-                cluster_id=cluster_id,
-                total_clusters=len(clusters)
+        # OPT2: precompute {course_id: set(student_ids)} ONCE for all 2494 courses.
+        # Each cluster solver slices its own courses from this shared index,
+        # eliminating 216 redundant per-cluster set() constructions.
+        all_courses = data.get('courses', [])
+        student_course_index = build_student_course_index(all_courses)
+        logger.info(
+            f"[SAGA] Precomputed student-course index: {len(student_course_index)} courses"
+        )
+
+        solution = {}
+        total_clusters_count = len(clusters)
+        completed_count = 0
+
+        # -----------------------------------------------------------------
+        # OPT1: Parallel cluster execution via ProcessPoolExecutor
+        #
+        # Thread budget rule: parallel_clusters × workers_per_cluster ≤ physical_cores
+        # On 6-core hardware: 2 × 3 = 6 threads → no CPU thrashing.
+        #
+        # Falls back to sequential if:
+        #   (a) available RAM < 2 GB
+        #   (b) ProcessPoolExecutor fails to start
+        # -----------------------------------------------------------------
+        from engine.hardware.config import PARALLEL_CLUSTERS
+
+        physical_cores = os.cpu_count() or 6
+        parallel_clusters = PARALLEL_CLUSTERS
+        workers_per_cluster = max(1, physical_cores // parallel_clusters)
+        available_ram_gb = psutil.virtual_memory().available / (1024 ** 3)
+
+        use_parallel = available_ram_gb >= 2.0
+        if not use_parallel:
+            logger.warning(
+                f"[SAGA] Available RAM {available_ram_gb:.1f} GB < 2 GB — "
+                f"falling back to sequential cluster solving"
+            )
+        else:
+            logger.info(
+                f"[SAGA-PARALLEL] {parallel_clusters} clusters × "
+                f"{workers_per_cluster} workers = "
+                f"{parallel_clusters * workers_per_cluster} threads "
+                f"on {physical_cores} physical cores"
             )
 
-            cluster_solution = solver.solve_cluster(cluster)
+        if use_parallel:
+            try:
+                loop = asyncio.get_running_loop()
+                with ProcessPoolExecutor(max_workers=parallel_clusters) as executor:
+                    # Submit all clusters at once; results come back as they finish.
+                    tasks = [
+                        loop.run_in_executor(
+                            executor,
+                            _solve_cluster_worker,
+                            cluster_id,
+                            cluster,
+                            data['rooms'],
+                            data['time_slots'],
+                            data['faculty'],
+                            student_course_index,
+                            total_clusters_count,
+                            workers_per_cluster,
+                        )
+                        for cluster_id, cluster in enumerate(clusters)
+                    ]
 
-            # Update progress AFTER solving so completed_items is accurate
-            # (cluster_id is 0-indexed; add 1 for completed count)
-            if tracker:
-                tracker.update_stage_progress(cluster_id + 1, len(clusters))
-            
-            if cluster_solution:
-                solution.update(cluster_solution)
-            else:
-                logger.warning(f"[SAGA] Cluster {cluster_id} failed - using greedy fallback")
-                for course in cluster:
-                    solution[course.course_id] = {
-                        'time_slot': 0,
-                        'room': data['rooms'][0].room_id if data['rooms'] else None
-                    }
-        
+                    for coro in asyncio.as_completed(tasks):
+                        try:
+                            result_cid, cluster_solution, error_msg = await coro
+                            completed_count += 1
+
+                            if error_msg:
+                                logger.error(
+                                    f"[SAGA-PARALLEL] Cluster {result_cid} error: "
+                                    f"{error_msg[:300]}"
+                                )
+                                # Error isolation: greedy fallback for this cluster
+                                for course in clusters[result_cid]:
+                                    solution[course.course_id] = {
+                                        'time_slot': 0,
+                                        'room': (
+                                            data['rooms'][0].room_id
+                                            if data['rooms'] else None
+                                        ),
+                                    }
+                            elif cluster_solution:
+                                solution.update(cluster_solution)
+                            else:
+                                logger.warning(
+                                    f"[SAGA-PARALLEL] Cluster {result_cid} returned "
+                                    f"no solution — applying greedy fallback"
+                                )
+                                for course in clusters[result_cid]:
+                                    solution[course.course_id] = {
+                                        'time_slot': 0,
+                                        'room': (
+                                            data['rooms'][0].room_id
+                                            if data['rooms'] else None
+                                        ),
+                                    }
+
+                            # Progress update after each cluster completes
+                            if tracker:
+                                tracker.update_stage_progress(
+                                    completed_count, total_clusters_count
+                                )
+
+                            # Cancellation check at each safe point
+                            token.check_or_raise(
+                                f"cpsat_cluster_{result_cid}_done"
+                            )
+
+                        except CancellationError:
+                            raise  # propagate to saga's outer handler
+                        except Exception as future_exc:
+                            completed_count += 1
+                            logger.error(
+                                f"[SAGA-PARALLEL] Future raised unexpectedly: "
+                                f"{future_exc}"
+                            )
+                            if tracker:
+                                tracker.update_stage_progress(
+                                    completed_count, total_clusters_count
+                                )
+
+            except CancellationError:
+                raise
+            except Exception as pool_exc:
+                logger.error(
+                    f"[SAGA-PARALLEL] ProcessPoolExecutor failed: {pool_exc} — "
+                    f"falling back to sequential"
+                )
+                # Reset state so the sequential block below starts clean
+                use_parallel = False
+                solution = {}
+                completed_count = 0
+
+        if not use_parallel:
+            # Sequential fallback (original logic, preserved exactly)
+            for cluster_id, cluster in enumerate(clusters):
+                # Check cancellation BETWEEN clusters (safe point)
+                token.check_or_raise(f"cpsat_cluster_{cluster_id}")
+
+                logger.info(
+                    f"[SAGA] Solving cluster {cluster_id + 1}/{total_clusters_count}..."
+                )
+
+                solver = AdaptiveCPSATSolver(
+                    courses=cluster,
+                    rooms=data['rooms'],
+                    time_slots=data['time_slots'],
+                    faculty=data['faculty'],
+                    job_id=job_id,
+                    redis_client=self.redis_client,
+                    cluster_id=cluster_id,
+                    total_clusters=total_clusters_count,
+                    student_course_index=student_course_index,  # OPT2
+                )
+
+                cluster_solution = solver.solve_cluster(cluster)
+                completed_count += 1
+
+                if tracker:
+                    tracker.update_stage_progress(
+                        completed_count, total_clusters_count
+                    )
+
+                if cluster_solution:
+                    solution.update(cluster_solution)
+                else:
+                    logger.warning(
+                        f"[SAGA] Cluster {cluster_id} failed — using greedy fallback"
+                    )
+                    for course in cluster:
+                        solution[course.course_id] = {
+                            'time_slot': 0,
+                            'room': (
+                                data['rooms'][0].room_id if data['rooms'] else None
+                            ),
+                        }
+
         logger.info(f"[SAGA] CP-SAT complete: {len(solution)} assignments")
         # Store for PARTIAL_SUCCESS recovery (Google/Meta pattern)
         self.job_data['cpsat_solution'] = solution

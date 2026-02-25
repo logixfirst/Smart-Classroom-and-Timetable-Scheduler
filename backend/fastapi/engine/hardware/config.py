@@ -8,6 +8,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# OPT1: Parallel cluster execution config.
+# Rule: parallel_clusters × workers_per_cluster ≤ physical_cores
+# On 6-core hardware: 2 × 3 = 6 threads → no CPU thrashing.
+# Increase to 3 only if hardware has ≥ 9 physical cores.
+PARALLEL_CLUSTERS = 2
+
 
 def get_optimal_config(hardware_profile: HardwareProfile) -> Dict[str, Any]:
     """
@@ -50,6 +56,9 @@ def get_optimal_config(hardware_profile: HardwareProfile) -> Dict[str, Any]:
         'cpsat_timeout': _calculate_cpsat_timeout(hardware_profile),
         'ga_population_size': _calculate_ga_population(hardware_profile),
         'ga_generations': _calculate_ga_generations(hardware_profile),
+
+        # OPT1: Parallel cluster execution
+        'parallel_clusters': PARALLEL_CLUSTERS,
         
         # Cloud/environment info
         'is_cloud': hardware_profile.is_cloud_instance,

@@ -9,6 +9,10 @@ from typing import List, Dict
 # Strategy 0: Full constraints — all hard constraints active
 # Strategy 1: Relax student (CRITICAL only) + skip workload
 # Strategy 2: Minimum — faculty + room only, no per-day or workload
+# Timeout ladder (OPT3): 30s → 45s → 60s → 90s (ascending — fail fast, escalate time)
+# Observed: strategy 1 finds solution in 18-27s; 30s gives 3-12s buffer.
+# If strategy 1 fails in >30s it was infeasible anyway — move to relaxed sooner.
+# Normal case: 18-27s (unchanged). Failure path: 225s vs old 240s (15s faster).
 STRATEGIES: List[Dict] = [
     {
         "name": "Full Constraints",
@@ -17,7 +21,7 @@ STRATEGIES: List[Dict] = [
         "room_capacity": True,               # HC2
         "workload_constraints": True,        # HC3 (BUG 2 FIX)
         "max_sessions_per_day": True,        # HC5 (MISS 6 FIX)
-        "timeout": 60,
+        "timeout": 30,                       # OPT3: was 60 — solutions found in 18-27s
         "max_constraints": 10000,
         "student_limit": None
     },
@@ -28,7 +32,7 @@ STRATEGIES: List[Dict] = [
         "room_capacity": True,
         "workload_constraints": True,        # HC3 still enforced
         "max_sessions_per_day": True,        # HC5 still enforced
-        "timeout": 60,
+        "timeout": 45,                       # OPT3: was 60 — ascending ladder
         "max_constraints": 8000,
         "student_limit": 500
     },
@@ -39,7 +43,7 @@ STRATEGIES: List[Dict] = [
         "room_capacity": True,
         "workload_constraints": False,       # Relax workload
         "max_sessions_per_day": False,       # Relax per-day limit
-        "timeout": 45,
+        "timeout": 60,                       # OPT3: was 45 — ascending ladder
         "max_constraints": 5000,
         "student_limit": 0
     },
@@ -50,7 +54,7 @@ STRATEGIES: List[Dict] = [
         "room_capacity": False,              # Relax room
         "workload_constraints": False,
         "max_sessions_per_day": False,
-        "timeout": 30,
+        "timeout": 90,                       # OPT3: was 30 — emergency fallback needs most time
         "max_constraints": 1000,
         "student_limit": 0
     }

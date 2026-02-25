@@ -27,7 +27,9 @@ interface ProgressData {
   stage: string
   stage_progress: number
   overall_progress: number
-  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  // 'queued'  — Celery task accepted by FastAPI, generation pipeline starting
+  // 'running' — FastAPI actively solving (ProgressTracker writing to Redis)
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
   eta_seconds: number | null
   started_at: number
   last_updated: number
@@ -80,7 +82,10 @@ export function useProgress(
         }
 
         const url = `${DJANGO_API_BASE}/generation/stream/${jobId}/`
-        const eventSource = new EventSource(url)
+        // CRITICAL: withCredentials sends HttpOnly auth cookies to the Django SSE
+        // endpoint. Without this, the browser omits cookies on cross-origin
+        // EventSource requests and the server returns 401 Unauthorized.
+        const eventSource = new EventSource(url, { withCredentials: true })
         eventSourceRef.current = eventSource
 
         // Connection opened — reset counters for display, but do NOT call
