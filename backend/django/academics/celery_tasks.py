@@ -5,6 +5,7 @@ Enterprise Architecture: Async Task Queue with Progress Tracking
 
 from celery import shared_task
 from django.conf import settings
+from django.core.cache import cache
 import requests
 import logging
 from .models import GenerationJob
@@ -146,6 +147,69 @@ def generate_timetable_task(self, job_id, org_id, academic_year, semester):
         return {'status': 'failed', 'error': str(e)}
 
 
+def _warm_review_caches(job_id: str, job: "GenerationJob", variants: list) -> None:
+    """
+    Pre-populate Redis caches immediately after a job completes so the first
+    page load of the timetable review page is always a fast cache hit.
+
+    Mirrors the exact serialisation used by:
+      • TimetableWorkflowViewSet.retrieve()  → key: workflow_{job_id}
+      • TimetableVariantViewSet.list()       → key: variants_list_{job_id}
+
+    This is completely non-critical — any exception is caught and logged so it
+    never affects the main callback flow.
+    """
+    try:
+        # ── Workflow metadata ────────────────────────────────────────────────
+        workflow_data = {
+            'id':               str(job.id),
+            'job_id':           str(job.id),
+            'organization_id':  str(job.organization_id),
+            'status':           job.status,
+            'created_at':       job.created_at.isoformat(),
+            'timetable_entries': [],
+        }
+        cache.set(f'workflow_{job_id}', workflow_data, 300)  # 5 min
+
+        # ── Variants list (without entries — loaded on demand) ───────────────
+        variants_list = []
+        for idx, v in enumerate(variants):
+            qm  = v.get('quality_metrics', {})
+            sta = v.get('statistics', {})
+
+            overall_score   = qm.get('overall_score',         v.get('score',            0))
+            total_conflicts = qm.get('total_conflicts',       v.get('conflicts',         0))
+            room_util       = qm.get('room_utilization_score', v.get('room_utilization', 0))
+            total_classes   = sta.get('total_classes', len(v.get('timetable_entries', [])))
+
+            variants_list.append({
+                'id':               f"{job_id}-variant-{idx + 1}",
+                'job_id':           str(job_id),
+                'variant_number':   idx + 1,
+                'organization_id':  str(job.organization_id),
+                'timetable_entries': [],       # entries loaded separately via /entries/
+                'statistics': {
+                    'total_classes':   total_classes,
+                    'total_conflicts': total_conflicts,
+                },
+                'quality_metrics': {
+                    'overall_score':          overall_score,
+                    'total_conflicts':        total_conflicts,
+                    'room_utilization_score': room_util,
+                },
+                'generated_at': job.created_at.isoformat(),
+            })
+        cache.set(f'variants_list_{job_id}', variants_list, 300)  # 5 min
+
+        logger.info(
+            f"[CACHE WARM] Pre-populated workflow + {len(variants_list)} variants "
+            f"for job {job_id}"
+        )
+    except Exception as exc:
+        # Non-fatal — a warm-up failure should never fail the callback.
+        logger.warning(f"[CACHE WARM] Could not pre-warm caches for job {job_id}: {exc}")
+
+
 @shared_task
 def fastapi_callback_task(job_id, status, variants=None, error=None):
     """
@@ -181,8 +245,13 @@ def fastapi_callback_task(job_id, status, variants=None, error=None):
         
         job.save()
         
+        # ── Warm Redis caches proactively on success ──────────────────────────
+        # This ensures the first review-page load is a fast cache hit rather than
+        # a cold read of the 5-50 MB timetable_data JSONField from PostgreSQL.
+        if status == 'completed' and variants:
+            _warm_review_caches(job_id, job, variants)
+
         # Cleanup temporary Redis keys
-        from django.core.cache import cache
         cache.delete(f"generation_queue:{job_id}")
         cache.delete(f"cancel:job:{job_id}")  # Cleanup cancel flag
         

@@ -325,14 +325,28 @@ export default function TimetableStatusPage() {
   useEffect(() => {
     if (progress?.status !== 'completed') return
     setCountdown(3)
+
+    // Prefetch the review page shell so Next.js has it ready before we redirect.
+    router.prefetch(`/admin/timetables/${jobId}/review`)
+
+    // Warm the server-side Redis cache during the 3-second idle window.
+    // These are fire-and-forget: we don't await the results because we only
+    // care that Django has a chance to populate its Redis keys before the
+    // review page loads (where workflowId === jobId).
+    const API = process.env.NEXT_PUBLIC_DJANGO_API_URL ?? 'http://localhost:8000'
+    Promise.all([
+      fetch(`${API}/api/timetable/workflows/${jobId}/`,          { credentials: 'include' }),
+      fetch(`${API}/api/timetable/variants/?job_id=${jobId}`,    { credentials: 'include' }),
+    ]).catch(() => { /* warm-up is best-effort; ignore transient errors */ })
+
     const tick = setInterval(() => {
       setCountdown(c => {
-        if (c <= 1) { clearInterval(tick); router.push('/admin/timetables'); return 0 }
+        if (c <= 1) { clearInterval(tick); router.push(`/admin/timetables/${jobId}/review`); return 0 }
         return c - 1
       })
     }, 1000)
     return () => clearInterval(tick)
-  }, [progress?.status, router])
+  }, [progress?.status, router, jobId])
 
   // ── Derived colour values — blue-deepening (accessible; no red/green) ─────────
   // hue 210→224, saturation 85→95%, lightness 75→38%  (sky blue → deep navy)
@@ -451,13 +465,13 @@ export default function TimetableStatusPage() {
             Timetable Ready
           </h2>
           <p className="text-[#64748B] text-[15px] mb-8">
-            Redirecting to your schedule{countdown > 0 ? ` in ${countdown}...` : '...'}
+            Opening review page{countdown > 0 ? ` in ${countdown}...` : '...'}
           </p>
           <div className="w-full overflow-hidden mb-8 complete-track">
             <div className="complete-fill" />
           </div>
           <button
-            onClick={() => router.push('/admin/timetables')}
+            onClick={() => router.push(`/admin/timetables/${jobId}/review`)}
             className="px-8 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold rounded-xl text-sm transition-colors"
           >
             View Timetables
