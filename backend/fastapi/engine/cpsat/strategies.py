@@ -80,6 +80,18 @@ def select_strategy_for_cluster_size(cluster_size: int) -> Dict:
     """
     Select appropriate starting strategy based on cluster size.
     Smaller clusters can afford full constraints; larger ones start relaxed.
+
+    Thresholds (tuned to MAX_CLUSTER_SIZE=15 from config.py):
+      ≤10 courses  → Full Constraints (strategy 0)   — small clusters are fast
+      ≤20 courses  → Relaxed Student  (strategy 1)   — most common cluster size
+      ≤30 courses  → Faculty+Room     (strategy 2)   — large clusters skip student HC4
+      >30 courses  → Minimal          (strategy 3)   — never reached with MAX_SIZE=15
+
+    IDENTITY CHECK SAFETY: returns the actual STRATEGIES[i] dict object (not a copy),
+    so the caller can compare with `s is _start_strategy` (identity, not equality)
+    in enumerate(STRATEGIES). This works correctly both in the main process and inside
+    ProcessPoolExecutor worker subprocesses because each subprocess re-imports this
+    module, creating a single consistent STRATEGIES list per process.
     """
     if cluster_size <= 10:
         return STRATEGIES[0]   # Full constraints

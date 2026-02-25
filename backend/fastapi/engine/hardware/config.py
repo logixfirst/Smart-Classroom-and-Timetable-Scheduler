@@ -7,20 +7,43 @@ from typing import Dict, Any
 from .profile import HardwareProfile, ExecutionStrategy
 import logging
 
+import psutil as _psutil
+
 logger = logging.getLogger(__name__)
 
-# OPT1: Auto-scale parallel cluster execution to available CPU cores.
+# OPT1: RAM-aware + CPU-aware parallel cluster scaling.
 #
 # Strategy: maximise cluster-level parallelism, not per-solver parallelism.
-# Each CP-SAT instance gets 1 worker thread; run as many clusters simultaneously
-# as there are physical cores. This beats 2 clusters × 3 workers because:
+# Each CP-SAT instance gets 1 worker thread; run as many clusters in parallel
+# as resources allow. This beats 2 clusters × 3 workers because:
 #   - CP-SAT scales sub-linearly with workers (2 workers ≠ 2× speedup)
-#   - 2 independent clusters always give exactly 2× wall-clock speedup
+#   - N independent clusters give near-linear wall-clock speedup
+#
+# RF-4 FIX: Memory pressure at ~83% RAM observed at PARALLEL_CLUSTERS=6 on 8 GB
+# machine. Each active cluster holds ~300 MB of CP model + student index in
+# memory. With 6 parallel clusters: 6 × 300 MB = 1.8 GB overhead on top of
+# baseline Python/Django/Redis footprint (~5 GB) → 6.8 GB / 8 GB = 85%.
+#
+# RAM cap formula:
+#   total_ram_gb ≤ 8  → max 3 parallel (leaves 40% headroom)
+#   total_ram_gb ≤ 12 → max 5 parallel  (leaves 35% headroom)
+#   total_ram_gb  > 12 → max 6 parallel (leaves 30% headroom)
 #
 # saga.py computes: workers_per_cluster = max(1, physical_cores // PARALLEL_CLUSTERS)
-# At PARALLEL_CLUSTERS=6 on 6-core machine → 1 worker each → 6× speedup vs old sequential.
-# Capped at 6 to bound peak memory (each active cluster holds ~50-100 MB model data).
-PARALLEL_CLUSTERS = min(6, max(2, (_os.cpu_count() or 4)))
+_total_ram_gb = _psutil.virtual_memory().total / (1024 ** 3)
+_cpu_count = _os.cpu_count() or 4
+if _total_ram_gb <= 8:
+    _ram_cap = 3
+elif _total_ram_gb <= 12:
+    _ram_cap = 5
+else:
+    _ram_cap = 6
+
+PARALLEL_CLUSTERS = min(_ram_cap, max(2, _cpu_count))
+logger.debug(
+    "[HW-Config] PARALLEL_CLUSTERS=%d  (RAM=%.1f GB, CPUs=%d, cap=%d)",
+    PARALLEL_CLUSTERS, _total_ram_gb, _cpu_count, _ram_cap,
+)
 
 
 def get_optimal_config(hardware_profile: HardwareProfile) -> Dict[str, Any]:

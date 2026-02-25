@@ -18,7 +18,6 @@ from .progress import log_cluster_start, log_cluster_success
 from .constraints import (
     add_faculty_constraints,
     add_room_constraints,
-    add_student_constraints,
     add_workload_constraints,
     add_max_sessions_per_day_constraints,
     add_fixed_slot_constraints,
@@ -126,6 +125,20 @@ class AdaptiveCPSATSolver:
         logger.info(f"[CP-SAT] Domain size: {total_entries:,} entries (avg {avg_per_session:.0f}/session)")
         logger.info(f"[CP-SAT] Memory estimate: ~{total_entries * 16 / 1024 / 1024:.1f} MB")
 
+        # STEP 3: Precompute student conflict pairs ONCE before the strategy loop (RF-6).
+        # Previously, add_student_constraints() rebuilt the full (student, slot) →
+        # [vars] mapping on every strategy retry — O(V×E) per attempt where V is
+        # the variable count (~20K) and E is enrolled students per course (~200-900).
+        # For clusters that fail strategy 1+2 before landing on Faculty+Room Only,
+        # this scan ran 3× for 1.5-4s each = up to 12s wasted per cluster.
+        # Precomputing here cuts per-strategy cost to O(actual_conflicts) lookups.
+        self._student_conflict_groups = self._precompute_student_conflict_groups()
+        self._critical_students = self._compute_critical_students()
+        logger.debug(
+            "[CP-SAT] Precomputed %d student conflict groups (%d critical students)",
+            len(self._student_conflict_groups), len(self._critical_students),
+        )
+
         # OPT4: Skip strategies that are statistically infeasible for this
         # cluster's shape. Large clusters (>20 courses) almost always fail
         # Full Constraints (30s timeout) and Relaxed Student (45s timeout)
@@ -224,16 +237,13 @@ class AdaptiveCPSATSolver:
                 )
 
             # ------------------------------------------------------------------
-            # HC4: Student conflict constraints (BUG 1 FIX — implemented)
-            # Use "CRITICAL" mode in relaxed strategies to help feasibility,
-            # "ALL" mode in strict strategies for full correctness.
+            # HC4: Student conflict constraints — RF-6 fast path.
+            # Conflict pairs precomputed once in solve_cluster(); each strategy
+            # attempt here only iterates stored conflict entries via O(1) lookups
+            # instead of rescanning all ~20K variables × enrolled students.
             # ------------------------------------------------------------------
             student_priority = strategy.get('student_priority', 'ALL')
-            add_student_constraints(
-                model, variables, cluster, student_priority,
-                self.students_of_course,
-                student_course_index=self.student_course_index,
-            )
+            self._apply_student_constraints_fast(model, variables, student_priority)
 
             # ------------------------------------------------------------------
             # HC5: Max sessions per course per day (MISS 6 FIX)
@@ -386,3 +396,87 @@ class AdaptiveCPSATSolver:
                 valid_domains[(course.course_id, session)] = valid_pairs
 
         return valid_domains
+
+    # ------------------------------------------------------------------
+    # RF-6: Precomputed student conflict helpers
+    # ------------------------------------------------------------------
+
+    def _precompute_student_conflict_groups(self) -> Dict[tuple, list]:
+        """
+        One O(C×S×R×E) pass over valid_domains to find all (student, t_slot)
+        pairs that have courses competing for the same slot.
+
+        C = courses, S = sessions/course, R = rooms/slot, E = enrolled students.
+        Replaces the repeated O(V×E) scan inside add_student_constraints() that
+        was running once per strategy attempt (up to 4×) per cluster.
+
+        Returns:
+            {(student_id, t_slot_id): [(course_id, session, t_slot_id, room_id), ...]}
+            Only entries with 2+ elements are stored (actual conflicts).
+        """
+        groups: Dict[tuple, list] = defaultdict(list)
+        for (course_id, session), pairs in self.valid_domains.items():
+            students = self.students_of_course.get(course_id, set())
+            if not students:
+                continue
+            for (t_slot_id, r_id) in pairs:
+                for student_id in students:
+                    groups[(student_id, t_slot_id)].append(
+                        (course_id, session, t_slot_id, r_id)
+                    )
+        # Discard non-conflicting entries early to reduce memory
+        return {k: v for k, v in groups.items() if len(v) > 1}
+
+    def _compute_critical_students(self) -> set:
+        """
+        Students enrolled in 5+ courses within this cluster.
+        Precomputed once so CRITICAL-mode strategy attempts pay O(1) membership test.
+        """
+        counts: Dict[str, int] = defaultdict(int)
+        for students in self.students_of_course.values():
+            for sid in students:
+                counts[sid] += 1
+        return {sid for sid, n in counts.items() if n >= 5}
+
+    def _apply_student_constraints_fast(
+        self,
+        model,
+        variables: Dict,
+        student_priority: str,
+    ) -> None:
+        """
+        Apply HC4 student no-double-booking constraints using precomputed pairs.
+
+        RF-6 fast path: instead of scanning all variables × enrolled students,
+        iterate self._student_conflict_groups (computed once in solve_cluster)
+        and do O(1) dict lookups into the per-strategy `variables` dict.
+
+        Args:
+            student_priority: "ALL" | "CRITICAL" | "NONE"
+        """
+        if student_priority == "NONE":
+            logger.warning("[Constraints] Student constraints DISABLED (NONE mode)")
+            return
+
+        critical_set = self._critical_students if student_priority == "CRITICAL" else None
+        if student_priority == "CRITICAL":
+            logger.info(
+                "[Constraints] CRITICAL mode: constraining %d students with 5+ courses",
+                len(self._critical_students),
+            )
+
+        count = 0
+        for (student_id, t_slot_id), domain_keys in self._student_conflict_groups.items():
+            if critical_set is not None and student_id not in critical_set:
+                continue
+            vars_list = [variables[dk] for dk in domain_keys if dk in variables]
+            if len(vars_list) > 1:
+                model.Add(sum(vars_list) <= 1)
+                count += 1
+
+        mode_label = student_priority
+        logger.info(
+            "[Constraints] Added %d student conflict constraints "
+            "(HC4 — no student double-booking, mode=%s)",
+            count, mode_label,
+        )

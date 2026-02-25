@@ -851,9 +851,21 @@ class TimetableGenerationSaga:
         # ------------------------------------------------------------------
         if self.redis_client:
             try:
+                # Strip raw solution dicts (contain tuple keys not serialisable
+                # as JSON) — the timetable has already been built from them.
+                serialisable_variants = [
+                    {
+                        'variant_id': v['variant_id'],
+                        'seed': v.get('seed'),
+                        'fitness': v['fitness'],
+                        'label': v.get('label', ''),
+                        'weights': v.get('weights', {}),
+                    }
+                    for v in variants
+                ]
                 redis_result = {
                     'timetable': result_payload,
-                    'variants': variants,
+                    'variants': serialisable_variants,
                     'metadata': {
                         'job_id': job_id,
                         'org_id': data.get('organization_id'),
