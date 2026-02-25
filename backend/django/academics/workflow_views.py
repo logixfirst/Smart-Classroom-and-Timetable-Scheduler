@@ -172,24 +172,35 @@ class TimetableVariantViewSet(viewsets.ViewSet):
             )
     
     def _convert_timetable_entries(self, entries):
-        """FAST conversion - minimal processing"""
-        day_map = {'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3, 'Friday': 4, 'Saturday': 5, 'Sunday': 6}
-        
-        # Convert all entries without deduplication
+        """Convert FastAPI entry format → frontend TimetableEntry display format.
+
+        FastAPI stores: course_code, subject_name, faculty_name, room_code,
+        day (int 0-5), start_time ('09:00'), end_time ('10:00').
+        Frontend expects: subject_code, room_number, time_slot ('09:00-10:00'),
+        day (int 0-4).
+        """
+        _day_str_map = {
+            'Monday': 0, 'Tuesday': 1, 'Wednesday': 2,
+            'Thursday': 3, 'Friday': 4, 'Saturday': 5, 'Sunday': 6,
+        }
         result = []
         for e in entries:
-            day = day_map.get(e.get('day', 'Monday'), 0)
+            day_raw = e.get('day', 0)
+            # FastAPI TimeSlot.day is already int; legacy payload may be a day-name string
+            day = day_raw if isinstance(day_raw, int) else _day_str_map.get(day_raw, 0)
+            start_t = e.get('start_time', '')
+            end_t   = e.get('end_time',   '')
             result.append({
-                'day': day,
-                'time_slot': e.get('time_slot', ''),
-                'subject_code': e.get('subject_code', ''),
-                'subject_name': e.get('subject_name', ''),
+                'day':          day,
+                'time_slot':    f"{start_t}-{end_t}" if start_t else e.get('time_slot', ''),
+                'subject_code': e.get('course_code',  e.get('subject_code',  '')),
+                'subject_name': e.get('subject_name', e.get('course_name',   '')),
+                'faculty_id':   e.get('faculty_id',   ''),
                 'faculty_name': e.get('faculty_name', ''),
-                'room_number': e.get('room_number', ''),
-                'batch_name': e.get('batch_name', ''),
-                'department_id': e.get('department_id', '')
+                'room_number':  e.get('room_code',    e.get('room_number',   '')),
+                'batch_name':   e.get('batch_name',   ''),
+                'department_id': e.get('department_id', ''),
             })
-        
         return result
     
     def list(self, request):

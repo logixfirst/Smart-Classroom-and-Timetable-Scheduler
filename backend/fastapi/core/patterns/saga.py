@@ -918,10 +918,13 @@ class TimetableGenerationSaga:
                 room_slot_usage[room_key] = c_id
                 rooms_used.add(r_id)
 
+                _fac_id = getattr(course, 'faculty_id', '')
+                _fac    = data.get('faculty', {}).get(_fac_id)
                 v_entries.append({
                     'course_code':  getattr(course, 'course_code', ''),
                     'subject_name': getattr(course, 'course_name', ''),
-                    'faculty_id':   getattr(course, 'faculty_id', ''),
+                    'faculty_id':   _fac_id,
+                    'faculty_name': getattr(_fac, 'faculty_name', '') if _fac else '',
                     'room_id':      r_id,
                     'room_code':    getattr(room, 'room_code', ''),
                     'time_slot_id': str(t_sid),
