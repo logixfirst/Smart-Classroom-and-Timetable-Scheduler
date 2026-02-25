@@ -22,7 +22,7 @@
  *    - Separate from progress smoothing
  * 
  * 4. Continuous HSL Color Gradient (getProgressColor):
- *    - Red (0%) → Yellow (50%) → Green (100%)
+ *    - Sky blue (0%) → Deep navy (100%) — accessible, no red/green
  *    - No discrete color steps
  *    - Perceptually uniform
  * 
@@ -120,7 +120,7 @@ const CSS_KEYFRAMES = `
 .center-fade { text-align: center; animation: fadeUp 400ms ease-out 100ms both; }
 /* Checkmark SVG path draw-on animation */
 .check-path { stroke-dasharray: 44; stroke-dashoffset: 44; animation: drawCheck 600ms ease-in-out forwards; }
-/* Success bar (always 100% green) */
+/* Success bar (always 100% deep blue) */
 .complete-track { height: 14px; background-color: hsl(120,80%,94%); }
 .complete-fill  { height: 100%; border-radius: 9999px; background-color: hsl(120,88%,48%); }
 /* Dynamic progress bar — driven by CSS custom properties */
@@ -334,13 +334,17 @@ export default function TimetableStatusPage() {
     return () => clearInterval(tick)
   }, [progress?.status, router])
 
-  // ── Derived colour values — single source: hue ───────────────────────────────
-  const hue         = (smoothOverallProgress / 100) * 120
-  const barColor    = `hsl(${hue}, 88%, 48%)`
-  const trackColor  = `hsl(${hue}, 80%, 94%)`
-  const shadowColor = `hsla(${hue}, 60%, 70%, 0.4)`
-  const GREEN       = 'hsl(120, 88%, 48%)'
-  const GREEN_TRACK = 'hsl(120, 80%, 94%)'
+  // ── Derived colour values — blue-deepening (accessible; no red/green) ─────────
+  // hue 210→224, saturation 85→95%, lightness 75→38%  (sky blue → deep navy)
+  const t           = smoothOverallProgress / 100
+  const hue         = 210 + t * 14                           // 210 → 224
+  const saturation  = 85  + t * 10                           // 85% → 95%
+  const lightness   = 75  - t * 37                           // 75% → 38%
+  const barColor    = `hsl(${hue}, ${saturation}%, ${lightness}%)`
+  const trackColor  = `hsl(210, 85%, 95%)`                   // fixed pale blue
+  const shadowColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.3)`
+  const GREEN       = 'hsl(224, 95%, 38%)'                   // deep navy for success
+  const GREEN_TRACK = 'hsl(210, 85%, 95%)'                   // pale blue track
 
   // ── CSS-variable injection via DOM ref — avoids inline style props ──────────
   const containerRef = useRef<HTMLDivElement>(null)
