@@ -4,11 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import {
-  fetchFacultyAvailability,
-  updateFacultyAvailability,
-} from '@/lib/api/timetable'
-import type { TimetableListItem, FacultyAvailability } from '@/types/timetable'
+import type { TimetableListItem } from '@/types/timetable'
 
 interface RunningJob {
   job_id: string
@@ -21,7 +17,6 @@ interface RunningJob {
 export default function AdminTimetablesPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [timetables, setTimetables] = useState<TimetableListItem[]>([])
-  const [facultyAvailability, setFacultyAvailability] = useState<FacultyAvailability[]>([])
   const [runningJobs, setRunningJobs] = useState<RunningJob[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -42,25 +37,6 @@ export default function AdminTimetablesPage() {
     return () => clearInterval(interval)
   }, [])
   
-  // Lazy load faculty when faculty section becomes visible
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && facultyAvailability.length === 0) {
-          loadFacultyData()
-        }
-      },
-      { threshold: 0.1 }
-    )
-    
-    const facultySection = document.getElementById('faculty-section')
-    if (facultySection) {
-      observer.observe(facultySection)
-    }
-    
-    return () => observer.disconnect()
-  }, [facultyAvailability.length])
-
   const loadTimetableData = async () => {
     try {
       setLoading(true)
@@ -103,29 +79,6 @@ export default function AdminTimetablesPage() {
     }
   }
 
-  const loadFacultyData = async () => {
-    try {
-      // Only fetch 10 faculty initially
-      const response = await fetch(
-        `${API_BASE}/faculty/?page=1&page_size=10`,
-        { credentials: 'include' }
-      )
-      if (!response.ok) {
-        setFacultyAvailability([])
-        return
-      }
-      const data = await response.json()
-      const faculty = (data.results || []).map((f: any) => ({
-        id: f.faculty_code || f.faculty_id || f.id,
-        name: f.faculty_name || `${f.first_name || ''} ${f.last_name || ''}`.trim() || 'Unknown',
-        available: f.status === 'active' || f.is_active
-      })).filter(f => f.name !== 'Unknown')
-      setFacultyAvailability(faculty)
-    } catch (err) {
-      setFacultyAvailability([])
-    }
-  }
-
   const loadRunningJobs = async () => {
     try {
       const controller = new AbortController()
@@ -162,32 +115,6 @@ export default function AdminTimetablesPage() {
       setRunningJobs(runningJobs)
     } catch (err) {
       setRunningJobs([])
-    }
-  }
-
-  const toggleFacultyAvailability = async (facultyId: string) => {
-    // Optimistically update UI
-    setFacultyAvailability(prev =>
-      prev.map(faculty =>
-        faculty.id === facultyId ? { ...faculty, available: !faculty.available } : faculty
-      )
-    )
-
-    // Update backend
-    try {
-      const faculty = facultyAvailability.find(f => f.id === facultyId)
-      if (faculty) {
-        await updateFacultyAvailability(facultyId, !faculty.available)
-      }
-    } catch (err) {
-      console.error('Failed to update faculty availability:', err)
-      // Revert optimistic update on error
-      setFacultyAvailability(prev =>
-        prev.map(faculty =>
-          faculty.id === facultyId ? { ...faculty, available: !faculty.available } : faculty
-        )
-      )
-      alert('Failed to update faculty availability. Please try again.')
     }
   }
 
@@ -355,10 +282,8 @@ export default function AdminTimetablesPage() {
           </div>
         </div>
 
-        {/* Two Column Layout: Timetables (Left) + Faculty (Right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: Timetables (2/3 width) */}
-          <div className="lg:col-span-2 space-y-6">
+        {/* Timetables */}
+        <div className="space-y-6">
 
             {/* View Mode Toggle */}
             <div className="flex items-center justify-between">
@@ -509,80 +434,6 @@ export default function AdminTimetablesPage() {
               })
           )}
             </div>
-          </div>
-
-          {/* Right Column: Faculty Availability (1/3 width) */}
-          <div className="lg:col-span-1" id="faculty-section">
-            <div className="card sticky top-6">
-              <div className="card-header">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#2196F3]/10 dark:bg-[#2196F3]/20 flex items-center justify-center rounded-lg">
-                    <svg
-                      className="w-5 h-5 text-[#2196F3]"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"
-                      />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 dark:text-white">Faculty</h3>
-                    <p className="text-xs text-[#6B6B6B] dark:text-[#B3B3B3]">
-                      {facultyAvailability.filter(f => f.available).length} available
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="max-h-[calc(100vh-200px)] overflow-y-auto space-y-2">
-                {facultyAvailability.length === 0 ? (
-                  <div className="text-center py-8">
-                    <div className="loading-spinner w-6 h-6 mx-auto mb-2"></div>
-                    <p className="text-xs text-gray-500">Loading faculty...</p>
-                  </div>
-                ) : (
-                  facultyAvailability.filter(f => f.name).map(faculty => (
-                  <div key={faculty.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-8 h-8 bg-[#2196F3]/10 dark:bg-[#2196F3]/20 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-medium text-[#2196F3]">
-                          {faculty.name
-                            .split(' ')
-                            .map(n => n[0])
-                            .join('')
-                            .slice(0, 2)}
-                        </span>
-                      </div>
-                      <span className="text-sm font-medium text-[#2C2C2C] dark:text-[#FFFFFF] truncate">
-                        {faculty.name}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => toggleFacultyAvailability(faculty.id)}
-                      aria-label={`Toggle availability for ${faculty.name}`}
-                      className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#2196F3] focus:ring-offset-2 ${
-                        faculty.available ? 'bg-[#2196F3]' : 'bg-[#E0E0E0] dark:bg-[#404040]'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-300 shadow-md ${
-                          faculty.available ? 'translate-x-5' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Pagination */}
