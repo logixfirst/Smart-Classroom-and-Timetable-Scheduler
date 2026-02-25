@@ -23,18 +23,41 @@ export default function DashboardLayout({
   const [showSignOutDialog, setShowSignOutDialog] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [copiedJobRef, setCopiedJobRef] = useState(false)
   const settingsRef = useRef<HTMLDivElement>(null)
   const notificationsRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const router = useRouter()
 
-  const getPageTitle = () => {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+  // Human-readable labels for routes whose last real segment is a resource ID
+  const UUID_PARENT_LABELS: Record<string, string> = {
+    status: 'Generation Status',
+  }
+
+  const getPageInfo = (): { title: string; jobRef: string | null; fullId: string | null } => {
     const segments = pathname.split('/').filter(Boolean)
-    if (segments.length > 1) {
-      const page = segments[segments.length - 1]
-      return page.charAt(0).toUpperCase() + page.slice(1).replace(/-/g, ' ')
+    if (segments.length === 0) return { title: 'Dashboard', jobRef: null, fullId: null }
+
+    const last = segments[segments.length - 1]
+
+    if (UUID_RE.test(last)) {
+      const parent = segments[segments.length - 2] ?? ''
+      const label =
+        UUID_PARENT_LABELS[parent] ??
+        (parent.charAt(0).toUpperCase() + parent.slice(1).replace(/-/g, ' '))
+      return { title: label, jobRef: '#' + last.slice(0, 8).toUpperCase(), fullId: last }
     }
-    return 'Dashboard'
+
+    return {
+      title:
+        segments.length > 1
+          ? last.charAt(0).toUpperCase() + last.slice(1).replace(/-/g, ' ')
+          : 'Dashboard',
+      jobRef: null,
+      fullId: null,
+    }
   }
 
   useEffect(() => {
@@ -82,9 +105,57 @@ export default function DashboardLayout({
                 >
                   <span className="text-lg">☰</span>
                 </button>
-                <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
-                  {getPageTitle()}
-                </h1>
+                {(() => {
+                  const { title, jobRef, fullId } = getPageInfo()
+                  return (
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
+                        {pageTitle ?? title}
+                      </h1>
+                      {jobRef && fullId && (
+                        <div className="relative group">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(fullId)
+                              setCopiedJobRef(true)
+                              setTimeout(() => setCopiedJobRef(false), 2000)
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-mono font-semibold
+                              bg-blue-50 text-blue-600 border border-blue-100 cursor-pointer
+                              hover:bg-blue-100 hover:border-blue-300
+                              dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800
+                              dark:hover:bg-blue-900 dark:hover:border-blue-600
+                              transition-colors tracking-wide select-none"
+                          >
+                            {copiedJobRef ? (
+                              <>
+                                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3 shrink-0"><path d="M2 6l3 3 5-5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                {jobRef}
+                                <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3 h-3 shrink-0 opacity-50"><rect x="1" y="3" width="7" height="8" rx="1"/><path d="M4 3V2a1 1 0 011-1h5a1 1 0 011 1v7a1 1 0 01-1 1h-1"/></svg>
+                              </>
+                            )}
+                          </button>
+                          {/* Tooltip — full UUID on hover */}
+                          <div className="absolute left-0 top-full mt-2 z-50 pointer-events-none
+                            opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-200">
+                            <div className="bg-gray-900 dark:bg-gray-700 text-white text-[11px] font-mono
+                              px-3 py-2 rounded-lg shadow-lg whitespace-nowrap">
+                              <p className="text-gray-400 text-[10px] mb-0.5 font-sans not-italic">Job ID</p>
+                              {fullId}
+                            </div>
+                            {/* Arrow */}
+                            <div className="absolute -top-1 left-4 w-2 h-2 bg-gray-900 dark:bg-gray-700 rotate-45" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
 
               <div className="flex items-center gap-2">
