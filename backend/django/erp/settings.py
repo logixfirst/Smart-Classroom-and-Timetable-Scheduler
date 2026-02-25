@@ -19,6 +19,9 @@ from sentry_sdk.integrations.django import DjangoIntegration
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Ensure logs directory exists before LOGGING config tries to open files.
+(BASE_DIR / "logs").mkdir(exist_ok=True)
+
 # Load environment variables from backend/.env
 env_path = BASE_DIR.parent / ".env"
 load_dotenv(dotenv_path=env_path)
@@ -393,10 +396,13 @@ LOGGING = {
             "formatter": "verbose",
         },
         "file": {
-            "class": "logging.handlers.RotatingFileHandler",
+            # Plain FileHandler with mode='w': django.log is completely
+            # overwritten on every server restart — always shows current
+            # session only, ideal for debugging.
+            "class": "logging.FileHandler",
             "filename": os.path.join(BASE_DIR, "logs", "django.log"),
-            "maxBytes": 1024 * 1024 * 50,  # 50 MB
-            "backupCount": 5,
+            "mode": "w",
+            "encoding": "utf-8",
             "formatter": "verbose",
         },
         "api_requests_file": {
@@ -421,12 +427,12 @@ LOGGING = {
             "propagate": False,
         },
         "api_requests": {
-            "handlers": ["console", "api_requests_file"],
+            "handlers": ["console", "api_requests_file", "file"],
             "level": "INFO",
             "propagate": False,
         },
         "api_metrics": {
-            "handlers": ["api_metrics_file"],
+            "handlers": ["api_metrics_file", "file"],
             "level": "INFO",
             "propagate": False,
         },
@@ -437,7 +443,7 @@ LOGGING = {
         },
     },
     "root": {
-        "handlers": ["console"],
+        "handlers": ["console", "file"],
         "level": "WARNING",
     },
 }

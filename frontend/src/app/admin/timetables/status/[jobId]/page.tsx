@@ -49,18 +49,223 @@
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
-import { 
-  useProgress, 
-  formatETA, 
-  getStageDisplayName,
-  useSmoothProgress,
-  useSmoothedETA,
-  getProgressColor
-} from '@/hooks/useProgress'
-import { ProgressBarWithInfo } from '@/components/ui/progress-bar'
+import { useProgress, useSmoothProgress, useSmoothedETA } from '@/hooks/useProgress'
 import { fetchGenerationJobStatus } from '@/lib/api/timetable'
 import type { GenerationJob } from '@/types/timetable'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, ReactNode } from 'react'
+import { DM_Serif_Display, DM_Sans, JetBrains_Mono } from 'next/font/google'
+
+const dmSerifDisplay = DM_Serif_Display({ subsets: ['latin'], weight: '400' })
+const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
+const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '700'] })
+
+// ─── CSS Keyframes + Static Utility Classes ──────────────────────────────────
+const CSS_KEYFRAMES = `
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+@keyframes nodePulse {
+  0%, 100% { transform: scale(1);    }
+  50%       { transform: scale(1.12); }
+}
+@keyframes scalePop {
+  0%   { transform: scale(1);    }
+  50%  { transform: scale(1.04); }
+  100% { transform: scale(1);    }
+}
+@keyframes drawCheck {
+  to { stroke-dashoffset: 0; }
+}
+.shimmer-overlay {
+  background: linear-gradient(
+    90deg,
+    transparent              0%,
+    rgba(255,255,255,0.45)  35%,
+    rgba(255,255,255,0.75)  50%,
+    rgba(255,255,255,0.45)  65%,
+    transparent             100%
+  );
+  animation: shimmer 1.8s linear infinite;
+}
+/* Dot-grid page background — locked to viewport, no scroll */
+.page-bg {
+  height: 100vh;
+  overflow: hidden;
+  background: #F8FAFF;
+  background-image: radial-gradient(circle, #CBD5E1 1px, transparent 1px);
+  background-size: 24px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  position: relative;
+}
+/* Shared modal card */
+.modal-card { box-shadow: 0 4px 24px rgba(15,23,42,0.06); padding: 28px 36px; z-index: 1; }
+.modal-card--in  { animation: fadeUp 400ms ease-out both; }
+.modal-card--in1 { animation: fadeUp 400ms ease-out 100ms both; }
+/* Top gradient overlay */
+.top-gradient { background: linear-gradient(to bottom, rgba(248,250,255,0.95), transparent); z-index: 0; }
+/* SVG icon sizes */
+.stage-icon { width: 14px; height: 14px; }
+.small-icon { width: 12px; height: 12px; }
+/* Connecting spinner border */
+.spinner { border-color: #E2E8F0; border-top-color: #2563EB; }
+/* Connecting screen centre */
+.center-fade { text-align: center; animation: fadeUp 400ms ease-out 100ms both; }
+/* Checkmark SVG path draw-on animation */
+.check-path { stroke-dasharray: 44; stroke-dashoffset: 44; animation: drawCheck 600ms ease-in-out forwards; }
+/* Success bar (always 100% green) */
+.complete-track { height: 14px; background-color: hsl(120,80%,94%); }
+.complete-fill  { height: 100%; border-radius: 9999px; background-color: hsl(120,88%,48%); }
+/* Dynamic progress bar — driven by CSS custom properties */
+.progress-track { height: 14px; background-color: var(--track-color, #E2E8F0); }
+.progress-fill {
+  height: 100%; position: absolute; top: 0; left: 0;
+  border-radius: 9999px;
+  background-color: var(--bar-color, #2563EB);
+  box-shadow: 0 2px 8px var(--shadow-color, transparent);
+  width: var(--progress-pct, 0%);
+  transition: none;
+}
+.progress-shimmer-fill {
+  height: 100%; position: absolute; top: 0; left: 0;
+  border-radius: 9999px;
+  width: var(--progress-pct, 0%);
+  transition: none;
+}
+/* Percentage counter */
+.pct-display {
+  font-size: 2.5rem; font-weight: 700;
+  color: var(--bar-color, #2563EB);
+  display: inline-block;
+  animation: scalePop 150ms ease-out;
+}
+/* Stage stepper node states */
+.stage-node-fill {
+  background-color: var(--bar-color, #2563EB);
+  border-color: var(--bar-color, #2563EB);
+  color: #ffffff;
+}
+.stage-node-pulse {
+  box-shadow: 0 0 0 4px var(--track-color, #DBEAFE);
+  animation: nodePulse 2s ease-in-out infinite;
+}
+.stage-node-idle { background-color: transparent; border-color: #E2E8F0; color: #94A3B8; }
+.stage-label-active { font-size: 11px; max-width: 68px; color: #0F172A; font-weight: 600; }
+.stage-label-idle   { font-size: 11px; max-width: 68px; color: #94A3B8; font-weight: 400; }
+/* Connector lines */
+.connector-filled { height: 2px; background-color: var(--bar-color, #2563EB); }
+.connector-dashed {
+  height: 2px;
+  background-image: repeating-linear-gradient(
+    90deg, #E2E8F0 0, #E2E8F0 4px, transparent 4px, transparent 8px
+  );
+}
+/* Connection status dot */
+.status-dot-live  { background-color: #22C55E; box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
+.status-dot-warn  { background-color: #F59E0B; }
+.status-dot-err   { background-color: #EF4444; }
+/* Staggered entry animations */
+.fu-0   { animation: fadeUp 400ms ease-out both; }
+.fu-100 { animation: fadeUp 400ms ease-out 100ms both; }
+.fu-150 { animation: fadeUp 400ms ease-out 150ms both; }
+.fu-200 { animation: fadeUp 400ms ease-out 200ms both; }
+.fu-250 { animation: fadeUp 400ms ease-out 250ms both; }
+.fu-300 { animation: fadeUp 400ms ease-out 300ms both; }
+.fu-350 { animation: fadeUp 400ms ease-out 350ms both; }
+.fu-400 { animation: fadeUp 400ms ease-out 400ms both; }
+.fu-450 { animation: fadeUp 400ms ease-out 450ms both; }
+.fu-500 { animation: fadeUp 400ms ease-out 500ms both; }
+`
+
+// ─── Stage configuration ──────────────────────────────────────────────────────
+interface StageConfig {
+  key: string
+  label: string
+  description: string
+  icon: ReactNode
+}
+
+const STAGES: StageConfig[] = [
+  {
+    key: 'loading',
+    label: 'Reading Data',
+    description: 'Loading student and faculty information...',
+    icon: (
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="stage-icon">
+        <rect x="1.5" y="1.5" width="13" height="13" rx="2" />
+        <path d="M4 5.5h8M4 8h8M4 10.5h5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    key: 'clustering',
+    label: 'Organising Courses',
+    description: 'Grouping related subjects together...',
+    icon: (
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="stage-icon">
+        <path d="M2 4h12M4 8h8M6 12h4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    key: 'cpsat_solving',
+    label: 'Building Schedule',
+    description: 'Assigning all courses to rooms and available time slots...',
+    icon: (
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="stage-icon">
+        <rect x="1.5" y="3" width="13" height="11.5" rx="1.5" />
+        <path d="M5.5 1v4M10.5 1v4M1.5 8h13" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    key: 'ga_optimization',
+    label: 'Refining Timetable',
+    description: 'Resolving conflicts and improving overall balance...',
+    icon: (
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="stage-icon">
+        <path d="M8 2l1.6 3.2 3.5.5-2.55 2.48.6 3.5L8 9.95 4.85 11.68l.6-3.5L2.9 5.7l3.5-.5z" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    key: 'rl_refinement',
+    label: 'Final Polish',
+    description: 'Completing final checks and quality verification...',
+    icon: (
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="stage-icon">
+        <path d="M13 8A5 5 0 113 8" strokeLinecap="round" />
+        <path d="M8 3V1M8 3l-1.5 1.5M8 3l1.5 1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+]
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function getStageOrder(stage: string): number {
+  const order: Record<string, number> = {
+    initializing: 0, loading: 1, clustering: 2,
+    cpsat_solving: 3, ga_optimization: 4, rl_refinement: 5,
+    completed: 6, failed: 6, cancelled: 6,
+  }
+  return order[stage] ?? 0
+}
+
+function formatETADisplay(seconds: number | null): string {
+  if (seconds === null || seconds < 5) return 'Almost done...'
+  if (seconds < 60) return `~${Math.round(seconds)} sec remaining`
+  const mins = Math.ceil(seconds / 60)
+  return `~${mins} min remaining`
+}
+
+
 
 export default function TimetableStatusPage() {
   const params = useParams()
@@ -69,81 +274,39 @@ export default function TimetableStatusPage() {
 
   const { progress, isConnected, error, reconnectAttempt } = useProgress(
     jobId,
-    // On completion
-    (data) => {
-      console.log('Generation completed:', data.job_id)
-      setTimeout(() => {
-        router.push(`/admin/timetables`)
-      }, 2000)
-    },
-    // On error
-    (err) => {
-      console.error('Generation failed:', err)
-    }
+    () => { /* completion handled via useEffect on progress.status */ },
+    (err) => { console.error('[Status] generation error:', err) }
   )
 
-  // ========================================
-  // ENTERPRISE SMOOTH ANIMATION INTEGRATION
-  // ========================================
-  // Apply velocity-based physics to raw backend progress
-  // This creates smooth 60 FPS animation even with irregular updates
-  
   const smoothOverallProgress = useSmoothProgress(
-    progress?.overall_progress || 0,
-    {
-      acceleration: 0.02,   // Moderate acceleration feel
-      damping: 0.85,        // Natural deceleration
-      epsilon: 0.05,        // Snap within 0.05%
-      completionDuration: 600  // Smooth 600ms finish
-    }
-  )
-  
-  const smoothStageProgress = useSmoothProgress(
-    progress?.stage_progress || 0,
-    {
-      acceleration: 0.03,   // Slightly faster for stage (changes more frequently)
-      damping: 0.8,         // Less damping for quicker response
-      epsilon: 0.1,
-      completionDuration: 400
-    }
-  )
-  
-  // Exponential smoothing for ETA (prevents jarring jumps)
-  const smoothETA = useSmoothedETA(
-    progress?.eta_seconds || 0,
-    0.15  // 15% weight to new value (moderate smoothing)
+    progress?.overall_progress ?? 0,
+    { acceleration: 0.02, damping: 0.85, epsilon: 0.05, completionDuration: 600 }
   )
 
-  // Handle terminal states
-  useEffect(() => {
-    if (progress?.status === 'completed') {
-      setTimeout(() => {
-        router.push(`/admin/timetables`)
-      }, 2000)
-    }
-  }, [progress?.status, router])
+  // smoothStageProgress kept alive — hook must not be conditionally skipped
+  useSmoothProgress(
+    progress?.stage_progress ?? 0,
+    { acceleration: 0.03, damping: 0.8, epsilon: 0.1, completionDuration: 400 }
+  )
 
-  // ─── REST polling fallback ────────────────────────────────────────────────
-  // If the SSE stream doesn't deliver any progress within 30 s (e.g. because
-  // the Django server hasn't started writing to Redis yet, or the SSE
-  // connection drops before reconnect succeeds), we fall back to polling the
-  // standard REST job-status endpoint every 5 s so the user can still see
-  // that the generation is alive.
+  const smoothETA = useSmoothedETA(progress?.eta_seconds ?? 0, 0.15)
 
+  // ── UI state ────────────────────────────────────────────────────────────────
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [countdown, setCountdown] = useState(3)
+
+  // ── REST polling fallback (functional — hidden from UI) ──────────────────────
   const [sseTimedOut, setSseTimedOut] = useState(false)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [polledJob, setPolledJob] = useState<GenerationJob | null>(null)
 
-  // Arm a 30-second one-shot timer.  Cleared immediately if SSE catches up.
   useEffect(() => {
-    if (progress) {
-      setSseTimedOut(false) // SSE is healthy – cancel fallback if active
-      return
-    }
+    if (progress) { setSseTimedOut(false); return }
     const timer = setTimeout(() => setSseTimedOut(true), 30_000)
     return () => clearTimeout(timer)
   }, [progress])
 
-  // Polling loop: active only while SSE has not delivered progress
   useEffect(() => {
     if (!sseTimedOut || progress) return
     let cancelled = false
@@ -151,432 +314,381 @@ export default function TimetableStatusPage() {
       try {
         const job = await fetchGenerationJobStatus(jobId)
         if (!cancelled) setPolledJob(job)
-      } catch {
-        // swallow – next tick will retry
-      }
+      } catch { /* swallow — next tick retries */ }
     }
     poll()
     const id = setInterval(poll, 5_000)
-    return () => {
-      cancelled = true
-      clearInterval(id)
-    }
+    return () => { cancelled = true; clearInterval(id) }
   }, [sseTimedOut, progress, jobId])
 
-  // Render connection error
+  // ── Success countdown + redirect ─────────────────────────────────────────────
+  useEffect(() => {
+    if (progress?.status !== 'completed') return
+    setCountdown(3)
+    const tick = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) { clearInterval(tick); router.push('/admin/timetables'); return 0 }
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(tick)
+  }, [progress?.status, router])
+
+  // ── Derived colour values — single source: hue ───────────────────────────────
+  const hue         = (smoothOverallProgress / 100) * 120
+  const barColor    = `hsl(${hue}, 88%, 48%)`
+  const trackColor  = `hsl(${hue}, 80%, 94%)`
+  const shadowColor = `hsla(${hue}, 60%, 70%, 0.4)`
+  const GREEN       = 'hsl(120, 88%, 48%)'
+  const GREEN_TRACK = 'hsl(120, 80%, 94%)'
+
+  // ── CSS-variable injection via DOM ref — avoids inline style props ──────────
+  const containerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    el.style.setProperty('--bar-color',    barColor)
+    el.style.setProperty('--track-color',  trackColor)
+    el.style.setProperty('--shadow-color', shadowColor)
+    el.style.setProperty('--progress-pct', `${smoothOverallProgress}%`)
+  }, [barColor, trackColor, shadowColor, smoothOverallProgress])
+
+  // ── Cancel handler ───────────────────────────────────────────────────────────
+  const handleCancel = async () => {
+    setIsCancelling(true)
+    try {
+      await fetch(
+        `${process.env.NEXT_PUBLIC_DJANGO_API_URL ?? 'http://localhost:8000'}/api/generation-jobs/${jobId}/cancel/`,
+        { method: 'POST', credentials: 'include' }
+      )
+      router.push('/admin/timetables')
+    } catch (e) {
+      console.error('Failed to cancel:', e)
+      setIsCancelling(false)
+      setShowCancelConfirm(false)
+    }
+  }
+
+  // ── Connection error ─────────────────────────────────────────────────────────
   if (error && reconnectAttempt > 5) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center p-4">
-        <div className="max-w-2xl w-full bg-white dark:bg-[#2C2C2C] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-8">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full mb-6">
-              <svg className="w-12 h-12 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h2 className="text-3xl font-bold text-red-600 dark:text-red-400 mb-4">
-              Connection Lost
-            </h2>
-            <p className="text-[#606060] dark:text-[#aaaaaa] mb-8">{error}</p>
-            <div className="flex gap-4 justify-center">
-              <button
-                onClick={() => window.location.reload()}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors shadow-lg"
-              >
-                Retry Connection
-              </button>
-              <button
-                onClick={() => router.push('/admin/timetables')}
-                className="px-6 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg text-[#2C2C2C] dark:text-white font-semibold transition-colors"
-              >
-                Back to Timetables
-              </button>
-            </div>
+      <div className={`page-bg ${dmSans.className}`}>
+        <div className="max-w-[680px] w-full bg-white border border-[#E2E8F0] rounded-2xl text-center modal-card modal-card--in">
+          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F172A] font-medium mb-6 -ml-1 transition-colors">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Back to Timetables
+          </button>
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Render initial loading / reconnecting state.
-  // This catches three sub-cases:
-  //   a) First load, SSE not yet connected (no error)
-  //   b) SSE sent a named error event and is reconnecting (error && attempt <=5)
-  //   c) SSE timed out and we are showing REST-polled status
-  if (!progress) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 dark:border-indigo-800 border-t-indigo-600 dark:border-t-indigo-400 mb-4"></div>
-          <p className="text-lg font-semibold text-[#2C2C2C] dark:text-white mb-2">
-            {error
-              ? `Reconnecting to generation service…`
-              : 'Connecting to generation service...'}
-          </p>
-          <p className="text-sm text-[#606060] dark:text-[#aaaaaa] font-mono">
-            Job ID: {jobId}
-          </p>
-          {reconnectAttempt > 0 && (
-            <p className="mt-2 text-xs text-yellow-600 dark:text-yellow-400">
-              Reconnecting... (attempt {reconnectAttempt}/5)
-            </p>
-          )}
-          {error && (
-            <p className="mt-2 text-xs text-red-500 dark:text-red-400 max-w-sm mx-auto">
-              Last error: {error}
-            </p>
-          )}
-          {polledJob && (
-            <div className="mt-4 text-sm text-[#606060] dark:text-[#aaaaaa] bg-white dark:bg-[#2C2C2C] rounded-lg px-4 py-2 inline-block shadow">
-              <span className="font-semibold">Job status (REST):</span>{' '}
-              <span className="capitalize">{polledJob.status}</span>
-              {polledJob.progress > 0 && (
-                <span className="ml-2">— {polledJob.progress}%</span>
-              )}
-            </div>
-          )}
-          {sseTimedOut && !polledJob && (
-            <p className="mt-3 text-xs text-yellow-600 dark:text-yellow-400">
-              SSE stream is slow — checking job status via REST…
-            </p>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Render completion state
-  if (progress?.status === 'completed') {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center p-4">
-        <div className="max-w-2xl w-full bg-white dark:bg-[#2C2C2C] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-8">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full mb-6">
-              <svg className="w-12 h-12 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h2 className="text-3xl font-bold text-green-600 dark:text-green-400 mb-4">
-              Schedule Ready!
-            </h2>
-            <p className="text-[#606060] dark:text-[#aaaaaa] mb-8 text-lg">
-              Your timetable has been successfully generated and is ready for review.
-            </p>
+          <h2 className={`${dmSerifDisplay.className} text-[24px] text-[#0F172A] mb-3`}>
+            Connection Lost
+          </h2>
+          <p className="text-[#64748B] text-[15px] mb-8 max-w-xs mx-auto">{error}</p>
+          <div className="flex gap-3 justify-center">
             <button
-              onClick={() => router.push('/admin/timetables')}
-              className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors shadow-lg"
+              onClick={() => window.location.reload()}
+              className="px-6 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold rounded-xl text-sm transition-colors"
             >
-              View Timetables
+              Try Again
             </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Render failed state
-  if (progress?.status === 'failed') {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center p-4">
-        <div className="max-w-2xl w-full bg-white dark:bg-[#2C2C2C] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-8">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full mb-6">
-              <svg className="w-12 h-12 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <h2 className="text-3xl font-bold text-red-600 dark:text-red-400 mb-4">
-              Generation Failed
-            </h2>
-            <p className="text-[#606060] dark:text-[#aaaaaa] mb-8 text-lg">
-              {progress.metadata?.error || 'An error occurred during timetable generation.'}
-            </p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => router.push('/admin/timetables')}
-                className="px-6 py-3 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-[#2C2C2C] dark:text-white font-semibold rounded-lg transition-colors"
-              >
-                Back to Timetables
-              </button>
-              <button
-                onClick={() => router.push('/admin/timetables/new')}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors shadow-lg"
-              >
-                Try Again
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Render cancelled state
-  if (progress?.status === 'cancelled') {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center p-4">
-        <div className="max-w-2xl w-full bg-white dark:bg-[#2C2C2C] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-8">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-yellow-100 dark:bg-yellow-900/30 rounded-full mb-6">
-              <svg className="w-12 h-12 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <h2 className="text-3xl font-bold text-yellow-600 dark:text-yellow-400 mb-4">
-              Cancelled by User
-            </h2>
-            <p className="text-[#606060] dark:text-[#aaaaaa] mb-8 text-lg">
-              The timetable generation was cancelled.
-            </p>
             <button
               onClick={() => router.push('/admin/timetables')}
-              className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors shadow-lg"
+              className="px-6 py-2.5 border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] font-semibold rounded-xl text-sm transition-colors"
             >
               Back to Timetables
             </button>
           </div>
         </div>
+        <style>{CSS_KEYFRAMES}</style>
       </div>
     )
   }
 
-  // Render active progress state
-  // Use SMOOTH values for display (not raw backend values)
-  const stageName = getStageDisplayName(progress?.stage || 'initializing')
-  const overallProgress = smoothOverallProgress  // Physics-animated
-  const stageProgress = smoothStageProgress      // Physics-animated
-  const eta = formatETA(smoothETA)               // Exponentially smoothed
+  // ── Connecting / loading ─────────────────────────────────────────────────────
+  if (!progress) {
+    return (
+      <div className={`page-bg ${dmSans.className}`}>
+        <div className="center-fade">
+          <div className="w-12 h-12 rounded-full border-4 animate-spin mx-auto mb-6 spinner" />
+          <p className="text-[#0F172A] font-semibold text-[17px] mb-1">
+            {reconnectAttempt > 0 ? 'Reconnecting...' : 'Connecting...'}
+          </p>
+          <p className="text-[#64748B] text-sm">
+            {reconnectAttempt > 0 ? `Attempt ${reconnectAttempt} of 5` : 'Please wait a moment'}
+          </p>
+        </div>
+        <style>{CSS_KEYFRAMES}</style>
+      </div>
+    )
+  }
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full bg-white dark:bg-[#2C2C2C] rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 dark:bg-indigo-900/30 rounded-full mb-4">
-            <svg className="w-8 h-8 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  // ── Success ──────────────────────────────────────────────────────────────────
+  if (progress.status === 'completed') {
+    return (
+      <div className={`page-bg ${dmSans.className}`}>
+        <div className="max-w-[680px] w-full bg-white border border-[#E2E8F0] rounded-2xl text-center modal-card modal-card--in">
+          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F172A] font-medium mb-4 -ml-1 transition-colors">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Back to Timetables
+          </button>
+          <svg className="mx-auto mb-8" width="96" height="96" viewBox="0 0 52 52">
+            <circle cx="26" cy="26" r="25" fill={GREEN_TRACK} stroke={GREEN} strokeWidth="1.5" />
+            <path
+              d="M14 27l8 8 16-16"
+              fill="none" stroke={GREEN} strokeWidth="3"
+              strokeLinecap="round" strokeLinejoin="round"
+              className="check-path"
+            />
+          </svg>
+          <h2 className={`${dmSerifDisplay.className} text-[28px] text-[#0F172A] mb-3`}>
+            Timetable Ready
+          </h2>
+          <p className="text-[#64748B] text-[15px] mb-8">
+            Redirecting to your schedule{countdown > 0 ? ` in ${countdown}...` : '...'}
+          </p>
+          <div className="w-full overflow-hidden mb-8 complete-track">
+            <div className="complete-fill" />
+          </div>
+          <button
+            onClick={() => router.push('/admin/timetables')}
+            className="px-8 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold rounded-xl text-sm transition-colors"
+          >
+            View Timetables
+          </button>
+        </div>
+        <style>{CSS_KEYFRAMES}</style>
+      </div>
+    )
+  }
+
+  // ── Failed ───────────────────────────────────────────────────────────────────
+  if (progress.status === 'failed') {
+    const errorMsg = progress.metadata?.error != null
+      ? String(progress.metadata.error)
+      : 'Something went wrong while building the timetable. Please try again.'
+    return (
+      <div className={`page-bg ${dmSans.className}`}>
+        <div className="max-w-[680px] w-full bg-white border border-[#E2E8F0] rounded-2xl text-center modal-card modal-card--in">
+          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F172A] font-medium mb-6 -ml-1 transition-colors">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Back to Timetables
+          </button>
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-[#2C2C2C] dark:text-white mb-2">
-            Generating Timetable
-          </h1>
-          <p className="text-[#606060] dark:text-[#aaaaaa] mb-3">
-            Please wait while we optimize your schedule...
-          </p>
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-full">
-            <span className="text-xs font-mono text-gray-500 dark:text-gray-400">Job ID:</span>
-            <span className="text-xs font-mono font-semibold text-indigo-600 dark:text-indigo-400">{jobId}</span>
-          </div>
-        </div>
-
-        {/* Status Indicators & Actions */}
-        <div className="mb-8 flex items-center justify-between">
-          {/* Left: Connection Status */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className={`h-2 w-2 rounded-full ${
-                isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-              }`} />
-              <span className="text-xs font-medium text-[#606060] dark:text-[#aaaaaa]">
-                {isConnected ? 'Live Updates' : 'Disconnected'}
-              </span>
-            </div>
-            <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
-            <div className="text-xs px-2.5 py-1 bg-indigo-50 dark:bg-indigo-900/20 rounded-full text-indigo-600 dark:text-indigo-400 font-medium">
-              60 FPS Animation
-            </div>
-          </div>
-          
-          {/* Right: Action Buttons */}
-          <div className="flex items-center gap-2">
+          <h2 className={`${dmSerifDisplay.className} text-[28px] text-[#0F172A] mb-3`}>
+            Generation Failed
+          </h2>
+          <p className="text-[#64748B] text-[15px] mb-8 max-w-sm mx-auto">{errorMsg}</p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => router.push('/admin/timetables/new')}
+              className="px-6 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold rounded-xl text-sm transition-colors"
+            >
+              Try Again
+            </button>
             <button
               onClick={() => router.push('/admin/timetables')}
-              className="px-4 py-2 text-sm font-medium text-[#606060] dark:text-[#aaaaaa] hover:text-[#2C2C2C] dark:hover:text-white bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              className="px-6 py-2.5 border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] font-semibold rounded-xl text-sm transition-colors"
             >
-              ← Back
-            </button>
-            <button
-              onClick={async () => {
-                if (confirm('Are you sure you want to cancel timetable generation?')) {
-                  try {
-                    await fetch(`${process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000'}/api/generation-jobs/${jobId}/cancel/`, {
-                      method: 'POST',
-                      credentials: 'include'
-                    })
-                    router.push('/admin/timetables')
-                  } catch (error) {
-                    console.error('Failed to cancel:', error)
-                  }
-                }
-              }}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Cancel Generation
+              Back to Timetables
             </button>
           </div>
         </div>
+        <style>{CSS_KEYFRAMES}</style>
+      </div>
+    )
+  }
 
-        {/* Overall Progress Bar - Enterprise Smooth Animation */}
-        <div className="mb-8 p-6 bg-gray-50 dark:bg-[#1a1a1a] rounded-xl border border-gray-200 dark:border-gray-700">
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-sm font-semibold text-[#2C2C2C] dark:text-white">
-              Overall Progress
-            </span>
-            <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-              {Math.floor(overallProgress)}%
-            </span>
-          </div>
-          {/* Physics-based smooth progress bar with HSL color gradient */}
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-5 overflow-hidden shadow-inner">
-            <div
-              className="h-5 rounded-full"
-              style={{
-                width: `${overallProgress}%`,
-                backgroundColor: getProgressColor(overallProgress),
-                // NO CSS transitions - animation via requestAnimationFrame
-                transition: 'none',
-                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Current Stage */}
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/10 dark:to-purple-900/10 rounded-xl p-6 mb-8 border border-indigo-100 dark:border-indigo-900/30">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-xs text-[#606060] dark:text-[#aaaaaa] uppercase tracking-wide font-semibold mb-1">
-                Current Stage
-              </p>
-              <h3 className="text-2xl font-bold text-[#2C2C2C] dark:text-white flex items-center gap-2">
-                <span className="inline-block w-2 h-2 bg-indigo-600 dark:bg-indigo-400 rounded-full animate-pulse"></span>
-                {stageName}
-              </h3>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-[#606060] dark:text-[#aaaaaa] uppercase tracking-wide font-semibold mb-1">
-                Stage Progress
-              </p>
-              <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                {Math.floor(stageProgress)}%
-              </p>
-            </div>
-          </div>
-          
-          {/* Stage Progress Bar - Smooth Animation */}
-          <div className="w-full bg-white dark:bg-gray-800 rounded-full h-3 overflow-hidden shadow-inner">
-            <div
-              className="h-3 rounded-full"
-              style={{
-                width: `${stageProgress}%`,
-                backgroundColor: getProgressColor(stageProgress),
-                transition: 'none'  // No CSS transitions
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Estimated Time Remaining */}
-        <div className="text-center mb-8 p-6 bg-white dark:bg-[#2C2C2C] rounded-xl border border-gray-200 dark:border-gray-700">
-          <div className="inline-flex items-center gap-2 mb-2">
-            <svg className="w-5 h-5 text-[#606060] dark:text-[#aaaaaa]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  // ── Cancelled ────────────────────────────────────────────────────────────────
+  if (progress.status === 'cancelled') {
+    return (
+      <div className={`page-bg ${dmSans.className}`}>
+        <div className="max-w-[680px] w-full bg-white border border-[#E2E8F0] rounded-2xl text-center modal-card modal-card--in">
+          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F172A] font-medium mb-6 -ml-1 transition-colors">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Back to Timetables
+          </button>
+          <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
             </svg>
-            <p className="text-sm font-semibold text-[#606060] dark:text-[#aaaaaa] uppercase tracking-wide">
-              Time Remaining
-            </p>
           </div>
-          <p className="text-4xl font-bold text-[#2C2C2C] dark:text-white">
-            {eta}
+          <h2 className={`${dmSerifDisplay.className} text-[28px] text-[#0F172A] mb-3`}>
+            Generation Cancelled
+          </h2>
+          <p className="text-[#64748B] text-[15px] mb-8">The timetable generation was stopped.</p>
+          <button
+            onClick={() => router.push('/admin/timetables')}
+            className="px-8 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold rounded-xl text-sm transition-colors"
+          >
+            Back to Timetables
+          </button>
+        </div>
+        <style>{CSS_KEYFRAMES}</style>
+      </div>
+    )
+  }
+
+  // ── Active progress ──────────────────────────────────────────────────────────
+  const currentStageOrder = getStageOrder(progress.stage ?? 'loading')
+  const activeStage = STAGES.find(s => s.key === progress.stage) ?? STAGES[0]
+
+  const semesterNum  = progress.metadata?.semester  as string | number | undefined
+  const academicYear = progress.metadata?.academic_year as string | undefined
+  const subtitle = semesterNum && academicYear
+    ? `Semester ${semesterNum} · ${academicYear}`
+    : 'Timetable Generation in Progress'
+
+  return (
+    <div ref={containerRef} className={`page-bg ${dmSans.className}`}>
+
+      {/* Top gradient fade */}
+      <div className="fixed top-0 left-0 right-0 h-32 pointer-events-none top-gradient" />
+
+      {/* Main card */}
+      <div className="relative max-w-[680px] w-full bg-white border border-[#E2E8F0] rounded-2xl modal-card modal-card--in1">
+
+        {/* Back navigation */}
+        <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F172A] font-medium mb-5 -ml-1 transition-colors fu-100">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          Back to Timetables
+        </button>
+
+        {/* Institution badge */}
+        <p className="text-[11px] font-medium uppercase tracking-widest text-[#64748B] mb-2 fu-150">
+          Banaras Hindu University
+        </p>
+
+        {/* Heading — DM Sans (parent font), bold */}
+        <h1 className="text-[26px] font-bold text-[#0F172A] mb-1 fu-200">
+          Building Your Timetable
+        </h1>
+
+        {/* Subtitle */}
+        <p className="text-[15px] text-[#64748B] mb-5 fu-250">
+          {subtitle}
+        </p>
+
+        {/* Percentage number — key remount triggers scalePop on each integer change */}
+        <div className="text-right mb-2 fu-300">
+          <span
+            key={Math.floor(smoothOverallProgress)}
+            className={`${jetbrainsMono.className} pct-display`}
+          >
+            {smoothOverallProgress.toFixed(1)}%
+          </span>
+        </div>
+
+        {/* Progress bar */}
+        <div className="fu-350">
+          <div className="relative w-full rounded-full overflow-hidden progress-track">
+            {/* Coloured fill — width driven by CSS var (--progress-pct) set via DOM ref */}
+            <div className="progress-fill" />
+            {/* Shimmer overlay — clipped to fill width only */}
+            <div className="shimmer-overlay progress-shimmer-fill" />
+          </div>
+        </div>
+
+        {/* ETA + active stage description */}
+        <div className="mt-3 flex items-start justify-between gap-6 fu-400">
+          <p className="text-[13px] text-[#64748B] italic leading-snug">
+            {activeStage.description}
+          </p>
+          <p className="text-[14px] text-[#64748B] whitespace-nowrap shrink-0">
+            {formatETADisplay(smoothETA)}
           </p>
         </div>
 
-        {/* Stage Breakdown */}
-        <div className="mb-8">
-          <h3 className="text-sm font-semibold text-[#2C2C2C] dark:text-white mb-4 uppercase tracking-wide">
-            Generation Pipeline
-          </h3>
-          <div className="grid grid-cols-5 gap-3">
-            {[
-              { name: 'Data Load', key: 'loading', weight: '5%' },
-              { name: 'Organize', key: 'clustering', weight: '10%' },
-              { name: 'Build', key: 'cpsat_solving', weight: '60%' },
-              { name: 'Optimize', key: 'ga_optimization', weight: '15%' },
-              { name: 'Finalize', key: 'rl_refinement', weight: '10%' }
-            ].map(stage => {
-              const isCurrent = progress?.stage === stage.key
-              const isPast = getStageOrder(progress?.stage || '') > getStageOrder(stage.key)
-              
+        {/* Stage pipeline stepper */}
+        <div className="mt-6 mb-5 fu-450">
+          <div className="relative flex items-start">
+            {STAGES.map((stage, i) => {
+              const stageOrder  = getStageOrder(stage.key)
+              const isCompleted = currentStageOrder > stageOrder
+              const isActive    = progress.stage === stage.key
+              const isDone      = isCompleted || isActive
+
               return (
-                <div
-                  key={stage.key}
-                  className={`p-4 rounded-xl text-center transition-all ${
-                    isCurrent
-                      ? 'bg-indigo-600 dark:bg-indigo-600 shadow-lg scale-105'
-                      : isPast
-                      ? 'bg-green-500 dark:bg-green-600 shadow-md'
-                      : 'bg-gray-200 dark:bg-gray-700 opacity-60'
-                  }`}
-                >
-                  <p className={`text-xs font-bold mb-1 ${
-                    isCurrent || isPast
-                      ? 'text-white'
-                      : 'text-[#606060] dark:text-[#aaaaaa]'
-                  }`}>
-                    {stage.name}
-                  </p>
-                  <p className={`text-[10px] ${
-                    isCurrent || isPast
-                      ? 'text-white/80'
-                      : 'text-gray-500 dark:text-gray-500'
-                  }`}>
-                    {stage.weight}
-                  </p>
-                  {isPast && <div className="text-lg mt-1">✓</div>}
-                  {isCurrent && <div className="text-lg mt-1 animate-pulse">⏳</div>}
+                <div key={stage.key} className="flex items-start flex-1 last:flex-none">
+                  {/* Node + label */}
+                  <div className="flex flex-col items-center min-w-0">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 ${isDone ? 'stage-node-fill' : 'stage-node-idle'}${isActive ? ' stage-node-pulse' : ''}`}
+                    >
+                      {isCompleted ? (
+                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" className="small-icon">
+                          <path d="M2 6l3 3 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : (
+                        stage.icon
+                      )}
+                    </div>
+                    <span className={`mt-2 text-center leading-tight ${isDone ? 'stage-label-active' : 'stage-label-idle'}`}>
+                      {stage.label}
+                    </span>
+                  </div>
+
+                  {/* Connector line (not after last node) */}
+                  {i < STAGES.length - 1 && (
+                    <div className={`flex-1 self-start mt-4 mx-1 ${isCompleted ? 'connector-filled' : 'connector-dashed'}`} />
+                  )}
                 </div>
               )
             })}
           </div>
         </div>
 
-        {/* Info Cards */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="p-4 bg-white dark:bg-[#2C2C2C] rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-[#606060] dark:text-[#aaaaaa] font-semibold mb-1 uppercase tracking-wide">Stage</p>
-            <p className="text-sm font-bold text-[#2C2C2C] dark:text-white truncate">{stageName}</p>
+        {/* Separator */}
+        <div className="h-px bg-[#E2E8F0] mb-6" />
+
+        {/* Footer: connection dot + cancel */}
+        <div className="flex items-center justify-between flex-wrap gap-3 fu-500">
+          {/* Tiny connection indicator */}
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? 'status-dot-live' : reconnectAttempt > 0 ? 'status-dot-warn' : 'status-dot-err'}`}
+            />
+            <span className="text-[11px] text-[#64748B]">
+              {isConnected ? 'Live' : reconnectAttempt > 0 ? 'Reconnecting...' : 'Offline'}
+            </span>
           </div>
-          <div className="p-4 bg-white dark:bg-[#2C2C2C] rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-[#606060] dark:text-[#aaaaaa] font-semibold mb-1 uppercase tracking-wide">Progress</p>
-            <p className="text-sm font-bold text-[#2C2C2C] dark:text-white">{Math.floor(overallProgress)}%</p>
-          </div>
-          <div className="p-4 bg-white dark:bg-[#2C2C2C] rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-[#606060] dark:text-[#aaaaaa] font-semibold mb-1 uppercase tracking-wide">ETA</p>
-            <p className="text-sm font-bold text-[#2C2C2C] dark:text-white">{eta}</p>
-          </div>
+
+          {/* Cancel / inline confirmation */}
+          {!showCancelConfirm ? (
+            <button
+              onClick={() => setShowCancelConfirm(true)}
+              className="text-[13px] font-medium text-red-400 hover:text-red-600 border border-red-200 hover:border-red-300 px-4 py-2 rounded-xl transition-colors"
+            >
+              Cancel Generation
+            </button>
+          ) : (
+            <div className="flex items-center gap-3 flex-wrap justify-end">
+              <span className="text-[13px] text-[#64748B]">Are you sure? This cannot be undone.</span>
+              <button
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="text-[13px] font-semibold text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 px-4 py-2 rounded-xl transition-colors"
+              >
+                {isCancelling ? 'Stopping...' : 'Yes, stop'}
+              </button>
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                className="text-[13px] font-medium text-[#64748B] hover:text-[#0F172A] px-3 py-2 rounded-xl transition-colors"
+              >
+                Keep going
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      <style>{CSS_KEYFRAMES}</style>
     </div>
   )
-}
-
-/**
- * Helper to determine stage order for UI visual states
- */
-function getStageOrder(stage: string): number {
-  const order: Record<string, number> = {
-    'initializing': 0,
-    'loading': 1,
-    'clustering': 2,
-    'cpsat_solving': 3,
-    'ga_optimization': 4,
-    'rl_refinement': 5,
-    'completed': 6,
-    'failed': 6,
-    'cancelled': 6
-  }
-  return order[stage] || 0
 }
