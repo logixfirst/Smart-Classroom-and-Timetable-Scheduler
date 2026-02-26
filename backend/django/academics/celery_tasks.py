@@ -8,6 +8,13 @@ from django.conf import settings
 from django.core.cache import cache
 import requests
 import logging
+
+# Day-name → int mapping shared by the cache-warmer and TimetableVariantViewSet.
+_DAY_STR_MAP: dict[str, int] = {
+    'Monday': 0, 'Tuesday': 1, 'Wednesday': 2,
+    'Thursday': 3, 'Friday': 4, 'Saturday': 5, 'Sunday': 6,
+}
+
 from .models import GenerationJob
 from django.utils import timezone
 
@@ -147,67 +154,118 @@ def generate_timetable_task(self, job_id, org_id, academic_year, semester):
         return {'status': 'failed', 'error': str(e)}
 
 
+def _convert_entries_for_cache(entries: list) -> list:
+    """Convert FastAPI entry format → frontend TimetableEntry format (≤ 500 entries).
+
+    Mirrors TimetableVariantViewSet._convert_timetable_entries so both the
+    viewset and the Celery cache-warmer produce identical payloads.
+    """
+    result = []
+    for e in entries[:500]:
+        day_raw = e.get('day', 0)
+        day = day_raw if isinstance(day_raw, int) else _DAY_STR_MAP.get(day_raw, 0)
+        start_t = e.get('start_time', '')
+        end_t = e.get('end_time', '')
+        result.append({
+            'day': day,
+            'time_slot': f"{start_t}-{end_t}" if start_t else e.get('time_slot', ''),
+            'subject_code': e.get('course_code', e.get('subject_code', '')),
+            'subject_name': e.get('subject_name', e.get('course_name', '')),
+            'faculty_id': e.get('faculty_id', ''),
+            'faculty_name': e.get('faculty_name', ''),
+            'room_number': e.get('room_code', e.get('room_number', '')),
+            'batch_name': e.get('batch_name', ''),
+            'department_id': e.get('department_id', ''),
+        })
+    return result
+
+
+def _warm_workflow_cache(job_id: str, job: "GenerationJob", ttl: int) -> None:
+    """Store workflow metadata in Redis.  Independently testable."""
+    data = {
+        'id': str(job.id),
+        'job_id': str(job.id),
+        'organization_id': str(job.organization_id),
+        'status': job.status,
+        'academic_year': getattr(job, 'academic_year', None),
+        'semester': getattr(job, 'semester', None),
+        'created_at': job.created_at.isoformat(),
+        'timetable_entries': [],
+    }
+    cache.set(f'workflow_{job_id}', data, ttl)
+
+
+def _warm_variants_cache(job_id: str, job: "GenerationJob", variants: list, ttl: int) -> None:
+    """Store variants-list metadata AND per-variant entries in Redis.
+
+    Keys written:
+      variants_list_{job_id}              → TimetableVariantViewSet.list()
+      variant_entries_{job_id}-variant-N  → TimetableVariantViewSet.entries()
+    """
+    variants_list = []
+    for idx, v in enumerate(variants):
+        qm = v.get('quality_metrics', {}) or {}
+        sta = v.get('statistics', {}) or {}
+        variant_id = f"{job_id}-variant-{idx + 1}"
+
+        overall_score = qm.get('overall_score', v.get('score', 0))
+        total_conflicts = qm.get('total_conflicts', v.get('conflicts', 0))
+        room_util = qm.get('room_utilization_score', v.get('room_utilization', 0))
+        total_classes = sta.get('total_classes', len(v.get('timetable_entries', [])))
+
+        variants_list.append({
+            'id': variant_id,
+            'job_id': str(job_id),
+            'variant_number': idx + 1,
+            'organization_id': str(job.organization_id),
+            'timetable_entries': [],
+            'statistics': {
+                'total_classes': total_classes,
+                'total_conflicts': total_conflicts,
+            },
+            'quality_metrics': {
+                'overall_score': overall_score,
+                'total_conflicts': total_conflicts,
+                'room_utilization_score': room_util,
+            },
+            'generated_at': job.created_at.isoformat(),
+        })
+
+        # Pre-warm per-variant entries — clicking any variant card becomes instant
+        converted = _convert_entries_for_cache(v.get('timetable_entries', []))
+        cache.set(f'variant_entries_{variant_id}', converted, ttl)
+
+    cache.set(f'variants_list_{job_id}', variants_list, ttl)
+
+
 def _warm_review_caches(job_id: str, job: "GenerationJob", variants: list) -> None:
     """
-    Pre-populate Redis caches immediately after a job completes so the first
-    page load of the timetable review page is always a fast cache hit.
+    Pre-populate Redis caches immediately after a job completes.
 
-    Mirrors the exact serialisation used by:
-      • TimetableWorkflowViewSet.retrieve()  → key: workflow_{job_id}
-      • TimetableVariantViewSet.list()       → key: variants_list_{job_id}
+    TTL = REVIEW_CACHE_TTL (default 3 600 s / 1 hour).  Variant data is
+    immutable after generation so 1 hour is safe.  The previous 5-minute TTL
+    caused every visit more than 5 min after generation to hit the Neon JSONB
+    column cold (10-20 s page-read latency on the free tier).
 
-    This is completely non-critical — any exception is caught and logged so it
-    never affects the main callback flow.
+    Keys populated:
+      workflow_{job_id}                   ← TimetableWorkflowViewSet.retrieve()
+      variants_list_{job_id}              ← TimetableVariantViewSet.list()
+      variant_entries_{job_id}-variant-N  ← TimetableVariantViewSet.entries()
     """
     try:
-        # ── Workflow metadata ────────────────────────────────────────────────
-        workflow_data = {
-            'id':               str(job.id),
-            'job_id':           str(job.id),
-            'organization_id':  str(job.organization_id),
-            'status':           job.status,
-            'created_at':       job.created_at.isoformat(),
-            'timetable_entries': [],
-        }
-        cache.set(f'workflow_{job_id}', workflow_data, 300)  # 5 min
-
-        # ── Variants list (without entries — loaded on demand) ───────────────
-        variants_list = []
-        for idx, v in enumerate(variants):
-            qm  = v.get('quality_metrics', {})
-            sta = v.get('statistics', {})
-
-            overall_score   = qm.get('overall_score',         v.get('score',            0))
-            total_conflicts = qm.get('total_conflicts',       v.get('conflicts',         0))
-            room_util       = qm.get('room_utilization_score', v.get('room_utilization', 0))
-            total_classes   = sta.get('total_classes', len(v.get('timetable_entries', [])))
-
-            variants_list.append({
-                'id':               f"{job_id}-variant-{idx + 1}",
-                'job_id':           str(job_id),
-                'variant_number':   idx + 1,
-                'organization_id':  str(job.organization_id),
-                'timetable_entries': [],       # entries loaded separately via /entries/
-                'statistics': {
-                    'total_classes':   total_classes,
-                    'total_conflicts': total_conflicts,
-                },
-                'quality_metrics': {
-                    'overall_score':          overall_score,
-                    'total_conflicts':        total_conflicts,
-                    'room_utilization_score': room_util,
-                },
-                'generated_at': job.created_at.isoformat(),
-            })
-        cache.set(f'variants_list_{job_id}', variants_list, 300)  # 5 min
-
+        ttl = getattr(settings, 'REVIEW_CACHE_TTL', 3600)
+        _warm_workflow_cache(job_id, job, ttl)
+        _warm_variants_cache(job_id, job, variants, ttl)
         logger.info(
-            f"[CACHE WARM] Pre-populated workflow + {len(variants_list)} variants "
-            f"for job {job_id}"
+            "[CACHE WARM] Pre-populated review caches for job",
+            extra={"job_id": str(job_id), "variant_count": len(variants), "ttl": ttl},
         )
     except Exception as exc:
-        # Non-fatal — a warm-up failure should never fail the callback.
-        logger.warning(f"[CACHE WARM] Could not pre-warm caches for job {job_id}: {exc}")
+        # Non-fatal — a cache warm-up failure must never fail the Celery callback.
+        logger.warning(
+            "[CACHE WARM] Could not pre-warm caches for job",
+            extra={"job_id": str(job_id), "error": str(exc)},
+        )
 
 
 @shared_task

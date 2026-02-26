@@ -70,31 +70,48 @@ interface TimetableSlot {
 }
 
 export default function StudentDashboard() {
-  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(null)
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const PROFILE_CACHE_KEY = 'student_profile_cache'
+  const PROFILE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+  const [studentProfile, setStudentProfile] = useState<StudentProfile | null>(() => {
+    // Stale-while-revalidate: render cached profile instantly on first paint
+    try {
+      const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+      if (raw) {
+        const { data, ts } = JSON.parse(raw)
+        if (Date.now() - ts < PROFILE_CACHE_TTL) return data
+      }
+    } catch { /* storage unavailable */ }
+    return null
+  })
   const [todaysClasses, setTodaysClasses] = useState<TodayClass[]>([])
   const [loading, setLoading] = useState(true)
   const [timetableData, setTimetableData] = useState<any>(null)
 
   useEffect(() => {
-    loadStudentProfile()
-    loadTimetableData()
+    // Run profile + timetable fetches in parallel — single loading gate
+    Promise.all([loadStudentProfile(), loadTimetableData()]).catch(() => {})
   }, [])
 
   const loadStudentProfile = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/student/profile/', {
+      const response = await fetch(`${API_BASE}/student/profile/`, {
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
         throw new Error(`Failed to load student profile: ${response.status}`)
       }
-      
+
       const data: StudentProfile = await response.json()
       setStudentProfile(data)
+
+      // Persist for next navigation — instant stale render
+      try {
+        sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ data, ts: Date.now() }))
+      } catch { /* quota exceeded */ }
     } catch (error) {
       console.error('Failed to load student profile:', error)
     }

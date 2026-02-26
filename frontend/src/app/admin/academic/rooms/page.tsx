@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import apiClient from '@/lib/api'
-import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
+import { TableSkeleton } from '@/components/LoadingSkeletons'
 
 interface Room {
   room_id: string
@@ -11,6 +11,7 @@ interface Room {
   room_name?: string
   seating_capacity: number
   room_type: string
+  building_name?: string
   building?: {
     building_id: string
     building_name: string
@@ -62,24 +63,29 @@ export default function ClassroomsPage() {
     setError(null)
 
     try {
-      const response = await apiClient.getRooms()
-      if (response.error) {
-        setError(response.error)
-      } else if (response.data) {
-        let roomData = Array.isArray(response.data) ? response.data : response.data.results || []
-
-        if (searchTerm) {
-          roomData = roomData.filter(
-            (room: Room) =>
-              room.room_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              room.room_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              room.room_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-              room.department?.dept_name?.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-        }
-
-        setRooms(roomData)
+      const all: Room[] = []
+      let page = 1
+      while (true) {
+        const response = await apiClient.getRooms(page, 100)
+        if (response.error) { setError(response.error); break }
+        if (!response.data) break
+        const items: Room[] = Array.isArray(response.data) ? response.data : response.data.results || []
+        all.push(...items)
+        const hasNext = !Array.isArray(response.data) && (response.data as any).next
+        if (!hasNext) break
+        page++
       }
+      let roomData = all
+      if (searchTerm) {
+        roomData = all.filter(
+          (room: Room) =>
+            room.room_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            room.room_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            room.room_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            room.department?.dept_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      }
+      setRooms(roomData)
     } catch (err) {
       setError('Failed to load rooms')
     } finally {
@@ -150,32 +156,6 @@ export default function ClassroomsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-gray-200">
-          Rooms ({filteredRooms.length})
-        </h2>
-        <button onClick={() => setShowForm(true)} className="btn-primary w-full sm:w-auto">
-          Add Room
-        </button>
-      </div>
-
-      {/* Search Bar */}
-      <div className="card">
-        <div className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <input
-                type="text"
-                placeholder="Search by room code, number, type, or department..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="input-primary w-full"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {showForm && (
         <div className="card">
           <div className="card-header">
@@ -222,12 +202,28 @@ export default function ClassroomsPage() {
       )}
 
       <div className="card">
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center py-8">
-            <GoogleSpinner size={48} className="mb-3" />
-            <p className="text-gray-600 dark:text-gray-400">Loading rooms...</p>
+        <div className="card-header">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="card-title">Rooms</h3>
+              <p className="card-description">Total: {filteredRooms.length} rooms</p>
+            </div>
+            <button onClick={() => setShowForm(true)} className="btn-primary w-full sm:w-auto">
+              Add Room
+            </button>
           </div>
-        )}
+          <div className="relative mt-4">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+            <input
+              type="text"
+              placeholder="Search by room code, number, type, or department..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="input-primary pl-10 w-full"
+            />
+          </div>
+        </div>
+        {isLoading && <TableSkeleton rows={5} columns={7} />}
 
         {!isLoading && filteredRooms.length === 0 && (
           <div className="text-center py-12">
@@ -237,12 +233,10 @@ export default function ClassroomsPage() {
 
         {!isLoading && filteredRooms.length > 0 && (
           <div className="overflow-x-auto relative">
-            {/* Table Loading Overlay */}
             {isTableLoading && (
               <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
                 <div className="flex flex-col items-center">
-                  <GoogleSpinner size={48} />
-                  <span className="text-sm text-gray-600 dark:text-gray-400 mt-3">Loading...</span>
+                  <TableSkeleton rows={3} columns={7} />
                 </div>
               </div>
             )}
@@ -253,6 +247,7 @@ export default function ClassroomsPage() {
                 <th className="table-header-cell">Code</th>
                 <th className="table-header-cell">Number</th>
                 <th className="table-header-cell">Name</th>
+                <th className="table-header-cell">Building</th>
                 <th className="table-header-cell">Capacity</th>
                 <th className="table-header-cell">Type</th>
                 <th className="table-header-cell">Actions</th>
@@ -264,6 +259,7 @@ export default function ClassroomsPage() {
                   <td className="table-cell font-medium">{room.room_code}</td>
                   <td className="table-cell">{room.room_number}</td>
                   <td className="table-cell">{room.room_name || '-'}</td>
+                  <td className="table-cell">{room.building_name || room.building?.building_name || '-'}</td>
                   <td className="table-cell">{room.seating_capacity}</td>
                   <td className="table-cell"><span className="badge badge-neutral">{room.room_type}</span></td>
                   <td className="table-cell">

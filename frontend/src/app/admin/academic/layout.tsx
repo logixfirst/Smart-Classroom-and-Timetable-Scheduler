@@ -8,7 +8,6 @@ const tabs = [
   { id: 'departments', label: 'Departments', href: '/admin/academic/departments' },
   { id: 'programs', label: 'Programs', href: '/admin/academic/programs' },
   { id: 'courses', label: 'Courses', href: '/admin/academic/courses' },
-  { id: 'batches', label: 'Batches', href: '/admin/academic/batches' },
   { id: 'buildings', label: 'Buildings', href: '/admin/academic/buildings' },
   { id: 'rooms', label: 'Rooms', href: '/admin/academic/rooms' },
 ]

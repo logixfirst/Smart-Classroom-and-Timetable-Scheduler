@@ -8,7 +8,7 @@ import { subjectSchema, type SubjectInput } from '@/lib/validations'
 import { FormField, SelectField } from '@/components/FormFields'
 import { useToast } from '@/components/Toast'
 import Pagination from '@/components/Pagination'
-import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
+import { TableSkeleton } from '@/components/LoadingSkeletons'
 
 interface Course {
   course_id: string
@@ -165,31 +165,6 @@ export default function SubjectsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <p className="text-sm text-gray-600 dark:text-gray-400">Total: {courses.length} courses</p>
-        <button onClick={() => setShowForm(true)} className="btn-primary w-full sm:w-auto">
-          Add Course
-        </button>
-      </div>
-
-      {/* Search Bar */}
-      <div className="card">
-        <div className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-center">
-            <div className="flex-1">
-              <input
-                type="text"
-                placeholder="Search by course name, code, or department..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="input-primary w-full"
-              />
-            </div>
-            <p className="text-sm text-gray-600">Total: {totalCount} courses</p>
-          </div>
-        </div>
-      </div>
-
       {showForm && (
         <div className="card">
           <div className="card-header">
@@ -288,12 +263,28 @@ export default function SubjectsPage() {
       )}
 
       <div className="card">
-        {isLoading && (
-          <div className="flex flex-col items-center justify-center py-8">
-            <GoogleSpinner size={48} className="mb-3" />
-            <p className="text-gray-600 dark:text-gray-400">Loading courses...</p>
+        <div className="card-header">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h3 className="card-title">Courses</h3>
+              <p className="card-description">Total: {totalCount} courses</p>
+            </div>
+            <button onClick={() => setShowForm(true)} className="btn-primary w-full sm:w-auto">
+              Add Course
+            </button>
           </div>
-        )}
+          <div className="relative mt-4">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+            <input
+              type="text"
+              placeholder="Search by course name, code, or department..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="input-primary pl-10 w-full"
+            />
+          </div>
+        </div>
+        {isLoading && <TableSkeleton rows={5} columns={6} />}
 
         {!isLoading && courses.length === 0 && (
           <div className="text-center py-12">
@@ -303,13 +294,9 @@ export default function SubjectsPage() {
 
         {!isLoading && courses.length > 0 && (
           <div className="overflow-x-auto relative">
-            {/* Table Loading Overlay */}
             {isTableLoading && (
             <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
-              <div className="flex flex-col items-center">
-                <GoogleSpinner size={48} />
-                <span className="text-sm text-gray-600 dark:text-gray-400 mt-3">Loading...</span>
-              </div>
+              <TableSkeleton rows={3} columns={6} />
             </div>
           )}
 

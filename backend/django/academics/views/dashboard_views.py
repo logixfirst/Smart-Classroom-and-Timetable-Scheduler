@@ -3,6 +3,9 @@ Dashboard views: Stats, student profile, faculty profile
 User-specific dashboard data and course information
 """
 
+import logging
+
+from django.core.cache import cache
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -10,63 +13,72 @@ from rest_framework.response import Response
 
 from ..models import Student, Faculty, CourseOffering
 
+logger = logging.getLogger(__name__)
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
-    """Get dashboard statistics"""
+    """Get dashboard statistics — single-query, Redis-cached for 2 min."""
+    CACHE_KEY = 'dashboard_stats_v1'
+    CACHE_TTL = 120  # 2 minutes
+
+    payload = cache.get(CACHE_KEY)
+    if payload is not None:
+        return Response(payload)
+
     try:
         from django.db import connection
-        
+
         with connection.cursor() as cursor:
-            cursor.execute("SELECT COUNT(*) FROM users")
-            total_users = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM courses WHERE is_active = true")
-            active_courses = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM students WHERE is_active = true")
-            total_students = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT COUNT(*) FROM faculty")
-            total_faculty = cursor.fetchone()[0]
-        
+            # Single round-trip: four sub-selects evaluated in parallel by the DB engine
+            cursor.execute("""
+                SELECT
+                    (SELECT COUNT(*) FROM users)                         AS total_users,
+                    (SELECT COUNT(*) FROM courses WHERE is_active = TRUE) AS active_courses,
+                    (SELECT COUNT(*) FROM students WHERE is_active = TRUE) AS total_students,
+                    (SELECT COUNT(*) FROM faculty)                       AS total_faculty
+            """)
+            total_users, active_courses, total_students, total_faculty = cursor.fetchone()
+
         stats = {
-            "total_users": total_users,
-            "active_courses": active_courses,
-            "total_students": total_students,
-            "total_faculty": total_faculty,
+            "total_users":       total_users,
+            "active_courses":    active_courses,
+            "total_students":    total_students,
+            "total_faculty":     total_faculty,
             "pending_approvals": 0,
-            "system_health": 98,
+            "system_health":     98,
         }
-        
-        return Response({
-            "stats": stats,
-            "faculty": [],
-        })
-    except Exception as e:
-        import traceback
-        print(f"Dashboard stats error: {e}")
-        print(traceback.format_exc())
+
+        payload = {"stats": stats, "faculty": []}
+        cache.set(CACHE_KEY, payload, CACHE_TTL)
+        return Response(payload)
+
+    except Exception as exc:
+        logger.warning("dashboard_stats query failed", extra={"error": str(exc)})
         return Response({
             "stats": {
-                "total_users": 0,
-                "active_courses": 0,
-                "total_students": 0,
-                "total_faculty": 0,
-                "pending_approvals": 0,
-                "system_health": 98
+                "total_users": 0, "active_courses": 0,
+                "total_students": 0, "total_faculty": 0,
+                "pending_approvals": 0, "system_health": 98,
             },
-            "faculty": []
+            "faculty": [],
         })
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def student_profile_and_courses(request):
-    """Get student profile and enrolled courses"""
+    """Get student profile and enrolled courses — per-user Redis cache 5 min."""
+    username = request.user.username
+    CACHE_KEY = f'student_profile_{username}'
+    CACHE_TTL = 300  # 5 minutes
+
+    cached = cache.get(CACHE_KEY)
+    if cached is not None:
+        return Response(cached)
+
     try:
-        username = request.user.username
         
         try:
             student = Student.objects.select_related(
@@ -130,15 +142,14 @@ def student_profile_and_courses(request):
             "enrolled_courses": courses,
             "total_courses": len(courses),
         }
-        
+
+        cache.set(CACHE_KEY, student_data, CACHE_TTL)
         return Response(student_data, status=status.HTTP_200_OK)
-        
-    except Exception as e:
-        import traceback
-        print(f"Student profile error: {e}")
-        print(traceback.format_exc())
+
+    except Exception as exc:
+        logger.warning("student_profile query failed", extra={"username": username, "error": str(exc)})
         return Response(
-            {"error": f"Failed to fetch student profile: {str(e)}"},
+            {"error": f"Failed to fetch student profile: {str(exc)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -146,10 +157,16 @@ def student_profile_and_courses(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def faculty_profile_and_courses(request):
-    """Get faculty profile and assigned courses"""
+    """Get faculty profile and assigned courses — per-user Redis cache 5 min."""
+    username = request.user.username
+    CACHE_KEY = f'faculty_profile_{username}'
+    CACHE_TTL = 300  # 5 minutes
+
+    cached = cache.get(CACHE_KEY)
+    if cached is not None:
+        return Response(cached)
+
     try:
-        username = request.user.username
-        
         try:
             faculty = Faculty.objects.select_related('department', 'organization').get(username=username)
         except Faculty.DoesNotExist:
@@ -202,14 +219,13 @@ def faculty_profile_and_courses(request):
             "total_courses": len(courses),
             "total_students": sum(c["total_enrolled"] for c in courses),
         }
-        
+
+        cache.set(CACHE_KEY, faculty_data, CACHE_TTL)
         return Response(faculty_data, status=status.HTTP_200_OK)
-        
-    except Exception as e:
-        import traceback
-        print(f"Faculty profile error: {e}")
-        print(traceback.format_exc())
+
+    except Exception as exc:
+        logger.warning("faculty_profile query failed", extra={"username": username, "error": str(exc)})
         return Response(
-            {"error": f"Failed to fetch faculty profile: {str(e)}"},
+            {"error": f"Failed to fetch faculty profile: {str(exc)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

@@ -57,7 +57,7 @@ export default function AdminUsersPage() {
   }, [searchTerm, selectedRole, selectedDepartment, currentPage])
 
   const fetchUsers = async (isPageChange = false) => {
-    if (isPageChange || searchTerm || selectedRole || selectedDepartment || currentPage > 1) {
+    if (currentPage > 1 || isPageChange || searchTerm || selectedDepartment) {
       setIsTableLoading(true)
     } else {
       setIsLoading(true)
@@ -65,58 +65,36 @@ export default function AdminUsersPage() {
 
     setError(null)
     try {
-      // Build query params - Fetch all users with large page size, ordered by role
-      let url = `/users/?page=1&page_size=10000&ordering=role&_t=${Date.now()}`
+      // Always filter to ADMIN role server-side — no more 10 000-row dump
+      const params = new URLSearchParams({
+        role: 'ADMIN',
+        page: currentPage.toString(),
+        page_size: '100',
+        ordering: 'username',
+      })
+      if (searchTerm) params.set('search', searchTerm)
+      if (selectedDepartment) params.set('department', selectedDepartment)
 
-      // Note: Backend doesn't support role filtering, so we filter client-side below
-      // if (selectedRole) url += `&role=${selectedRole}`
-      if (selectedDepartment) url += `&department=${selectedDepartment}`
-
-      // Add search term if provided (for username, email, first_name, last_name)
-      if (searchTerm) {
-        url += `&search=${encodeURIComponent(searchTerm)}`
-      }
-
-      console.log('Fetching users from:', url)
-      const response = await apiClient.request<PaginatedResponse<User>>(url)
-      console.log('API Response:', response)
+      const response = await apiClient.request<PaginatedResponse<User>>(`/users/?${params}`)
 
       if (response.error) {
-        console.error('API Error:', response.error)
         setError(response.error)
       } else if (response.data) {
-        // Filter to show only administrative users (client-side filtering)
-        const allUsers = response.data.results || []
-        
-        console.log('Total users fetched:', allUsers.length)
-        console.log('User roles:', allUsers.map(u => ({ username: u.username, role: u.role })))
-
-        let adminUsers = allUsers.filter(
-          u => {
-            const role = u.role?.toUpperCase()
-            // Only show ADMIN roles (database constraint values)
-            return role === 'ADMIN'
-          }
-        )
-        
-        console.log('Admin users after filter:', adminUsers.length, adminUsers.map(u => ({ username: u.username, role: u.role })))
-
-        // Apply role filter if selected
+        let results = response.data.results || []
+        // Secondary in-page filter when a specific role sub-type is selected
         if (selectedRole) {
-          adminUsers = adminUsers.filter(u => u.role?.toUpperCase() === selectedRole.toUpperCase())
+          results = results.filter(u => u.role?.toUpperCase() === selectedRole.toUpperCase())
         }
-
-        setUsers(adminUsers)
-        setTotalCount(adminUsers.length)
-        setTotalPages(Math.ceil(adminUsers.length / 100))
+        setUsers(results)
+        const count = response.data.count ?? results.length
+        setTotalCount(count)
+        setTotalPages(Math.max(1, Math.ceil(count / 100)))
       } else {
-        console.warn('No data in response')
         setUsers([])
         setTotalCount(0)
         setTotalPages(0)
       }
     } catch (err) {
-      console.error('Exception fetching users:', err)
       setError('Failed to fetch admin users')
     } finally {
       setIsLoading(false)

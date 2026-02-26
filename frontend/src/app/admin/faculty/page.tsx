@@ -12,12 +12,14 @@ interface Faculty {
   id: number
   faculty_id: string
   faculty_code: string
-  faculty_name: string
+  first_name: string
+  middle_name?: string
+  last_name: string
   designation: string
   specialization: string
   department: {
-    department_id: string
-    department_name: string
+    dept_id: string
+    dept_name: string
   }
   max_workload: number
   status: string
@@ -106,7 +108,9 @@ export default function FacultyManagePage() {
       if (selectedFaculty) {
         const response = await apiClient.updateFaculty(String(selectedFaculty.id), {
           faculty_id: facultyData.faculty_id,
-          faculty_name: facultyData.faculty_name,
+          first_name: facultyData.first_name,
+          middle_name: facultyData.middle_name || '',
+          last_name: facultyData.last_name,
           designation: facultyData.designation,
           specialization: facultyData.specialization,
           max_workload_per_week: facultyData.max_workload_per_week,
@@ -125,7 +129,9 @@ export default function FacultyManagePage() {
       } else {
         const response = await apiClient.createFaculty({
           faculty_id: facultyData.faculty_id,
-          faculty_name: facultyData.faculty_name,
+          first_name: facultyData.first_name,
+          middle_name: facultyData.middle_name || '',
+          last_name: facultyData.last_name,
           designation: facultyData.designation,
           specialization: facultyData.specialization,
           max_workload_per_week: facultyData.max_workload_per_week,
@@ -177,11 +183,11 @@ export default function FacultyManagePage() {
   // Client-side filtering for department (search is server-side)
   const filteredFaculty = faculty.filter(member => {
     const matchesDepartment =
-      !selectedDepartment || member.department?.department_name === selectedDepartment
+      !selectedDepartment || member.department?.dept_name === selectedDepartment
     return matchesDepartment
   })
 
-  const departments = [...new Set(faculty.map(f => f.department?.department_name).filter(Boolean))].filter(Boolean)
+  const departments = [...new Set(faculty.map(f => f.department?.dept_name).filter(Boolean))].filter(Boolean)
 
   if (error) {
     return (
@@ -270,7 +276,7 @@ export default function FacultyManagePage() {
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">
-                        {member.faculty_name}
+                        {[member.first_name, member.middle_name, member.last_name].filter(Boolean).join(' ')}
                       </h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
                         {member.faculty_code}
@@ -283,7 +289,7 @@ export default function FacultyManagePage() {
                   <div className="space-y-2">
                     <div className="flex gap-2">
                       <span className="badge badge-neutral text-xs">
-                        {member.department.department_name}
+                        {member.department?.dept_name}
                       </span>
                       <span className="badge badge-info text-xs">{member.max_workload}h/week</span>
                     </div>
@@ -304,7 +310,7 @@ export default function FacultyManagePage() {
                       Edit
                     </button>
                     <button
-                      onClick={() => handleDeleteFaculty(member.id, member.faculty_name)}
+                      onClick={() => handleDeleteFaculty(member.id, `${member.first_name} ${member.last_name}`)}
                       disabled={isDeleting === member.id}
                       className="btn-danger text-xs px-2 py-1"
                     >
@@ -353,7 +359,7 @@ export default function FacultyManagePage() {
 
                         <td className="table-cell">
                           <div className="font-medium text-gray-800 dark:text-gray-200">
-                            {member.faculty_name}
+                            {[member.first_name, member.middle_name, member.last_name].filter(Boolean).join(' ')}
                           </div>
                         </td>
 
@@ -364,7 +370,7 @@ export default function FacultyManagePage() {
                         </td>
 
                         <td className="table-cell">
-                          {member.department.department_name}
+                          {member.department?.dept_name}
                         </td>
 
                         <td className="table-cell">{member.specialization}</td>
@@ -392,7 +398,7 @@ export default function FacultyManagePage() {
 
                             <button
                               onClick={() =>
-                                handleDeleteFaculty(member.id, member.faculty_name)
+                                handleDeleteFaculty(member.id, `${member.first_name} ${member.last_name}`)
                               }
                               disabled={isDeleting === member.id}
                               className="btn-danger text-xs px-2 py-1"

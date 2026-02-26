@@ -5,7 +5,20 @@ import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import DashboardLayout from '@/components/dashboard-layout'
 
 export default function FacultySchedule() {
-  const [schedule, setSchedule] = useState<any[]>([])
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const CACHE_KEY = 'faculty_schedule_cache'
+  const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+
+  const [schedule, setSchedule] = useState<any[]>(() => {
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY)
+      if (raw) {
+        const { data, ts } = JSON.parse(raw)
+        if (Date.now() - ts < CACHE_TTL) return data
+      }
+    } catch { /* storage unavailable */ }
+    return []
+  })
   const [loading, setLoading] = useState(true)
   const [faculty, setFaculty] = useState<any>(null)
 
@@ -15,14 +28,16 @@ export default function FacultySchedule() {
 
   const fetchSchedule = async () => {
     try {
-      // 🔐 Use HttpOnly cookies (no manual token handling)
-      const res = await fetch('http://localhost:8000/api/timetable/faculty/me/', {
-        credentials: 'include', // Send HttpOnly cookies automatically
+      const res = await fetch(`${API_BASE}/timetable/faculty/me/`, {
+        credentials: 'include',
       })
       const data = await res.json()
       if (data.success) {
         setSchedule(data.slots)
         setFaculty(data.faculty)
+        try {
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: data.slots, ts: Date.now() }))
+        } catch { /* quota exceeded */ }
       }
     } catch (error) {
       console.error('Failed to fetch schedule:', error)

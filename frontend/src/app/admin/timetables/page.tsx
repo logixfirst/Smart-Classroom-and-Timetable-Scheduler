@@ -94,6 +94,18 @@ export default function AdminTimetablesPage() {
       const listItems = transformJobs(jobs)
       setTimetables(listItems)
 
+      // Background-prefetch variants for the 3 most-recent completed/failed jobs.
+      // This warms the Redis cache so clicking any of those timetables is instant,
+      // even if Redis has evicted the keys since the initial cache-warm on completion.
+      const toPrewarm = listItems
+        .filter((t: TimetableListItem) => t.status === 'completed' || t.status === 'failed')
+        .slice(0, 3)
+      toPrewarm.forEach((job: TimetableListItem) => {
+        fetch(`${API_BASE}/timetable/variants/?job_id=${job.id}`, {
+          credentials: 'include',
+        } as RequestInit).catch(() => {}) // fire-and-forget: warms Redis silently
+      })
+
       // Persist to sessionStorage so next navigation is instant
       try {
         sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: listItems, ts: Date.now() }))

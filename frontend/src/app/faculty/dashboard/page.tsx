@@ -77,37 +77,61 @@ interface TimetableSlot {
 
 export default function FacultyDashboard() {
   const router = useRouter()
-  const [facultyProfile, setFacultyProfile] = useState<FacultyProfile | null>(null)
-  const [mySubjects, setMySubjects] = useState<Subject[]>([])
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const PROFILE_CACHE_KEY = 'faculty_profile_cache'
+  const PROFILE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+  const [facultyProfile, setFacultyProfile] = useState<FacultyProfile | null>(() => {
+    // Stale-while-revalidate: render cached profile instantly on first paint
+    try {
+      const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+      if (raw) {
+        const { data, ts } = JSON.parse(raw)
+        if (Date.now() - ts < PROFILE_CACHE_TTL) return data
+      }
+    } catch { /* storage unavailable */ }
+    return null
+  })
+  const [mySubjects, setMySubjects] = useState<Subject[]>(() => {
+    try {
+      const raw = sessionStorage.getItem(PROFILE_CACHE_KEY)
+      if (raw) {
+        const { data, ts } = JSON.parse(raw)
+        if (Date.now() - ts < PROFILE_CACHE_TTL) return data?.assigned_courses || []
+      }
+    } catch { /* storage unavailable */ }
+    return []
+  })
   const [todaysClasses, setTodaysClasses] = useState<ClassSession[]>([])
   const [mySchedule, setMySchedule] = useState<TimeSlot[]>([])
   const [selectedClass, setSelectedClass] = useState<ClassSession | null>(null)
-  // REMOVED: showAttendanceModal - attendance feature removed
   const [loading, setLoading] = useState(true)
   const [timetableData, setTimetableData] = useState<any>(null)
 
   useEffect(() => {
-    loadFacultyProfile()
-    loadTimetableData()
+    // Run profile + timetable fetches in parallel — single loading gate
+    Promise.all([loadFacultyProfile(), loadTimetableData()]).catch(() => {})
   }, [])
 
   const loadFacultyProfile = async () => {
     try {
       setLoading(true)
-      const response = await fetch('http://localhost:8000/api/faculty/profile/', {
+      const response = await fetch(`${API_BASE}/faculty/profile/`, {
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
         throw new Error(`Failed to load faculty profile: ${response.status}`)
       }
-      
+
       const data: FacultyProfile = await response.json()
       setFacultyProfile(data)
       setMySubjects(data.assigned_courses || [])
+
+      try {
+        sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ data, ts: Date.now() }))
+      } catch { /* quota exceeded */ }
     } catch (error) {
       console.error('Failed to load faculty profile:', error)
       setMySubjects([])

@@ -54,7 +54,20 @@ function TimetableGrid({ schedule }: { schedule: any[] }) {
 }
 
 export default function StudentTimetable() {
-  const [schedule, setSchedule] = useState<any[]>([])
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const SCHEDULE_CACHE_KEY = 'student_schedule_cache'
+  const SCHEDULE_CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+
+  const [schedule, setSchedule] = useState<any[]>(() => {
+    try {
+      const raw = sessionStorage.getItem(SCHEDULE_CACHE_KEY)
+      if (raw) {
+        const { data, ts } = JSON.parse(raw)
+        if (Date.now() - ts < SCHEDULE_CACHE_TTL) return data
+      }
+    } catch { /* storage unavailable */ }
+    return []
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [student, setStudent] = useState<any>(null)
@@ -67,19 +80,21 @@ export default function StudentTimetable() {
     try {
       setLoading(true)
       setError(null)
-      // 🔐 Use HttpOnly cookies (no manual token handling)
-      const res = await fetch('http://localhost:8000/api/timetable/student/me/', {
-        credentials: 'include', // Send HttpOnly cookies automatically
+      const res = await fetch(`${API_BASE}/timetable/student/me/`, {
+        credentials: 'include',
       })
-      
+
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`)
       }
-      
+
       const data = await res.json()
       if (data.success) {
         setSchedule(data.slots || [])
         setStudent(data.student)
+        try {
+          sessionStorage.setItem(SCHEDULE_CACHE_KEY, JSON.stringify({ data: data.slots || [], ts: Date.now() }))
+        } catch { /* quota exceeded */ }
       } else {
         setError(data.message || 'Failed to load timetable')
       }

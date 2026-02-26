@@ -8,36 +8,45 @@ import apiClient from '@/lib/api'
 export default function AdminDashboard() {
   const router = useRouter()
   const { showToast } = useToast()
+  const STATS_CACHE_KEY = 'admin_dashboard_stats'
+  const STATS_CACHE_TTL = 2 * 60 * 1000 // 2 minutes — matches backend cache
+
   const [isLoading, setIsLoading] = useState(false)
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeCourses: 0,
-    pendingApprovals: 0,
-    systemHealth: 98,
+  const [stats, setStats] = useState(() => {
+    // Stale-while-revalidate: show cached numbers instantly
+    try {
+      const raw = sessionStorage.getItem(STATS_CACHE_KEY)
+      if (raw) {
+        const { data, ts } = JSON.parse(raw)
+        if (Date.now() - ts < STATS_CACHE_TTL) return data
+      }
+    } catch { /* storage unavailable */ }
+    return { totalUsers: 0, activeCourses: 0, pendingApprovals: 0, systemHealth: 98 }
   })
   const [loading, setLoading] = useState(true)
   const [faculty, setFaculty] = useState<any[]>([])
-  useEffect(() => {
-    // Fetch data when component mounts
-    fetchDashboardData()
 
-    // Cleanup function is not needed as we want fresh data on each visit
+  useEffect(() => {
+    fetchDashboardData()
   }, [])
 
   const fetchDashboardData = async () => {
     setLoading(true)
     try {
-      // Use optimized dashboard stats endpoint
       const response = await apiClient.request('/dashboard/stats/')
       const data = response.data as any
 
       if (data.stats) {
-        setStats({
+        const freshStats = {
           totalUsers: data.stats.total_users || 0,
           activeCourses: data.stats.active_courses || 0,
           pendingApprovals: data.stats.pending_approvals || 0,
           systemHealth: data.stats.system_health || 98,
-        })
+        }
+        setStats(freshStats)
+        try {
+          sessionStorage.setItem(STATS_CACHE_KEY, JSON.stringify({ data: freshStats, ts: Date.now() }))
+        } catch { /* quota exceeded */ }
       }
 
       if (data.faculty) {

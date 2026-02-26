@@ -96,10 +96,19 @@ export const simpleFacultySchema = z.object({
     .min(1, 'Faculty ID is required')
     .max(20, 'Faculty ID must not exceed 20 characters')
     .regex(/^[A-Z0-9]+$/, 'Faculty ID must contain only uppercase letters and numbers'),
-  faculty_name: z
+  first_name: z
     .string()
-    .min(2, 'Faculty name must be at least 2 characters')
-    .max(200, 'Faculty name must not exceed 200 characters'),
+    .min(1, 'First name is required')
+    .max(100, 'First name must not exceed 100 characters'),
+  middle_name: z
+    .string()
+    .max(100, 'Middle name must not exceed 100 characters')
+    .optional()
+    .or(z.literal('')),
+  last_name: z
+    .string()
+    .min(1, 'Last name is required')
+    .max(100, 'Last name must not exceed 100 characters'),
   designation: z.enum(designationOptions, {
     errorMap: () => ({ message: 'Please select a valid designation' }),
   }),

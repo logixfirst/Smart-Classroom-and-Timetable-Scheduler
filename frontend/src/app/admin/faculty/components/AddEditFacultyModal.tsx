@@ -21,7 +21,9 @@ export default function AddEditFacultyModal({ isOpen, onClose, faculty, onSave }
     resolver: zodResolver(simpleFacultySchema),
     defaultValues: {
       faculty_id: '',
-      faculty_name: '',
+      first_name: '',
+      middle_name: '',
+      last_name: '',
       designation: 'Assistant Professor',
       specialization: '',
       max_workload_per_week: 20,
@@ -34,14 +36,16 @@ export default function AddEditFacultyModal({ isOpen, onClose, faculty, onSave }
 
   useEffect(() => {
     if (faculty) {
-      setValue('faculty_id', faculty.faculty_id || '')
-      setValue('faculty_name', faculty.faculty_name || '')
+      setValue('faculty_id', faculty.faculty_code || faculty.faculty_id || '')
+      setValue('first_name', faculty.first_name || '')
+      setValue('middle_name', faculty.middle_name || '')
+      setValue('last_name', faculty.last_name || '')
       setValue('designation', faculty.designation || 'Assistant Professor')
       setValue('specialization', faculty.specialization || '')
       setValue('max_workload_per_week', faculty.max_workload || 20)
       setValue('email', faculty.email || '')
       setValue('phone', faculty.phone || '')
-      setValue('department', faculty.department?.department_name || faculty.department || '')
+      setValue('department', faculty.department?.dept_name || faculty.department || '')
       setValue('status', faculty.status || 'active')
     } else {
       reset()
@@ -99,12 +103,31 @@ export default function AddEditFacultyModal({ isOpen, onClose, faculty, onSave }
             />
 
             <FormField
-              label="Faculty Name"
-              name="faculty_name"
+              label="First Name"
+              name="first_name"
               type="text"
-              placeholder="Dr. John Doe"
+              placeholder="John"
               register={register}
-              error={errors.faculty_name}
+              error={errors.first_name}
+              required
+            />
+
+            <FormField
+              label="Middle Name"
+              name="middle_name"
+              type="text"
+              placeholder="(optional)"
+              register={register}
+              error={errors.middle_name}
+            />
+
+            <FormField
+              label="Last Name"
+              name="last_name"
+              type="text"
+              placeholder="Doe"
+              register={register}
+              error={errors.last_name}
               required
             />
 
