@@ -6,12 +6,13 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import { useAuth } from '@/context/AuthContext'
 import { authenticatedFetch } from '@/lib/auth'
 import { useToast } from '@/components/Toast'
+import { TimetableGridSkeleton } from '@/components/LoadingSkeletons'
 
 // Backend types matching Django models
 interface TimetableEntry {
@@ -211,10 +212,19 @@ export default function TimetableReviewPage() {
   const [workflow, setWorkflow] = useState<TimetableWorkflow | null>(null)
   const [variants, setVariants] = useState<TimetableVariant[]>([])
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  // ── Split loading into two phases ───────────────────────────────────
+  // loadingMeta: blocks full page (only until workflow + variants list arrive)
+  // loadingEntries: inline skeleton inside the timetable grid area only
+  const [loadingMeta, setLoadingMeta] = useState(true)
+  const [loading, setLoading] = useState(true) // keep for error/redirect guards
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [loadingVariantId, setLoadingVariantId] = useState<string | null>(null)
+
+  // ── Per-variant entry cache – avoids re-fetching when user switches back ──
+  const entryCache = useRef<Map<string, TimetableEntry[]>>(new Map())
+  // AbortController ref so switching variants cancels the in-flight request
+  const entryAbortRef = useRef<AbortController | null>(null)
 
   // Modals
   const [showApprovalModal, setShowApprovalModal] = useState(false)
@@ -234,21 +244,19 @@ export default function TimetableReviewPage() {
   }, [workflowId])
 
   /**
-   * Fetch workflow metadata, variants list, and first-variant entries in parallel.
+   * Fetch workflow metadata + variants list in parallel (Round 1), then fetch
+   * first-variant entries in the background (Round 2) WITHOUT blocking the UI.
    *
-   * WHY: workflowId === job_id (the backend uses the same UUID for both).
-   * Previous implementation had 4 sequential awaits (job-check → workflow →
-   * variants → entries) which totalled 8-20 s on a cold cache.
+   * Round 1 result → page renders immediately with variant cards + scores.
+   * Round 2 result → timetable grid fills in once entries arrive.
    *
-   * New order:
-   *   Round 1 (parallel): job status check + workflow metadata + variants list
-   *   Round 2 (parallel): first variant entries (fired as soon as Round 1 resolves)
-   *
-   * This cuts cold-cache latency by ~65 % (2 round-trips instead of 4).
+   * On every variant click: check entryCache first — hit → instant paint,
+   * miss → fetch with AbortController cancelling any in-flight request.
    */
   const loadWorkflowData = async () => {
     try {
       setLoading(true)
+      setLoadingMeta(true)
       setError(null)
 
       // ── Round 1: fire all three independent requests simultaneously ──────────
@@ -258,7 +266,7 @@ export default function TimetableReviewPage() {
         authenticatedFetch(`${API_BASE}/timetable/variants/?job_id=${workflowId}`, { credentials: 'include' }),
       ])
 
-      // Re-route if job is still running (job status check result)
+      // Re-route if job is still running
       if (jobRes.ok) {
         const jobData = await jobRes.json()
         if (jobData.status === 'running' || jobData.status === 'queued') {
@@ -267,7 +275,6 @@ export default function TimetableReviewPage() {
         }
       }
 
-      // Handle workflow auth errors
       if (!workflowRes.ok) {
         if (workflowRes.status === 401 || workflowRes.status === 403) {
           router.push('/login?redirect=' + encodeURIComponent(window.location.pathname))
@@ -284,32 +291,48 @@ export default function TimetableReviewPage() {
       setWorkflow(workflowData)
       setVariants(variantsData)
 
-      // Determine which variant to load first
       const selected = variantsData.find((v: TimetableVariant) => v.is_selected)
       const variantToLoad: TimetableVariant | undefined = selected ?? variantsData[0]
 
-      if (!variantToLoad) return
+      if (!variantToLoad) {
+        setLoadingMeta(false)
+        return
+      }
 
       setSelectedVariantId(variantToLoad.id)
+      // ── Show variant cards NOW – entries load in background ──────────────
+      setActiveVariant(variantToLoad)
+      setLoadingMeta(false)  // ←← page is visible from this point on
 
-      // ── Round 2: fetch entries for the pre-selected variant ──────────────────
+      // ── Round 2: entries in background (non-blocking) ────────────────────
+      setLoadingVariantId(variantToLoad.id)
       try {
-        const entriesRes = await authenticatedFetch(
-          `${API_BASE}/timetable/variants/${variantToLoad.id}/entries/?job_id=${variantToLoad.job_id}`,
-          { credentials: 'include' }
-        )
-        if (entriesRes.ok) {
-          const entriesData = await entriesRes.json()
-          setActiveVariant({ ...variantToLoad, timetable_entries: entriesData.timetable_entries })
+        const cached = entryCache.current.get(variantToLoad.id)
+        if (cached) {
+          setActiveVariant({ ...variantToLoad, timetable_entries: cached })
         } else {
-          setActiveVariant(variantToLoad)
+          const entriesRes = await authenticatedFetch(
+            `${API_BASE}/timetable/variants/${variantToLoad.id}/entries/?job_id=${variantToLoad.job_id}`,
+            { credentials: 'include' }
+          )
+          if (entriesRes.ok) {
+            const entriesData = await entriesRes.json()
+            const entries: TimetableEntry[] = entriesData.timetable_entries
+            entryCache.current.set(variantToLoad.id, entries)
+            setActiveVariant(prev =>
+              prev?.id === variantToLoad.id ? { ...prev, timetable_entries: entries } : prev
+            )
+          }
         }
       } catch {
-        setActiveVariant(variantToLoad)
+        // entries failed – page still usable with empty grid
+      } finally {
+        setLoadingVariantId(null)
       }
     } catch (err) {
       console.error('Failed to load workflow:', err)
       setError(err instanceof Error ? err.message : 'Failed to load timetable data')
+      setLoadingMeta(false)
     } finally {
       setLoading(false)
     }
@@ -320,29 +343,15 @@ export default function TimetableReviewPage() {
       setActionLoading(true)
       const response = await authenticatedFetch(
         `${API_BASE}/timetable/variants/${variantId}/select/`,
-        {
-          method: 'POST',
-          credentials: 'include',
-        }
+        { method: 'POST', credentials: 'include' }
       )
 
-      if (!response.ok) {
-        throw new Error('Failed to select variant')
-      }
+      if (!response.ok) throw new Error('Failed to select variant')
 
       setSelectedVariantId(variantId)
-
-      // Update local state
-      setVariants(prev =>
-        prev.map(v => ({
-          ...v,
-          is_selected: v.id === variantId,
-        }))
-      )
-
+      // ── Update local state only – no full reload needed ─────────────────
+      setVariants(prev => prev.map(v => ({ ...v, is_selected: v.id === variantId })))
       showSuccessToast('Variant selected successfully')
-      // Reload workflow
-      await loadWorkflowData()
     } catch (err) {
       console.error('Failed to select variant:', err)
       showErrorToast('Failed to select variant. Please try again.')
@@ -417,48 +426,76 @@ export default function TimetableReviewPage() {
     }
   }
 
-// Build stable subject → palette mapping from ALL variants' entries
+// Build stable subject → palette mapping from the active variant's entries.
+  // (variants[] carries empty timetable_entries; actual entries are in activeVariant)
   const subjectPaletteMap = useMemo(() => {
     const map = new Map<string, (typeof SUBJECT_PALETTES)[0]>()
-    variants.forEach(v => {
-      ;(v.timetable_entries || []).forEach(e => {
-        const key = e.subject_id ?? e.subject_code ?? ''
-        if (key && !map.has(key)) {
-          map.set(key, SUBJECT_PALETTES[subjectPaletteIndex(key)])
-        }
-      })
+    ;(activeVariant?.timetable_entries || []).forEach(e => {
+      const key = e.subject_id ?? e.subject_code ?? ''
+      if (key && !map.has(key)) {
+        map.set(key, SUBJECT_PALETTES[subjectPaletteIndex(key)])
+      }
     })
     return map
-  }, [variants])
+  }, [activeVariant?.timetable_entries])
 
   const loadVariantEntries = useCallback(async (variant: TimetableVariant) => {
-    setLoadingVariantId(variant.id)
-    try {
-      const response = await authenticatedFetch(
-        `${API_BASE}/timetable/variants/${variant.id}/entries/?job_id=${variant.job_id}`,
-        { credentials: 'include' }
-      )
-      if (response.ok) {
-        const data = await response.json()
-        setActiveVariant({ ...variant, timetable_entries: data.timetable_entries })
-      } else {
-        setActiveVariant(variant)
-      }
-    } catch (err) {
-      console.error('Failed to load entries:', err)
-      setActiveVariant(variant)
-    } finally {
-      setLoadingVariantId(null)
+    // ── Instant paint from cache if available ───────────────────────────
+    const cached = entryCache.current.get(variant.id)
+    if (cached) {
+      setActiveVariant({ ...variant, timetable_entries: cached })
       setActiveDay('all')
       setDepartmentFilter('all')
       setTimeout(() => {
         document.getElementById('timetable-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 100)
+      }, 80)
+      return
+    }
+
+    // ── Cache miss: show variant card immediately then load entries ────────
+    setActiveVariant(variant) // show empty grid + skeleton right away
+    setLoadingVariantId(variant.id)
+    setActiveDay('all')
+    setDepartmentFilter('all')
+
+    // Cancel any pending in-flight request for a different variant
+    if (entryAbortRef.current) entryAbortRef.current.abort()
+    const controller = new AbortController()
+    entryAbortRef.current = controller
+
+    try {
+      const response = await authenticatedFetch(
+        `${API_BASE}/timetable/variants/${variant.id}/entries/?job_id=${variant.job_id}`,
+        { credentials: 'include', signal: controller.signal }
+      )
+      if (response.ok) {
+        const data = await response.json()
+        const entries: TimetableEntry[] = data.timetable_entries
+        entryCache.current.set(variant.id, entries) // store for future switches
+        // Only update if this variant is still the active one
+        setActiveVariant(prev =>
+          prev?.id === variant.id ? { ...prev, timetable_entries: entries } : prev
+        )
+      }
+    } catch (err) {
+      if ((err as any)?.name !== 'AbortError') {
+        console.error('Failed to load entries:', err)
+      }
+    } finally {
+      if (!controller.signal.aborted) setLoadingVariantId(null)
+      setTimeout(() => {
+        document.getElementById('timetable-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 80)
     }
   }, [API_BASE])
 
   const renderTimetableGrid = (variant: TimetableVariant) => {
     const entries = variant.timetable_entries ?? []
+
+    // Show grid skeleton while entries are still loading for this variant
+    if (loadingVariantId === variant.id && entries.length === 0) {
+      return <TimetableGridSkeleton days={5} slots={8} />
+    }
 
     if (entries.length === 0) {
       return (
@@ -647,7 +684,9 @@ export default function TimetableReviewPage() {
     )
   }
 
-  if (loading) {
+  // Block the full page ONLY while workflow metadata + variant list are loading.
+  // Entries for the grid load in the background and show an inline skeleton.
+  if (loadingMeta) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="text-center space-y-4">

@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
+import { TimetableListSkeleton } from '@/components/LoadingSkeletons'
 import type { TimetableListItem } from '@/types/timetable'
 
 interface RunningJob {
@@ -15,111 +15,124 @@ interface RunningJob {
   time_remaining_seconds?: number | null
 }
 
+const CACHE_KEY = 'admin_timetables_cache'
+const CACHE_TTL_MS = 60_000 // 60 s stale-while-revalidate window
+
+function transformJobs(jobs: any[]): TimetableListItem[] {
+  return jobs.map((job: any) => ({
+    id: job.job_id || job.id,
+    department: job.organization_name || 'All Departments',
+    batch: job.batch?.batch_name || null,
+    semester: job.semester || 1,
+    academic_year: job.academic_year || '2024-25',
+    status: job.status || 'draft',
+    lastUpdated: new Date(job.updated_at || job.created_at).toLocaleDateString(),
+    conflicts: job.conflicts_count || 0,
+    score: job.quality_score || null,
+  }))
+}
+
 export default function AdminTimetablesPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [timetables, setTimetables] = useState<TimetableListItem[]>([])
-  const [runningJobs, setRunningJobs] = useState<RunningJob[]>([])
+  const [timetables, setTimetables] = useState<TimetableListItem[]>(() => {
+    // ── Stale-while-revalidate: seed state from sessionStorage immediately ──
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY)
+      if (raw) {
+        const { data, ts } = JSON.parse(raw)
+        if (Date.now() - ts < CACHE_TTL_MS) return data
+      }
+    } catch { /* ignore */ }
+    return []
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
+  // Running-job poll: derive from main timetables list (no separate fetch)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const emptyPollCount = useRef(0)
 
   const { user } = useAuth()
   const router = useRouter()
   const API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000/api'
 
-  useEffect(() => {
-    loadTimetableData()
-  }, [currentPage])
-  
-  useEffect(() => {
-    loadRunningJobs()
-    const interval = setInterval(loadRunningJobs, 5000)
-    return () => clearInterval(interval)
-  }, [])
-  
-  const loadTimetableData = async () => {
+  // ── Derive running jobs from the main list (no extra API round-trip) ─────
+  const runningJobs = useMemo<RunningJob[]>(
+    () =>
+      timetables
+        .filter(t => t.status === 'running' || t.status === 'pending')
+        .map(t => ({
+          job_id: t.id,
+          progress: 0,
+          status: t.status,
+          message: t.status === 'pending' ? 'Starting…' : 'Processing…',
+          time_remaining_seconds: null,
+        })),
+    [timetables]
+  )
+
+  const loadTimetableData = useCallback(async () => {
     try {
-      setLoading(true)
       setError(null)
 
-      // Fast load: Paginated with minimal data
       const response = await fetch(
         `${API_BASE}/generation-jobs/?page=${currentPage}&page_size=20`,
         { credentials: 'include' }
       )
-      
+
       if (!response.ok) {
-        setTimetables([])
+        setTimetables(prev => prev) // keep stale data visible
+        setLoading(false)
         return
       }
 
       const data = await response.json()
       const jobs = data.results || []
       setTotalCount(data.count || 0)
-      
-      // Transform to list items (minimal processing)
-      const listItems = jobs.map((job: any) => ({
-        id: job.job_id || job.id,
-        department: job.organization_name || 'All Departments', // Show organization name instead of N/A
-        batch: job.batch?.batch_name || null,
-        semester: job.semester || 1,
-        academic_year: job.academic_year || '2024-25',
-        status: job.status || 'draft',
-        lastUpdated: new Date(job.updated_at || job.created_at).toLocaleDateString(),
-        conflicts: job.conflicts_count || 0,
-        score: job.quality_score || null
-      }))
-      
+
+      const listItems = transformJobs(jobs)
       setTimetables(listItems)
+
+      // Persist to sessionStorage so next navigation is instant
+      try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: listItems, ts: Date.now() }))
+      } catch { /* quota exceeded – ignore */ }
+
+      // Stop background polling once no running jobs remain
+      const hasActive = listItems.some(t => t.status === 'running' || t.status === 'pending')
+      if (!hasActive) {
+        emptyPollCount.current += 1
+        if (emptyPollCount.current >= 2 && pollingRef.current) {
+          clearInterval(pollingRef.current)
+          pollingRef.current = null
+        }
+      } else {
+        emptyPollCount.current = 0
+      }
     } catch (err) {
       console.error('Failed to load timetables:', err)
-      setTimetables([])
     } finally {
       setLoading(false)
     }
-  }
+  }, [currentPage, API_BASE])
 
-  const loadRunningJobs = async () => {
-    try {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 3000)
-      
-      const response = await fetch(
-        `${API_BASE}/generation-jobs/?status=running,pending&page=1&page_size=5`,
-        { credentials: 'include', signal: controller.signal }
-      )
-      clearTimeout(timeoutId)
-      
-      if (!response.ok) {
-        setRunningJobs([])
-        return
-      }
-      
-      const data = await response.json()
-      const jobs = (data.results || []).filter((job: any) => ['running', 'pending'].includes(job.status))
-      
-      if (jobs.length === 0) {
-        setRunningJobs([])
-        return
-      }
-      
-      // Simplified: Use job data directly without extra progress calls
-      const runningJobs = jobs.map((job: any) => ({
-        job_id: job.job_id || job.id,
-        progress: job.progress || 1,  // Show at least 1% to indicate activity
-        status: job.status === 'pending' ? 'running' : job.status,  // Treat pending as running
-        message: job.current_stage || (job.status === 'pending' ? 'Starting...' : 'Processing...'),
-        time_remaining_seconds: null
-      }))
-      
-      setRunningJobs(runningJobs)
-    } catch (err) {
-      setRunningJobs([])
+  useEffect(() => {
+    loadTimetableData()
+  }, [loadTimetableData])
+
+  // Background poll – only keep going while there are active jobs
+  useEffect(() => {
+    pollingRef.current = setInterval(() => {
+      loadTimetableData()
+    }, 8_000) // 8 s is plenty for status updates
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current)
     }
-  }
+  }, [loadTimetableData])
 
-  const getGroupedBySemester = () => {
+  // ── Pure helper – memoised so it doesn't recompute on every render ────────
+  const getGroupedBySemester = useMemo(() => () => {
     const grouped: { [key: string]: TimetableListItem[] } = {}
 
     timetables.forEach(timetable => {
@@ -131,7 +144,7 @@ export default function AdminTimetablesPage() {
     })
 
     return grouped
-  }
+  }, [timetables])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -165,13 +178,14 @@ export default function AdminTimetablesPage() {
 
   const groupedTimetables = getGroupedBySemester()
 
-  if (loading) {
+  // Show skeleton only on the very first load (no stale data yet)
+  if (loading && timetables.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <GoogleSpinner size={48} className="mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading timetables...</p>
+      <div className="space-y-6">
+        <div className="flex justify-end">
+          <div className="h-9 w-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
         </div>
+        <TimetableListSkeleton cards={6} />
       </div>
     )
   }

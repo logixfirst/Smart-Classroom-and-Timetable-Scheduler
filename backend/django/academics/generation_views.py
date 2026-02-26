@@ -48,22 +48,38 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter jobs based on user role and status"""
         queryset = GenerationJob.objects.all().order_by('-created_at')
-        
-        # CRITICAL: Use select_related to avoid N+1 queries
+
+        # CRITICAL: Use select_related to avoid N+1 queries for org_name
         queryset = queryset.select_related('organization')
-        
+
         # CRITICAL: Defer timetable_data for list view (can be 5-50MB per job!)
         if self.action == 'list':
             queryset = queryset.defer('timetable_data')
-        
+
         # Filter by status if provided
         status_filter = self.request.query_params.get('status')
         if status_filter:
             # Handle comma-separated statuses
             statuses = [s.strip() for s in status_filter.split(',')]
             queryset = queryset.filter(status__in=statuses)
-        
+
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        """List jobs with short-lived HTTP cache hint for the browser."""
+        response = super().list(request, *args, **kwargs)
+        # Short TTL: job statuses can change (running → completed).
+        # 10 s is enough to benefit navigating back/forward without stale data.
+        response['Cache-Control'] = 'private, max-age=10'
+        return response
+
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve single job; use a longer cache hint for completed jobs."""
+        response = super().retrieve(request, *args, **kwargs)
+        job = self.get_object()
+        ttl = 3600 if job.status in ('completed', 'failed', 'cancelled') else 10
+        response['Cache-Control'] = f'private, max-age={ttl}'
+        return response
 
     @action(detail=False, methods=["post"], url_path="generate")
     def generate_timetable(self, request):

@@ -1,21 +1,26 @@
 """
 Timetable Workflow API - Review and Approval System
 """
+import hashlib
+import json
 import logging
+
+from django.core.cache import cache
+from django.db.models import JSONField
+from django.db.models.expressions import RawSQL
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.utils import timezone
-from django.core.cache import cache
 
 from .models import GenerationJob
 from core.rbac import (
-    CanViewTimetable,
-    CanManageTimetable,
     CanApproveTimetable,
+    CanManageTimetable,
+    CanViewTimetable,
     DepartmentAccessPermission,
-    has_department_access
+    has_department_access,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,21 +35,32 @@ class TimetableWorkflowViewSet(viewsets.ViewSet):
         cache_key = f'workflow_{pk}'
         cached = cache.get(cache_key)
         if cached:
-            return Response(cached)
-        
+            response = Response(cached)
+            response['Cache-Control'] = 'private, max-age=300'
+            return response
+
         try:
-            job = GenerationJob.objects.only('id', 'organization_id', 'created_at', 'status').get(id=pk)
-            
+            job = GenerationJob.objects.only(
+                'id', 'organization_id', 'created_at', 'status',
+                'academic_year', 'semester',
+            ).get(id=pk)
+
             data = {
                 'id': str(job.id),
                 'job_id': str(job.id),
                 'organization_id': str(job.organization_id),
                 'status': job.status,
+                'academic_year': job.academic_year,
+                'semester': job.semester,
                 'created_at': job.created_at.isoformat(),
-                'timetable_entries': []  # Don't load entries here
+                'timetable_entries': [],  # Don't load entries here
             }
-            cache.set(cache_key, data, 300)  # 5 min cache
-            return Response(data)
+            # Immutable once completed/failed \u2013 cache for 1 hour; otherwise 5 min
+            ttl = 3600 if job.status in ('completed', 'failed') else 300
+            cache.set(cache_key, data, ttl)
+            response = Response(data)
+            response['Cache-Control'] = f'private, max-age={ttl}'
+            return response
         except GenerationJob.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
     
@@ -204,83 +220,174 @@ class TimetableVariantViewSet(viewsets.ViewSet):
         return result
     
     def list(self, request):
-        """List variants - ULTRA FAST (no entries processing)"""
+        """List variants metadata - ULTRA FAST (PostgreSQL strips entries server-side).
+
+        Instead of loading the full timetable_data JSON (5-50 MB) into Python
+        and iterating in Python, this uses PostgreSQL's JSONB operator
+        ``v - 'timetable_entries'`` to strip the bulky entries array BEFORE
+        the data is transferred over the wire.  The result is only the metadata
+        fields (quality_metrics, statistics, score, etc.) \u2013 typically < 50 KB.
+        """
         job_id = request.query_params.get('job_id')
         if not job_id:
             return Response({'error': 'job_id required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         cache_key = f'variants_list_{job_id}'
         cached = cache.get(cache_key)
         if cached:
-            return Response(cached)
-        
+            response = Response(cached)
+            response['Cache-Control'] = 'private, max-age=3600'
+            return response
+
         try:
-            job = GenerationJob.objects.only('id', 'organization_id', 'created_at', 'timetable_data').get(id=job_id)
-            variants = (job.timetable_data or {}).get('variants', [])
-            
-            result = []
-            for idx, v in enumerate(variants):
-                # Support both old format (fitness only) and new format (enriched)
-                # New format has 'score' (0-100 %), 'conflicts', 'room_utilization',
-                # 'quality_metrics', 'statistics' — all computed by FastAPI.
-                qm  = v.get('quality_metrics', {})
-                sta = v.get('statistics', {})
-
-                # Scores — prefer pre-computed blocks, fall back to top-level fields
-                overall_score  = qm.get('overall_score',          v.get('score',            0))
-                total_conflicts = qm.get('total_conflicts',        v.get('conflicts',         0))
-                room_util      = qm.get('room_utilization_score',  v.get('room_utilization',  0))
-                total_classes  = sta.get('total_classes',          len(v.get('timetable_entries', [])))
-
-                result.append({
-                    'id':              f"{job_id}-variant-{idx+1}",
-                    'job_id':          str(job_id),
-                    'variant_number':  idx + 1,
-                    'organization_id': str(job.organization_id),
-                    'timetable_entries': [],  # Empty - load on demand via /entries/
-                    'statistics': {
-                        'total_classes':   total_classes,
-                        'total_conflicts': total_conflicts,
-                    },
-                    'quality_metrics': {
-                        'overall_score':           overall_score,
-                        'total_conflicts':         total_conflicts,
-                        'room_utilization_score':  room_util,
-                    },
-                    'generated_at': job.created_at.isoformat(),
-                })
-            
-            cache.set(cache_key, result, 300)  # 5 min
-            return Response(result)
+            # \u2500\u2500 PostgreSQL does the heavy lifting \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+            # ``v - 'timetable_entries'`` removes the large array key from each
+            # variant object BEFORE transferring to Python.  Only call once; no
+            # Python-level iteration of raw entries.
+            job = (
+                GenerationJob.objects
+                .only('id', 'organization_id', 'created_at')
+                .annotate(
+                    variants_meta=RawSQL(
+                        """
+                        SELECT jsonb_agg(v - 'timetable_entries')
+                        FROM jsonb_array_elements(
+                            COALESCE(timetable_data->'variants', '[]'::jsonb)
+                        ) AS v
+                        """,
+                        (),
+                        output_field=JSONField(),
+                    )
+                )
+                .get(id=job_id)
+            )
         except GenerationJob.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        variants_meta = job.variants_meta or []
+
+        result = []
+        for idx, v in enumerate(variants_meta):
+            if v is None:
+                continue
+            qm = v.get('quality_metrics', {}) or {}
+            sta = v.get('statistics', {}) or {}
+
+            # Support both old format (fitness only) and enriched FastAPI format
+            overall_score   = qm.get('overall_score',          v.get('score',            0))
+            total_conflicts = qm.get('total_conflicts',        v.get('conflicts',         0))
+            room_util       = qm.get('room_utilization_score', v.get('room_utilization',  0))
+            # total_classes comes from statistics or was pre-computed by FastAPI
+            total_classes   = sta.get('total_classes',         v.get('entry_count',       0))
+
+            result.append({
+                'id':             f"{job_id}-variant-{idx + 1}",
+                'job_id':         str(job_id),
+                'variant_number': idx + 1,
+                'organization_id': str(job.organization_id),
+                'timetable_entries': [],  # populated on demand via /entries/
+                'statistics': {
+                    'total_classes':   total_classes,
+                    'total_conflicts': total_conflicts,
+                },
+                'quality_metrics': {
+                    'overall_score':          overall_score,
+                    'total_conflicts':        total_conflicts,
+                    'room_utilization_score': room_util,
+                },
+                'generated_at': job.created_at.isoformat(),
+            })
+
+        # Variant metadata is immutable after generation \u2013 cache for 1 hour
+        cache.set(cache_key, result, 3600)
+        response = Response(result)
+        response['Cache-Control'] = 'private, max-age=3600'
+        return response
     
     @action(detail=True, methods=['get'])
     def entries(self, request, pk=None):
-        """Load entries on demand - separate endpoint"""
+        """Load entries on demand – separate endpoint.
+
+        Entries are immutable after generation so we cache for 1 hour and
+        return strong HTTP ETags so the browser can skip the round-trip
+        entirely on repeat visits using conditional GET.
+        """
         job_id = request.query_params.get('job_id')
         if not job_id:
             return Response({'error': 'job_id required'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         cache_key = f'variant_entries_{pk}'
         cached = cache.get(cache_key)
+
         if cached:
-            return Response({'timetable_entries': cached})
-        
+            # Build a deterministic ETag from the cache key + data hash
+            etag_value = f'"{hashlib.md5(cache_key.encode()).hexdigest()}"'
+            if request.META.get('HTTP_IF_NONE_MATCH') == etag_value:
+                return Response(status=304)
+            response = Response({'timetable_entries': cached})
+            response['Cache-Control'] = 'private, max-age=3600'
+            response['ETag'] = etag_value
+            return response
+
         try:
-            job = GenerationJob.objects.only('timetable_data').get(id=job_id)
-            variants = (job.timetable_data or {}).get('variants', [])
-            
-            # Find variant
-            for idx, v in enumerate(variants):
-                if f"{job_id}-variant-{idx+1}" == pk:
-                    entries = self._convert_timetable_entries(v.get('timetable_entries', [])[:500])  # Limit to 500
-                    cache.set(cache_key, entries, 600)  # 10 min
-                    return Response({'timetable_entries': entries})
-            
-            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+            # Use PostgreSQL to extract ONLY the target variant's entries
+            # without loading every other variant's data into Python.
+            variant_index_sql = """
+                (
+                  SELECT idx - 1
+                  FROM jsonb_array_elements(
+                      COALESCE(timetable_data->'variants', '[]'::jsonb)
+                  ) WITH ORDINALITY AS t(v, idx)
+                  WHERE %s = CONCAT(id::text, '-variant-', idx::text)
+                  LIMIT 1
+                )
+            """
+            job = (
+                GenerationJob.objects
+                .only('id')
+                .annotate(
+                    target_entries=RawSQL(
+                        """
+                        timetable_data->'variants'->
+                        (
+                          SELECT (idx - 1)::int
+                          FROM   jsonb_array_elements(
+                                     COALESCE(timetable_data->'variants', '[]'::jsonb)
+                                 ) WITH ORDINALITY AS t(v, idx)
+                          WHERE  %s = (id::text || '-variant-' || idx::text)
+                          LIMIT  1
+                        )->'timetable_entries'
+                        """,
+                        (pk,),
+                        output_field=JSONField(),
+                    )
+                )
+                .get(id=job_id)
+            )
+            raw_entries = job.target_entries or []
         except GenerationJob.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception:
+            # Fallback: load timetable_data the traditional way on annotation error
+            try:
+                job_fallback = GenerationJob.objects.only('timetable_data').get(id=job_id)
+                variants = (job_fallback.timetable_data or {}).get('variants', [])
+                raw_entries = []
+                for idx, v in enumerate(variants):
+                    if f"{job_id}-variant-{idx + 1}" == pk:
+                        raw_entries = v.get('timetable_entries', [])
+                        break
+            except GenerationJob.DoesNotExist:
+                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        entries = self._convert_timetable_entries(raw_entries[:500])
+        # Immutable after generation \u2013 cache for 1 hour
+        cache.set(cache_key, entries, 3600)
+        etag_value = f'"{hashlib.md5(cache_key.encode()).hexdigest()}"'
+        response = Response({'timetable_entries': entries})
+        response['Cache-Control'] = 'private, max-age=3600'
+        response['ETag'] = etag_value
+        return response
     
     @action(detail=True, methods=['post'])
     def select(self, request, pk=None):
