@@ -268,18 +268,21 @@
     display: inline-block;
     border-radius: 9999px;
     border-style: solid;
-    border-color: rgba(37, 99, 235, 0.18);   /* #2563EB at 18 % opacity — faint track */
-    border-top-color: #2563EB;               /* project blue accent                   */
-    animation: gsp-rotate 1.4s linear infinite;
+    /* Track ring: 15 % blue — visible on white, gray-50, and dark surfaces */
+    border-color: rgba(33, 150, 243, 0.15);
+    /* Arc: project accent blue */
+    border-top-color: #2196F3;
+    animation: gsp-rotate 2s linear infinite;
   }
 
   .loading-spinner-dark {
     display: inline-block;
     border-radius: 9999px;
     border-style: solid;
-    border-color: rgba(255, 255, 255, 0.15);
-    border-top-color: #2563EB;
-    animation: gsp-rotate 1.4s linear infinite;
+    /* Track on dark surfaces — slightly brighter so it reads */
+    border-color: rgba(33, 150, 243, 0.25);
+    border-top-color: #2196F3;
+    animation: gsp-rotate 2s linear infinite;
   }
 
   .loading-skeleton {
