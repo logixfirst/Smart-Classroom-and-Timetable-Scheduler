@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
 interface TimeSlot {
   day: string
@@ -208,7 +209,7 @@ export default function SubstitutionModal({
           >
             {isLoading ? (
               <div className="flex items-center justify-center gap-2">
-                <div className="loading-spinner w-4 h-4"></div>
+                <GoogleSpinner size={16} color="white" />
                 <span>Updating...</span>
               </div>
             ) : (

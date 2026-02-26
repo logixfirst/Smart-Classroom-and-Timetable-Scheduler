@@ -30,8 +30,9 @@ export function GoogleSpinner({
   /** @deprecated */
   singleColor?: string
 }) {
-  // Match project accent. 'white' is used for spinners inside coloured buttons.
-  const arcColor = color ?? singleColor ?? '#2196F3'
+  // Google's exact spinner blue: #4285F4
+  // Pass color="white" for spinners inside coloured buttons.
+  const arcColor = color ?? singleColor ?? '#4285F4'
 
   // strokeWidth scales with size so thin spinners look thin, large ones look bold.
   // Clamped between 2.5 (min readability) and 4 (max Material weight).

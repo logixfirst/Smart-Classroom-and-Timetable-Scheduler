@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import apiClient from '@/lib/api'
 import { useToast } from '@/components/Toast'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
 interface Department {
   id: number
@@ -45,9 +46,9 @@ export default function DepartmentsPage() {
 
       <div className="card">
         {isLoading && (
-          <div className="flex items-center justify-center py-8">
-            <div className="loading-spinner w-6 h-6 mr-2"></div>
-            <span className="text-gray-600 dark:text-gray-400">Loading departments...</span>
+          <div className="flex flex-col items-center justify-center py-8">
+            <GoogleSpinner size={48} className="mb-3" />
+            <p className="text-gray-600 dark:text-gray-400">Loading departments...</p>
           </div>
         )}
 

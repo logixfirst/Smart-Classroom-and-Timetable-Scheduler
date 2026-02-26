@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 
@@ -21,7 +22,7 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="loading-spinner w-8 h-8"></div>
+        <GoogleSpinner size={48} />
       </div>
     )
   }

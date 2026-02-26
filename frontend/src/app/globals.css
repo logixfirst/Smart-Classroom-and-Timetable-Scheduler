@@ -268,10 +268,10 @@
     display: inline-block;
     border-radius: 9999px;
     border-style: solid;
-    /* Track ring: 15 % blue — visible on white, gray-50, and dark surfaces */
-    border-color: rgba(33, 150, 243, 0.15);
-    /* Arc: project accent blue */
-    border-top-color: #2196F3;
+    /* Track ring: 15 % Google blue — visible on white, gray-50, and dark surfaces */
+    border-color: rgba(66, 133, 244, 0.15);
+    /* Arc: Google blue #4285F4 */
+    border-top-color: #4285F4;
     animation: gsp-rotate 2s linear infinite;
   }
 
@@ -280,8 +280,8 @@
     border-radius: 9999px;
     border-style: solid;
     /* Track on dark surfaces — slightly brighter so it reads */
-    border-color: rgba(33, 150, 243, 0.25);
-    border-top-color: #2196F3;
+    border-color: rgba(66, 133, 244, 0.25);
+    border-top-color: #4285F4;
     animation: gsp-rotate 2s linear infinite;
   }
 

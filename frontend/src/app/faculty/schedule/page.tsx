@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import DashboardLayout from '@/components/dashboard-layout'
 
 export default function FacultySchedule() {
@@ -35,7 +36,7 @@ export default function FacultySchedule() {
       <DashboardLayout role="faculty">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
-            <div className="loading-spinner w-8 h-8 mx-auto mb-4"></div>
+            <GoogleSpinner size={48} className="mx-auto mb-4" />
             <p className="text-gray-600 dark:text-gray-400">Loading schedule...</p>
           </div>
         </div>

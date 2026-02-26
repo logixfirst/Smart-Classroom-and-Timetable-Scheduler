@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import DashboardLayout from '@/components/dashboard-layout'
@@ -199,7 +200,7 @@ export default function FacultyDashboard() {
 
           {loading ? (
             <div className="text-center py-8">
-              <div className="loading-spinner w-6 h-6 mx-auto mb-4"></div>
+              <GoogleSpinner size={48} className="mx-auto mb-4" />
               <p className="text-gray-600 dark:text-gray-400">Loading your subjects...</p>
             </div>
           ) : mySubjects.length > 0 ? (

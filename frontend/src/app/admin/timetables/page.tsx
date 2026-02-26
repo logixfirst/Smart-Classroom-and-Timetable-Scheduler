@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import type { TimetableListItem } from '@/types/timetable'
 
 interface RunningJob {
@@ -168,7 +169,7 @@ export default function AdminTimetablesPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="loading-spinner w-8 h-8 mx-auto mb-4"></div>
+          <GoogleSpinner size={48} className="mx-auto mb-4" />
           <p className="text-gray-600 dark:text-gray-400">Loading timetables...</p>
         </div>
       </div>

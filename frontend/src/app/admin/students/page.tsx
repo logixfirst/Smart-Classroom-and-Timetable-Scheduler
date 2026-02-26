@@ -6,6 +6,7 @@ import AddEditStudentModal from './components/AddEditStudentModal'
 import { SimpleStudentInput } from '@/lib/validations'
 import apiClient from '@/lib/api'
 import { useToast } from '@/components/Toast'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
 interface Student {
   id: number
@@ -302,7 +303,7 @@ export default function StudentsPage() {
                 <tr key="loading-spinner">
                   <td colSpan={9}>
                     <div className="flex justify-center items-center py-10">
-                      <div className="loading-spinner w-6 h-6 mr-2"></div>
+                      <GoogleSpinner size={48} className="mr-2" />
                       <span className="text-gray-500">
                         Loading students...
                       </span>

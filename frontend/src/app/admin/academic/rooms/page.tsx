@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import apiClient from '@/lib/api'
+import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
 interface Room {
   room_id: string
@@ -222,9 +223,9 @@ export default function ClassroomsPage() {
 
       <div className="card">
         {isLoading && (
-          <div className="flex items-center justify-center py-8">
-            <div className="loading-spinner w-6 h-6 mr-2"></div>
-            <span className="text-gray-600 dark:text-gray-400">Loading rooms...</span>
+          <div className="flex flex-col items-center justify-center py-8">
+            <GoogleSpinner size={48} className="mb-3" />
+            <p className="text-gray-600 dark:text-gray-400">Loading rooms...</p>
           </div>
         )}
 
@@ -240,8 +241,8 @@ export default function ClassroomsPage() {
             {isTableLoading && (
               <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
                 <div className="flex flex-col items-center">
-                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Loading...</span>
+                  <GoogleSpinner size={48} />
+                  <span className="text-sm text-gray-600 dark:text-gray-400 mt-3">Loading...</span>
                 </div>
               </div>
             )}
