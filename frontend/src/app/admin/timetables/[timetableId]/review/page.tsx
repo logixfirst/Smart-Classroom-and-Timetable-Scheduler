@@ -272,7 +272,7 @@ export default function TimetableReviewPage() {
     )
     obs.observe(el)
     return () => obs.disconnect()
-  }, [activeVariant?.id, gridInView])
+  }, [gridInView])
 
   // Modals
   const [showApprovalModal, setShowApprovalModal] = useState(false)
@@ -284,6 +284,12 @@ export default function TimetableReviewPage() {
   const [activeVariant, setActiveVariant] = useState<TimetableVariant | null>(null)
   const [activeDay, setActiveDay] = useState<number | 'all'>('all')
   const [departmentFilter, setDepartmentFilter] = useState<string>('all')
+
+  // Reset gridInView when the active variant changes so the grid re-observes
+  // for the new content (must come after activeVariant is declared above).
+  useEffect(() => {
+    setGridInView(false)
+  }, [activeVariant?.id])
 
   useEffect(() => {
     if (workflowId) {
