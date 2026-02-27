@@ -1,3 +1,7 @@
+'use client'
+
+import { useState } from 'react'
+
 interface TimeSlot {
   day: string
   time: string
@@ -40,91 +44,120 @@ export default function TimetableGrid({
     '16:00-17:00',
   ]
 
+  const todayName = new Date()
+    .toLocaleDateString('en-US', { weekday: 'long' })
+    .toLowerCase()
+  const defaultDay = days.includes(todayName) ? todayName : days[0]
+  const [selectedDay, setSelectedDay] = useState<string>(defaultDay)
+
   return (
     <div className={`w-full ${className}`}>
-      {/* Mobile Card View */}
-      <div className="block sm:hidden space-y-4">
-        {days.map(day => {
-          const daySlots = schedule.filter(s => s.day === day)
-          if (daySlots.length === 0) return null
+      {/* ── Mobile Day-Pill + Card View (xs / sm) ─────────────────────── */}
+      <div className="block sm:hidden">
+        {/* Day pill selector */}
+        <div
+          className="flex gap-2 overflow-x-auto pb-2 no-scrollbar"
+          style={{ marginBottom: '12px' }}
+        >
+          {days.map(day => {
+            const isActive = day === selectedDay
+            return (
+              <button
+                key={day}
+                onClick={() => setSelectedDay(day)}
+                style={{
+                  flexShrink: 0,
+                  height: '32px',
+                  padding: '0 14px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: `1px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                  background: isActive ? 'var(--color-primary)' : 'var(--color-bg-surface)',
+                  color: isActive ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                  fontSize: '13px',
+                  fontWeight: isActive ? 600 : 400,
+                  cursor: 'pointer',
+                  transition: 'background-color 100ms',
+                  textTransform: 'capitalize',
+                }}
+              >
+                {day.slice(0, 3).charAt(0).toUpperCase() + day.slice(1, 3)}
+              </button>
+            )
+          })}
+        </div>
 
-          return (
-            <div key={day} className="card">
-              <div className="card-header">
-                <h3 className="card-title capitalize">{day}</h3>
-              </div>
-              <div className="space-y-2">
-                {daySlots.map((slot, index) => {
-                  const isConflicted = slot.isConflicted
-                  const bgColor = isConflicted
-                    ? 'bg-red-50 dark:bg-red-900/20'
-                    : 'bg-blue-50 dark:bg-blue-900/20'
-                  const borderColor = isConflicted
-                    ? 'border-red-200 dark:border-red-800'
-                    : 'border-blue-200 dark:border-blue-800'
-                  const textColor = isConflicted
-                    ? 'text-red-800 dark:text-red-300'
-                    : 'text-blue-800 dark:text-blue-300'
+        {/* Slots for selected day */}
+        <div className="space-y-2">
+          {times.map(time => {
+            const slot = schedule.find(s => s.day === selectedDay && s.time === time)
 
-                  return (
-                    <div
-                      key={index}
-                      className={`${bgColor} p-3 rounded-lg border ${borderColor} ${isAdminView && isConflicted ? 'cursor-pointer hover:opacity-80' : ''} transition-opacity duration-200`}
-                      onClick={() =>
-                        isAdminView && isConflicted && onSlotClick && onSlotClick(slot)
-                      }
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <span
-                          className={`text-xs font-medium ${textColor} bg-opacity-40 px-2 py-1 rounded`}
-                        >
-                          {slot.time}
-                        </span>
-                        {isConflicted && (
-                          <span className="text-xs font-medium text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40 px-2 py-1 rounded">
-                            Conflict
-                          </span>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <div
-                          className={`font-medium text-sm ${isConflicted ? 'text-red-900 dark:text-red-200' : 'text-blue-900 dark:text-blue-200'}`}
-                        >
-                          {slot.subject}
-                        </div>
-                        <div
-                          className={`text-xs ${isConflicted ? 'text-red-700 dark:text-red-300' : 'text-blue-700 dark:text-blue-300'}`}
-                        >
-                          {slot.faculty}
-                        </div>
-                        <div
-                          className={`text-xs ${isConflicted ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}
-                        >
-                          {slot.classroom} • {slot.batch}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+            if (!slot) {
+              return (
+                <div key={time} className="tt-mobile-slot tt-mobile-slot-empty">
+                  <span className="tt-mobile-slot-time">{time}</span>
+                  <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Free</span>
+                </div>
+              )
+            }
+
+            const isConflicted = slot.isConflicted
+
+            return (
+              <div
+                key={time}
+                className="tt-mobile-slot"
+                style={
+                  isConflicted
+                    ? { borderLeft: '3px solid var(--color-danger)', background: 'var(--color-danger-subtle)' }
+                    : {}
+                }
+                onClick={() => isAdminView && isConflicted && onSlotClick && onSlotClick(slot)}
+              >
+                <span className="tt-mobile-slot-time">{time}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="tt-mobile-slot-course">{slot.subject}</div>
+                  <div className="tt-mobile-slot-meta">
+                    {slot.faculty} &bull; {slot.classroom} &bull; {slot.batch}
+                  </div>
+                </div>
+                {isConflicted && (
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: 'var(--color-danger-text)',
+                      background: 'var(--color-danger-subtle)',
+                      border: '1px solid var(--color-danger)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '2px 6px',
+                    }}
+                  >
+                    Conflict
+                  </span>
+                )}
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
 
-      {/* Desktop Table View */}
+      {/* ── Tablet / Desktop Table View (sm+) ─────────────────────────── */}
       <div className="hidden sm:block overflow-x-auto">
-        <table className="table text-xs sm:text-sm lg:text-base min-w-full">
+        <table className="table text-xs sm:text-sm min-w-full">
           <thead className="table-header">
             <tr>
-              <th className="table-header-cell w-20 sm:w-24 lg:w-32">Time</th>
+              <th className="table-header-cell tt-time-cell" style={{ width: '96px' }}>
+                Time
+              </th>
               {days.map(day => (
                 <th
                   key={day}
-                  className="table-header-cell capitalize min-w-[120px] sm:min-w-[140px] lg:min-w-[160px]"
+                  className="table-header-cell capitalize"
+                  style={{ minWidth: '128px' }}
                 >
-                  <span className="hidden sm:inline">{day}</span>
-                  <span className="sm:hidden">{day.slice(0, 3)}</span>
+                  <span className="hidden md:inline">{day}</span>
+                  <span className="md:hidden">{day.slice(0, 3)}</span>
                 </th>
               ))}
             </tr>
@@ -132,54 +165,92 @@ export default function TimetableGrid({
           <tbody>
             {times.map(time => (
               <tr key={time} className="table-row">
-                <td className="table-cell font-medium whitespace-nowrap align-top">
-                  <div className="text-xs sm:text-sm lg:text-base py-1">{time}</div>
+                <td className="table-cell tt-time-cell font-medium whitespace-nowrap align-top">
+                  {time}
                 </td>
                 {days.map(day => {
                   const slot = schedule.find(s => s.day === day && s.time === time)
-                  return (
-                    <td key={`${day}-${time}`} className="table-cell align-top p-1 sm:p-2 lg:p-3">
-                      {slot &&
-                        (() => {
-                          const isConflicted = slot.isConflicted
-                          const bgColor = isConflicted
-                            ? 'bg-red-100 dark:bg-red-900/30'
-                            : 'bg-blue-100 dark:bg-blue-900/30'
-                          const borderColor = isConflicted
-                            ? 'border-red-200 dark:border-red-700'
-                            : 'border-blue-200 dark:border-blue-700'
-                          const hoverColor = isConflicted
-                            ? 'hover:bg-red-200 dark:hover:bg-red-900/40'
-                            : 'hover:bg-blue-200 dark:hover:bg-blue-900/40'
+                  const isConflicted = slot?.isConflicted
 
-                          return (
+                  return (
+                    <td
+                      key={`${day}-${time}`}
+                      className="table-cell align-top"
+                      style={{ padding: '8px', minHeight: '80px', verticalAlign: 'top' }}
+                    >
+                      {slot && (
+                        <div
+                          style={{
+                            minHeight: '80px',
+                            padding: '8px',
+                            borderRadius: 'var(--radius-md)',
+                            border: `1px solid ${isConflicted ? 'var(--color-danger)' : 'var(--color-primary-subtle)'}`,
+                            background: isConflicted
+                              ? 'var(--color-danger-subtle)'
+                              : 'color-mix(in srgb, var(--color-primary) 8%, transparent)',
+                            cursor: isAdminView && isConflicted ? 'pointer' : 'default',
+                            position: 'relative',
+                          }}
+                          onClick={() =>
+                            isAdminView && isConflicted && onSlotClick && onSlotClick(slot)
+                          }
+                        >
+                          {isConflicted && (
                             <div
-                              className={`${bgColor} p-1 sm:p-2 lg:p-3 rounded-lg text-xs sm:text-sm border ${borderColor} ${hoverColor} transition-colors duration-200 ${isAdminView && isConflicted ? 'cursor-pointer' : ''} relative`}
-                              onClick={() =>
-                                isAdminView && isConflicted && onSlotClick && onSlotClick(slot)
-                              }
-                            >
-                              {isConflicted && (
-                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></div>
-                              )}
-                              <div
-                                className={`font-medium mb-1 truncate ${isConflicted ? 'text-red-900 dark:text-red-200' : 'text-blue-900 dark:text-blue-200'}`}
-                              >
-                                {slot.subject}
-                              </div>
-                              <div
-                                className={`mb-1 truncate ${isConflicted ? 'text-red-700 dark:text-red-300' : 'text-blue-700 dark:text-blue-300'}`}
-                              >
-                                {slot.faculty}
-                              </div>
-                              <div
-                                className={`text-xs truncate ${isConflicted ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}
-                              >
-                                {slot.classroom} • {slot.batch}
-                              </div>
-                            </div>
-                          )
-                        })()}
+                              style={{
+                                position: 'absolute',
+                                top: '-4px',
+                                right: '-4px',
+                                width: '10px',
+                                height: '10px',
+                                background: 'var(--color-danger)',
+                                borderRadius: '50%',
+                                border: '2px solid var(--color-bg-surface)',
+                              }}
+                            />
+                          )}
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              fontWeight: 500,
+                              color: isConflicted
+                                ? 'var(--color-danger-text)'
+                                : 'var(--color-text-primary)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              marginBottom: '3px',
+                            }}
+                          >
+                            {slot.subject}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '11px',
+                              color: isConflicted
+                                ? 'var(--color-danger-text)'
+                                : 'var(--color-text-secondary)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              marginBottom: '2px',
+                            }}
+                          >
+                            {slot.faculty}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: '11px',
+                              color: 'var(--color-text-muted)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {slot.classroom} &bull; {slot.batch}
+                          </div>
+                        </div>
+                      )}
                     </td>
                   )
                 })}

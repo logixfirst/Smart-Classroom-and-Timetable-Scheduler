@@ -14,32 +14,52 @@ interface InContentNavProps {
 
 export default function InContentNav({ items, activeItem, onItemClick }: InContentNavProps) {
   return (
-    <div className="border-b border-gray-200 dark:border-gray-700 mb-4 sm:mb-6">
-      <nav className="flex space-x-1 overflow-x-auto scrollbar-hide">
-        {items.map(item => (
-          <button
-            key={item.id}
-            onClick={() => onItemClick(item.id)}
-            className={`px-3 sm:px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors duration-200 ${
-              activeItem === item.id
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-            } rounded-t-lg`}
-          >
-            {item.label}
-            {item.count !== undefined && (
-              <span
-                className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-                  activeItem === item.id
-                    ? 'bg-blue-100 text-blue-600 dark:bg-blue-800 dark:text-blue-300'
-                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                }`}
-              >
-                {item.count}
-              </span>
-            )}
-          </button>
-        ))}
+    <div
+      className="mb-4 sm:mb-6 overflow-x-auto no-scrollbar"
+      style={{ borderBottom: '1px solid var(--color-border)' }}
+    >
+      <nav className="flex" style={{ gap: 0, padding: 0 }}>
+        {items.map(item => {
+          const isActive = activeItem === item.id
+          return (
+            <button
+              key={item.id}
+              onClick={() => onItemClick(item.id)}
+              style={{
+                padding: '10px 16px',
+                fontSize: '14px',
+                fontWeight: isActive ? 600 : 500,
+                color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                borderBottom: isActive
+                  ? '2px solid var(--color-primary)'
+                  : '2px solid transparent',
+                marginBottom: '-1px',
+                cursor: 'pointer',
+                background: 'transparent',
+                border: 'none',
+                borderBottomWidth: '2px',
+                borderBottomStyle: 'solid',
+                borderBottomColor: isActive ? 'var(--color-primary)' : 'transparent',
+                whiteSpace: 'nowrap',
+                transition: 'color 100ms, border-color 100ms',
+              }}
+              className={!isActive ? 'hover:bg-[var(--color-bg-surface-2)] hover:text-[var(--color-text-primary)]' : ''}
+            >
+              {item.label}
+              {item.count !== undefined && (
+                <span
+                  className="ml-2 px-1.5 py-0.5 text-[11px] rounded"
+                  style={{
+                    background: isActive ? 'var(--color-primary-subtle)' : 'var(--color-bg-surface-3)',
+                    color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  }}
+                >
+                  {item.count}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </nav>
     </div>
   )

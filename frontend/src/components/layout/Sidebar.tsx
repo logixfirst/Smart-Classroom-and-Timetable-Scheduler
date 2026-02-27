@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 
 interface SidebarProps {
   sidebarOpen: boolean
@@ -13,31 +13,94 @@ interface SidebarProps {
   setShowSignOutDialog: (show: boolean) => void
 }
 
+// SVG icon components — consistent size, tintable via `color` CSS property
+const Icons = {
+  dashboard: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+      <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+  ),
+  admins: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+  ),
+  faculty: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg>
+  ),
+  students: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>
+    </svg>
+  ),
+  academic: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 9l10-6 10 6v11a2 2 0 01-2 2H4a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+  ),
+  timetables: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+      <line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+  ),
+  approvals: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+    </svg>
+  ),
+  logs: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+    </svg>
+  ),
+  schedule: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+  ),
+  preferences: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="20" y2="12"/><line x1="12" y1="18" x2="20" y2="18"/>
+      <circle cx="2" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="12" r="1" fill="currentColor"/><circle cx="10" cy="18" r="1" fill="currentColor"/>
+    </svg>
+  ),
+  signout: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+    </svg>
+  ),
+}
+
 const getNavigationItems = (role: string) => {
-  const baseItems = [{ name: 'Dashboard', href: `/${role}/dashboard`, icon: '📊' }]
+  const baseItems = [{ name: 'Dashboard', href: `/${role}/dashboard`, icon: Icons.dashboard }]
 
   switch (role) {
     case 'admin':
       return [
         ...baseItems,
-        { name: 'Admins', href: '/admin/admins', icon: '👨‍💼' },
-        { name: 'Faculty', href: '/admin/faculty', icon: '👨‍🏫' },
-        { name: 'Students', href: '/admin/students', icon: '🎓' },
-        { name: 'academic', href: '/admin/academic/rooms', icon: '🗂️' },
-        { name: 'Timetables', href: '/admin/timetables', icon: '📅' },
-        { name: 'Approvals', href: '/admin/approvals', icon: '✅' },
-        { name: 'Logs', href: '/admin/logs', icon: '📋' },
+        { name: 'Admins',      href: '/admin/admins',    icon: Icons.admins },
+        { name: 'Faculty',     href: '/admin/faculty',   icon: Icons.faculty },
+        { name: 'Students',    href: '/admin/students',  icon: Icons.students },
+        { name: 'Academic',    href: '/admin/academic',  icon: Icons.academic },
+        { name: 'Timetables',  href: '/admin/timetables', icon: Icons.timetables },
+        { name: 'Approvals',   href: '/admin/approvals', icon: Icons.approvals },
+        { name: 'Logs',        href: '/admin/logs',      icon: Icons.logs },
       ]
     case 'faculty':
       return [
         ...baseItems,
-        { name: 'Schedule', href: '/faculty/schedule', icon: '📅' },
-        { name: 'Preferences', href: '/faculty/preferences', icon: '⚙️' },
+        { name: 'Schedule',    href: '/faculty/schedule',     icon: Icons.schedule },
+        { name: 'Preferences', href: '/faculty/preferences',  icon: Icons.preferences },
       ]
     case 'student':
       return [
         ...baseItems,
-        { name: 'Timetable', href: '/student/timetable', icon: '📅' },
+        { name: 'Timetable',   href: '/student/timetable',   icon: Icons.timetables },
       ]
     default:
       return baseItems
@@ -72,87 +135,173 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Sidebar overlay for mobile */}
+      {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 md:hidden"
+          style={{ background: 'var(--color-bg-overlay)' }}
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <div
-        className={`fixed top-0 bottom-0 left-0 z-[60] bg-white dark:bg-[#2a2a2a] transform transition-transform duration-300 ease-in-out md:translate-x-0 ${
+        className={`sidebar-drawer fixed top-0 bottom-0 left-0 z-[60] md:z-30 flex flex-col transform md:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        } ${sidebarCollapsed ? 'md:w-16' : 'md:w-56'} w-56`}
+        }`}
+        style={{
+          width: sidebarCollapsed ? '60px' : '240px',
+          backgroundColor: 'var(--color-sidebar-bg)',
+          borderRight: '1px solid var(--color-sidebar-border)',
+          transition: 'width 150ms ease-out',
+          height: '100dvh',
+        }}
       >
-        <div className="flex flex-col h-full">
-          {/* Toggle */}
-          <div className="p-3 hidden md:block">
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="w-10 h-10 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-center transition-colors"
-              title="Toggle menu"
+        {/* Nav header zone — 56px, mirrors app-header height. Owns branding + sidebar toggle. */}
+        <div
+          className="flex items-center flex-shrink-0 px-3 gap-2"
+          style={{ height: 'var(--header-height)', borderBottom: '1px solid var(--color-sidebar-border)' }}
+        >
+          {/* Logo mark — always visible; wordmark only when expanded */}
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+            <rect x="2" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)"/>
+            <rect x="13" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
+            <rect x="2" y="13" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
+            <rect x="13" y="13" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.5"/>
+          </svg>
+
+          {/* Wordmark — hidden when sidebar is collapsed */}
+          {!sidebarCollapsed && (
+            <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              SIH28
+            </span>
+          )}
+
+          {/* Flex spacer when collapsed so buttons sit flush right */}
+          {sidebarCollapsed && <div style={{ flex: 1 }} />}
+
+          {/* Collapse chevron — desktop only */}
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="hidden md:flex icon-button flex-shrink-0"
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{ width: '28px', height: '28px' }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                transform: sidebarCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 150ms ease-out',
+                color: 'var(--color-text-muted)',
+              }}
             >
-              <span className="text-lg">☰</span>
-            </button>
-          </div>
+              <polyline points="10 4 6 8 10 12"/>
+            </svg>
+          </button>
 
-          {/* Navigation */}
-          <nav className="flex-1 p-3 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-hide">
-            {items.map(item => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`${isActive ? 'nav-link-active' : 'nav-link'} ${
-                    sidebarCollapsed ? 'md:justify-start md:w-10' : ''
-                  } pl-2 h-10 text-xs sm:text-sm`}
-                  title={sidebarCollapsed ? item.name : ''}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <div className="w-10 h-10 flex items-center justify-center">
-                    <span className="text-lg">{item.icon}</span>
-                  </div>
-                  <span
-                    className={`${
-                      sidebarCollapsed ? 'md:hidden md:opacity-0' : 'md:opacity-100'
-                    } truncate transition-all duration-300`}
-                  >
-                    {item.name}
-                  </span>
-                </Link>
-              )
-            })}
-
-
-          </nav>
-
-          {/* User info */}
-          <div className="p-3">
-            <div
-              className={`flex items-center gap-2 ${sidebarCollapsed ? 'md:justify-center' : ''}`}
-            >
-              <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-sm">👤</span>
-              </div>
-              <div className={`flex-1 min-w-0 ${sidebarCollapsed ? 'md:hidden' : ''}`}>
-                <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
-                  {userName ||
-                    (role === 'admin'
-                      ? 'Admin User'
-                      : role === 'faculty'
-                          ? 'Faculty User'
-                          : 'Student User')}
-                </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  {userEmail || `${role}@sih28.edu`}
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* Close button — mobile drawer only */}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="flex md:hidden icon-button flex-shrink-0"
+            aria-label="Close sidebar"
+            style={{ width: '28px', height: '28px' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ color: 'var(--color-text-muted)' }}>
+              <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
+            </svg>
+          </button>
         </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 flex flex-col p-2 gap-0.5 overflow-y-auto overflow-x-hidden scrollbar-hide">
+          {items.map(item => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={isActive ? 'nav-link-active' : 'nav-link'}
+                title={sidebarCollapsed ? item.name : undefined}
+                onClick={() => setSidebarOpen(false)}
+                style={sidebarCollapsed ? { justifyContent: 'center', padding: '8px' } : {}}
+              >
+                <span
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isActive ? 'var(--color-sidebar-active-text)' : 'var(--color-sidebar-icon)',
+                  }}
+                >
+                  {item.icon}
+                </span>
+                {!sidebarCollapsed && (
+                  <span className="truncate ml-2">{item.name}</span>
+                )}
+              </Link>
+            )
+          })}
+        </nav>
+
+        {/* Divider */}
+        <div style={{ borderTop: '1px solid var(--color-sidebar-border)' }} />
+
+        {/* User info + sign-out */}
+        <button
+          className="p-3 flex items-center gap-2 w-full text-left transition-colors"
+          style={sidebarCollapsed ? { justifyContent: 'center' } : {}}
+          onClick={() => setShowSignOutDialog(true)}
+          title="Sign out"
+        >
+          <div
+            className="flex-shrink-0 flex items-center justify-center"
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: 'var(--radius-pill)',
+              background: 'var(--color-primary-subtle)',
+              color: 'var(--color-primary)',
+              fontSize: '13px',
+              fontWeight: 600,
+            }}
+          >
+            {(userName || 'U').charAt(0).toUpperCase()}
+          </div>
+          {!sidebarCollapsed && (
+            <div className="flex-1 min-w-0">
+              <p
+                className="truncate"
+                style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', margin: 0 }}
+              >
+                {userName || (role === 'admin' ? 'Admin User' : role === 'faculty' ? 'Faculty User' : 'Student User')}
+              </p>
+              <p
+                className="truncate"
+                style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}
+              >
+                {userEmail || `${role}@sih28.edu`}
+              </p>
+            </div>
+          )}
+          {!sidebarCollapsed && (
+            <span style={{ flexShrink: 0, color: 'var(--color-text-muted)' }}>
+              {Icons.signout}
+            </span>
+          )}
+        </button>
+
+
       </div>
     </>
   )

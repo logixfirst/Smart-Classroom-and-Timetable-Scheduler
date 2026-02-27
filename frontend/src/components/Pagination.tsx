@@ -98,30 +98,34 @@ export default function Pagination({
   const pageNumbers = getPageNumbers()
 
   return (
-    <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 ${className}`}>
+    <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 ${className}`}
+      style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg-surface)' }}
+    >
       {/* Results info */}
-      <div className="text-sm text-gray-600 dark:text-gray-400">
+      <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>
         {totalCount === 0 ? (
           <span>No results found</span>
         ) : (
           <span>
             Showing{' '}
-            <span className="font-medium text-gray-800 dark:text-gray-200">{startItem}</span> -{' '}
-            <span className="font-medium text-gray-800 dark:text-gray-200">{endItem}</span> of{' '}
-            <span className="font-medium text-gray-800 dark:text-gray-200">{totalCount}</span>{' '}
-            results
+            <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{startItem}</span>
+            {'–'}
+            <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{endItem}</span>
+            {' of '}
+            <span style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{totalCount}</span>
+            {' results'}
           </span>
         )}
       </div>
 
       {/* Pagination controls */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center" style={{ gap: '2px' }}>
         {/* Items per page selector */}
         {showItemsPerPage && onItemsPerPageChange && (
           <div className="flex items-center gap-2 mr-4">
             <label
               htmlFor="items-per-page"
-              className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap"
+              style={{ fontSize: '13px', color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}
             >
               Per page:
             </label>
@@ -129,7 +133,8 @@ export default function Pagination({
               id="items-per-page"
               value={itemsPerPage}
               onChange={e => onItemsPerPageChange(Number(e.target.value))}
-              className="input-primary text-sm py-1 px-2 w-20"
+              className="input-primary"
+              style={{ width: '64px', height: '32px', fontSize: '13px' }}
             >
               <option value={10}>10</option>
               <option value={25}>25</option>
@@ -143,38 +148,58 @@ export default function Pagination({
         <button
           onClick={() => onPageChange(1)}
           disabled={currentPage === 1}
-          className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 
-                     bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300
-                     hover:bg-gray-50 dark:hover:bg-gray-700
-                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-800
-                     transition-colors"
+          style={{
+            width: '32px',
+            height: '32px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-bg-surface)',
+            color: 'var(--color-text-secondary)',
+            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+            opacity: currentPage === 1 ? 0.4 : 1,
+          }}
           title="First page (Home)"
         >
-          ⏮️
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+            <line x1="2" y1="2" x2="2" y2="10"/>
+            <polyline points="5 2 10 6 5 10"/>
+            <polyline points="5 2 10 6 5 10" transform="scale(-1,1) translate(-12,0)"/>
+          </svg>
         </button>
 
         {/* Previous button */}
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 
-                     bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300
-                     hover:bg-gray-50 dark:hover:bg-gray-700
-                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-800
-                     transition-colors"
+          style={{
+            width: '32px',
+            height: '32px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-bg-surface)',
+            color: 'var(--color-text-secondary)',
+            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+            opacity: currentPage === 1 ? 0.4 : 1,
+          }}
           title="Previous page (←)"
         >
-          ◀️
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><polyline points="9 2 5 7 9 12"/></svg>
         </button>
 
-        {/* Page numbers */}
-        <div className="hidden sm:flex items-center gap-1">
+        {/* Page numbers — hidden on mobile */}
+        <div className="hidden sm:flex items-center" style={{ gap: '2px' }}>
           {pageNumbers.map((page, index) => {
             if (page === '...') {
               return (
                 <span
                   key={`ellipsis-${index}`}
-                  className="px-3 py-2 text-gray-500 dark:text-gray-400"
+                  style={{ padding: '0 8px', fontSize: '13px', color: 'var(--color-text-muted)' }}
                 >
                   ...
                 </span>
@@ -188,12 +213,20 @@ export default function Pagination({
               <button
                 key={pageNum}
                 onClick={() => onPageChange(pageNum)}
-                className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors
-                  ${
-                    isActive
-                      ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
-                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 'var(--radius-md)',
+                  border: `1px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                  background: isActive ? 'var(--color-primary)' : 'var(--color-bg-surface)',
+                  color: isActive ? 'var(--color-text-inverse)' : 'var(--color-text-secondary)',
+                  fontSize: '13px',
+                  fontWeight: isActive ? 600 : 400,
+                  cursor: 'pointer',
+                }}
                 title={`Page ${pageNum}`}
               >
                 {pageNum}
@@ -202,37 +235,59 @@ export default function Pagination({
           })}
         </div>
 
-        {/* Current page indicator for mobile */}
-        <div className="sm:hidden px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-          Page {currentPage} of {totalPages}
+        {/* Mobile: current page indicator */}
+        <div
+          className="sm:hidden"
+          style={{ padding: '0 12px', fontSize: '13px', color: 'var(--color-text-secondary)' }}
+        >
+          {currentPage} / {totalPages}
         </div>
 
         {/* Next button */}
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 
-                     bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300
-                     hover:bg-gray-50 dark:hover:bg-gray-700
-                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-800
-                     transition-colors"
+          style={{
+            width: '32px',
+            height: '32px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-bg-surface)',
+            color: 'var(--color-text-secondary)',
+            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+            opacity: currentPage === totalPages ? 0.4 : 1,
+          }}
           title="Next page (→)"
         >
-          ▶️
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><polyline points="5 2 9 7 5 12"/></svg>
         </button>
 
         {/* Last button */}
         <button
           onClick={() => onPageChange(totalPages)}
           disabled={currentPage === totalPages}
-          className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 
-                     bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300
-                     hover:bg-gray-50 dark:hover:bg-gray-700
-                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-gray-800
-                     transition-colors"
+          style={{
+            width: '32px',
+            height: '32px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-bg-surface)',
+            color: 'var(--color-text-secondary)',
+            cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+            opacity: currentPage === totalPages ? 0.4 : 1,
+          }}
           title="Last page (End)"
         >
-          ⏭️
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+            <line x1="10" y1="2" x2="10" y2="10"/>
+            <polyline points="7 2 2 6 7 10"/>
+          </svg>
         </button>
       </div>
     </div>

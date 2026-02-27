@@ -224,6 +224,8 @@ export default function StudentsPage() {
                 className="input-primary w-full sm:w-36"
                 value={selectedDepartment}
                 onChange={e => setSelectedDepartment(e.target.value)}
+                title="Filter by department"
+                aria-label="Filter by department"
               >
                 <option value="">All Departments</option>
                 {departments.map(d => <option key={d}>{d}</option>)}
@@ -233,6 +235,8 @@ export default function StudentsPage() {
                 className="input-primary w-full sm:w-32"
                 value={selectedYear}
                 onChange={e => setSelectedYear(e.target.value)}
+                title="Filter by year"
+                aria-label="Filter by year"
               >
                 <option value="">All Years</option>
                 {years.map(y => <option key={y} value={y}>Year {y}</option>)}

@@ -4,37 +4,65 @@ import React from 'react'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
 // Base Skeleton component
-export function Skeleton({ className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={`animate-pulse bg-gray-200 rounded ${className}`} {...props} />
+export function Skeleton({ className = '', style, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={className}
+      style={{
+        background:
+          'linear-gradient(90deg, var(--color-bg-surface-2) 25%, var(--color-bg-surface-3) 50%, var(--color-bg-surface-2) 75%)',
+        backgroundSize: '800px 100%',
+        animation: 'shimmer 1.6s infinite linear',
+        borderRadius: 'var(--radius-sm)',
+        ...style,
+      }}
+      {...props}
+    />
+  )
 }
 
 // Table Skeleton
 export function TableSkeleton({ rows = 5, columns = 6 }: { rows?: number; columns?: number }) {
   return (
-    <div className="w-full">
+    <div
+      style={{
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        background: 'var(--color-bg-surface)',
+      }}
+    >
       {/* Table Header */}
-      <div className="border-b border-gray-200 pb-4 mb-4">
+      <div
+        style={{
+          background: 'var(--color-bg-surface-2)',
+          borderBottom: '1px solid var(--color-border)',
+          padding: '10px 16px',
+        }}
+      >
         <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
           {Array.from({ length: columns }).map((_, i) => (
-            <Skeleton key={i} className="h-4 w-3/4" />
+            <Skeleton key={i} style={{ height: '14px', width: '60%' }} />
           ))}
         </div>
       </div>
 
       {/* Table Rows */}
-      <div className="space-y-3">
-        {Array.from({ length: rows }).map((_, rowIndex) => (
-          <div
-            key={rowIndex}
-            className="grid gap-4 py-3 border-b border-gray-100"
-            style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
-          >
-            {Array.from({ length: columns }).map((_, colIndex) => (
-              <Skeleton key={colIndex} className="h-4" />
-            ))}
-          </div>
-        ))}
-      </div>
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <div
+          key={rowIndex}
+          className="grid gap-4"
+          style={{
+            gridTemplateColumns: `repeat(${columns}, 1fr)`,
+            padding: '12px 16px',
+            borderBottom: '1px solid var(--color-border)',
+          }}
+        >
+          {Array.from({ length: columns }).map((_, colIndex) => (
+            <Skeleton key={colIndex} style={{ height: '14px' }} />
+          ))}
+        </div>
+      ))}
     </div>
   )
 }
@@ -56,14 +84,22 @@ export function ListSkeleton({ items = 5 }: { items?: number }) {
   return (
     <div className="space-y-4">
       {Array.from({ length: items }).map((_, i) => (
-        <div key={i} className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-          <div className="flex justify-between items-start mb-3">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-6 w-20 rounded-full" />
+        <div
+          key={i}
+          style={{
+            background: 'var(--color-bg-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '16px',
+          }}
+        >
+          <div className="flex justify-between items-start" style={{ marginBottom: '12px' }}>
+            <Skeleton style={{ height: '20px', width: '128px' }} />
+            <Skeleton style={{ height: '24px', width: '80px', borderRadius: 'var(--radius-pill)' }} />
           </div>
-          <Skeleton className="h-4 w-full mb-2" />
-          <Skeleton className="h-4 w-3/4 mb-2" />
-          <Skeleton className="h-4 w-2/3" />
+          <Skeleton style={{ height: '16px', width: '100%', marginBottom: '8px' }} />
+          <Skeleton style={{ height: '16px', width: '75%', marginBottom: '8px' }} />
+          <Skeleton style={{ height: '16px', width: '66%' }} />
         </div>
       ))}
     </div>
@@ -104,13 +140,13 @@ export function StatsSkeleton({ count = 4 }: { count?: number }) {
 }
 
 // Full Page Loading
-export function PageLoader({ message = 'Loading...' }: { message?: string }) {
+export function PageLoader() {
   return (
-    <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
-      <div className="text-center">
-        <GoogleSpinner size={48} className="mb-4" />
-        <p className="text-gray-600 font-medium">{message}</p>
-      </div>
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50"
+      style={{ background: 'var(--color-bg-page)' }}
+    >
+      <GoogleSpinner size={48} />
     </div>
   )
 }
@@ -135,19 +171,27 @@ export function Spinner({
  */
 export function TimetableCardSkeleton() {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-3 shadow-sm">
+    <div
+      style={{
+        background: 'var(--color-bg-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '20px',
+      }}
+      className="space-y-3"
+    >
       <div className="flex justify-between items-start">
-        <Skeleton className="h-5 w-40 dark:bg-gray-600" />
-        <Skeleton className="h-5 w-20 rounded-full dark:bg-gray-600" />
+        <Skeleton style={{ height: '20px', width: '160px' }} />
+        <Skeleton style={{ height: '20px', width: '80px', borderRadius: 'var(--radius-pill)' }} />
       </div>
-      <Skeleton className="h-3.5 w-28 dark:bg-gray-600" />
+      <Skeleton style={{ height: '14px', width: '112px' }} />
       <div className="flex gap-4 pt-1">
-        <Skeleton className="h-3.5 w-20 dark:bg-gray-600" />
-        <Skeleton className="h-3.5 w-16 dark:bg-gray-600" />
+        <Skeleton style={{ height: '14px', width: '80px' }} />
+        <Skeleton style={{ height: '14px', width: '64px' }} />
       </div>
       <div className="flex justify-end gap-2 pt-2">
-        <Skeleton className="h-8 w-20 rounded-lg dark:bg-gray-600" />
-        <Skeleton className="h-8 w-24 rounded-lg dark:bg-gray-600" />
+        <Skeleton style={{ height: '32px', width: '80px', borderRadius: 'var(--radius-md)' }} />
+        <Skeleton style={{ height: '32px', width: '96px', borderRadius: 'var(--radius-md)' }} />
       </div>
     </div>
   )
@@ -202,33 +246,63 @@ export function VariantCardSkeleton() {
  */
 export function TimetableGridSkeleton({ days = 5, slots = 8 }: { days?: number; slots?: number }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
+    <div
+      className="overflow-x-auto"
+      style={{ borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}
+    >
       <table className="min-w-full text-xs border-collapse">
         <thead>
-          <tr className="bg-gray-50 dark:bg-gray-800">
-            <th className="px-3 py-3 border-b border-r border-gray-200 dark:border-gray-700 w-24">
-              <Skeleton className="h-3.5 w-10 mx-auto dark:bg-gray-600" />
+          <tr style={{ background: 'var(--color-bg-surface-2)' }}>
+            <th
+              style={{
+                padding: '12px',
+                borderBottom: '1px solid var(--color-border)',
+                borderRight: '1px solid var(--color-border)',
+                width: '96px',
+              }}
+            >
+              <Skeleton className="mx-auto" style={{ height: '14px', width: '40px' }} />
             </th>
             {Array.from({ length: days }).map((_, d) => (
-              <th key={d} className="px-3 py-3 border-b border-r border-gray-200 dark:border-gray-700 min-w-[8rem]">
-                <Skeleton className="h-3.5 w-16 mx-auto dark:bg-gray-600" />
+              <th
+                key={d}
+                style={{
+                  padding: '12px',
+                  borderBottom: '1px solid var(--color-border)',
+                  borderRight: '1px solid var(--color-border)',
+                  minWidth: '128px',
+                }}
+              >
+                <Skeleton className="mx-auto" style={{ height: '14px', width: '64px' }} />
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+        <tbody>
           {Array.from({ length: slots }).map((_, s) => (
-            <tr key={s}>
-              <td className="px-3 py-3 border-r border-gray-200 dark:border-gray-700">
-                <Skeleton className="h-3 w-16 dark:bg-gray-600" />
+            <tr
+              key={s}
+              style={{ borderBottom: '1px solid var(--color-border)' }}
+            >
+              <td style={{ padding: '12px', borderRight: '1px solid var(--color-border)' }}>
+                <Skeleton style={{ height: '12px', width: '64px' }} />
               </td>
               {Array.from({ length: days }).map((_, d) => (
-                <td key={d} className="px-2 py-2 border-r border-gray-100 dark:border-gray-700/50">
-                  {/* ~40 % of cells get a class-card placeholder */}
+                <td
+                  key={d}
+                  style={{ padding: '8px', borderRight: '1px solid var(--color-border)' }}
+                >
                   {(s + d) % 3 !== 2 ? null : (
-                    <div className="rounded-lg p-2 space-y-1 bg-gray-100 dark:bg-gray-700/50">
-                      <Skeleton className="h-3 w-full dark:bg-gray-600" />
-                      <Skeleton className="h-2.5 w-3/4 dark:bg-gray-600" />
+                    <div
+                      style={{
+                        borderRadius: 'var(--radius-md)',
+                        padding: '8px',
+                        background: 'var(--color-bg-surface-2)',
+                      }}
+                      className="space-y-1"
+                    >
+                      <Skeleton style={{ height: '12px', width: '100%' }} />
+                      <Skeleton style={{ height: '10px', width: '75%' }} />
                     </div>
                   )}
                 </td>
