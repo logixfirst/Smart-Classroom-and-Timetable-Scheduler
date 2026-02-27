@@ -195,8 +195,10 @@ export default function AdminUsersPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="text-4xl mb-4">⚠️</div>
-          <p className="text-red-600 dark:text-red-400">{error}</p>
+          <svg className="w-12 h-12 mx-auto mb-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
           <button onClick={() => fetchUsers()} className="btn-primary mt-4">
             Try Again
           </button>
@@ -207,12 +209,19 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+
+      {/* ── Page Header ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Manage admin accounts | Total: {totalCount} users
-        </p>
-        <button onClick={handleAddUser} className="btn-primary w-full sm:w-auto px-6 py-3">
-          <span className="mr-2 text-lg">➕</span>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Admin Users</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            {isLoading ? 'Loading…' : `${totalCount.toLocaleString()} admin accounts`}
+          </p>
+        </div>
+        <button onClick={handleAddUser} className="btn-primary w-full sm:w-auto">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+          </svg>
           Add Admin User
         </button>
       </div>
@@ -223,8 +232,10 @@ export default function AdminUsersPage() {
           <p className="card-description">Administrative personnel only</p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
             <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                🔍
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+                </svg>
               </span>
               <input
                 placeholder="Search users..."
@@ -268,146 +279,119 @@ export default function AdminUsersPage() {
 
         {isLoading && <TableSkeleton rows={5} columns={7} />}
 
-        {/* Mobile Card View */}
-        {!isLoading && <div className="block sm:hidden space-y-3 relative">
-          {/* Mobile Loading Overlay */}
-          {isTableLoading && (
-            <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
-              <TableSkeleton rows={3} columns={7} />
-            </div>
-          )}
+        {!isLoading && filteredUsers.length === 0 && (
+          <div className="text-center py-16">
+            <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No admin users found</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              {users.length === 0 ? 'No admin accounts have been created yet.' : 'Try adjusting your search or filters.'}
+            </p>
+          </div>
+        )}
 
-          {filteredUsers.map((user, index) => (
-            <div
-              key={user.id}
-              className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]"
-            >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                      #{(currentPage - 1) * 100 + index + 1}
-                    </span>
-                  </div>
-                  <h4 className="font-medium text-gray-800 dark:text-gray-200 truncate">
-                    {user.first_name} {user.last_name}
-                  </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 truncate">{user.email}</p>
-                </div>
-                <span className={`badge ${user.is_active ? 'badge-success' : 'badge-error'} ml-2`}>
-                  {user.is_active ? 'Active' : 'Inactive'}
-                </span>
+        {/* Mobile Card View */}
+        {!isLoading && filteredUsers.length > 0 && (
+          <div className="block lg:hidden space-y-3 relative">
+            {isTableLoading && (
+              <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
+                <TableSkeleton rows={3} columns={7} />
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex gap-2">
-                  <span className="badge badge-neutral">{user.role}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {user.department || 'N/A'}
+            )}
+            {filteredUsers.map((user, index) => (
+              <div
+                key={user.id}
+                className="interactive-element p-4 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 dark:text-white truncate">
+                      {user.first_name} {user.last_name}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{user.email}</div>
+                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{user.department || 'No department'}</div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <button onClick={() => handleEditUser(user)} className="btn-ghost text-xs px-2 py-1">Edit</button>
+                    <button onClick={() => handleDeleteUser(user.id)} className="btn-danger text-xs px-2 py-1">Delete</button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-2.5">
+                  <span className="badge badge-neutral text-xs">{user.role}</span>
+                  <span className={`badge text-xs ${user.is_active ? 'badge-success' : 'badge-error'}`}>
+                    {user.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => handleEditUser(user)}
-                    className="btn-ghost text-xs px-2 py-1"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteUser(user.id)}
-                    className="btn-danger text-xs px-2 py-1"
-                  >
-                    Delete
-                  </button>
-                </div>
               </div>
-            </div>
-          ))}
-        </div>}
+            ))}
+          </div>
+        )}
 
         {/* Desktop Table View */}
-        {!isLoading && <div className="hidden sm:block overflow-x-auto relative">
-          {/* Table Loading Overlay */}
-          {isTableLoading && (
-            <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
-              <TableSkeleton rows={3} columns={7} />
-            </div>
-          )}
-
-          <table className="table">
-            <thead className="table-header">
-              <tr>
-                <th className="table-header-cell">S.No</th>
-                <th className="table-header-cell">Name</th>
-                <th className="table-header-cell">Email</th>
-                <th className="table-header-cell">Role</th>
-                <th className="table-header-cell">Department</th>
-                <th className="table-header-cell">Status</th>
-                <th className="table-header-cell">Actions</th>
-              </tr>
-            </thead>
-        
-            <tbody>
-  {filteredUsers.map((user, index) => (
-      <tr key={user.id} className="table-row">
-        <td className="table-cell">
-          <div className="font-medium text-gray-800 dark:text-gray-200">
-            {(currentPage - 1) * 100 + index + 1}
+        {!isLoading && filteredUsers.length > 0 && (
+          <div className="hidden lg:block overflow-x-auto relative">
+            {isTableLoading && (
+              <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
+                <TableSkeleton rows={3} columns={7} />
+              </div>
+            )}
+            <table className="table">
+              <thead className="table-header">
+                <tr>
+                  <th className="table-header-cell">S.No</th>
+                  <th className="table-header-cell">Name</th>
+                  <th className="table-header-cell">Email</th>
+                  <th className="table-header-cell">Role</th>
+                  <th className="table-header-cell">Department</th>
+                  <th className="table-header-cell">Status</th>
+                  <th className="table-header-cell">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.map((user, index) => (
+                  <tr key={user.id} className="table-row">
+                    <td className="table-cell">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {(currentPage - 1) * 100 + index + 1}
+                      </span>
+                    </td>
+                    <td className="table-cell">
+                      <div className="font-medium text-gray-800 dark:text-gray-200">
+                        {user.first_name} {user.last_name}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{user.username}</div>
+                    </td>
+                    <td className="table-cell">{user.email}</td>
+                    <td className="table-cell">
+                      <span className="badge badge-neutral text-xs">{user.role}</span>
+                    </td>
+                    <td className="table-cell">{user.department || <span className="text-gray-400">N/A</span>}</td>
+                    <td className="table-cell">
+                      <span className={`badge text-xs ${user.is_active ? 'badge-success' : 'badge-error'}`}>
+                        {user.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="table-cell">
+                      <div className="flex gap-1">
+                        <button onClick={() => handleEditUser(user)} className="btn-ghost text-xs px-2 py-1">
+                          Edit
+                        </button>
+                        <button onClick={() => handleDeleteUser(user.id)} className="btn-danger text-xs px-2 py-1">
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </td>
-
-        <td className="table-cell">
-          <div className="font-medium text-gray-800 dark:text-gray-200">
-            {user.first_name} {user.last_name}
-          </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden">
-            {user.email}
-          </div>
-        </td>
-
-        <td className="table-cell">{user.email}</td>
-
-        <td className="table-cell">
-          <span className="badge badge-neutral text-xs">{user.role}</span>
-        </td>
-
-        <td className="table-cell">{user.department || 'N/A'}</td>
-
-        <td className="table-cell">
-          <span
-            className={`badge ${
-              user.is_active ? 'badge-success' : 'badge-error'
-            } text-xs`}
-          >
-            {user.is_active ? 'Active' : 'Inactive'}
-          </span>
-        </td>
-
-        <td className="table-cell">
-          <div className="flex gap-1 sm:gap-2">
-            <button
-              onClick={() => handleEditUser(user)}
-              className="btn-ghost text-xs px-2 py-1"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => handleDeleteUser(user.id)}
-              className="btn-danger text-xs px-2 py-1"
-            >
-              Del
-            </button>
-          </div>
-        </td>
-      </tr>
-    ))
-  }
-</tbody>
- </table>
-        </div>}
+        )}
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-[#3c4043]">
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}

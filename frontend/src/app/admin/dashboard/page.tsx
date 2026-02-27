@@ -192,59 +192,79 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Stats Grid */}
+
+      {/* ── Page Header ───────────────────────────────────────────────────── */}
+      <div>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Dashboard</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          Overview of your institution’s academic operations.
+        </p>
+      </div>
+
+      {/* ── Stats Grid ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+
+        {/* Total Users */}
         <div className="card">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</p>
-              <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">
-                {loading ? '...' : stats.totalUsers}
-              </p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
+              {loading
+                ? <div className="loading-skeleton h-8 w-24 rounded-md mt-1" />
+                : <p className="text-2xl lg:text-3xl font-semibold text-gray-900 dark:text-white truncate mt-1">{stats.totalUsers.toLocaleString()}</p>
+              }
             </div>
-            <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#1a73e8] rounded-xl flex items-center justify-center flex-shrink-0">
-              <span className="text-xl lg:text-2xl text-white">👥</span>
+            <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 ml-3">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-[#34a853] font-medium">↗ 12%</span>
-            <span className="ml-2 text-gray-500 dark:text-gray-400">vs last month</span>
+            <span className="text-green-600 dark:text-green-400 font-medium">↗ 12%</span>
+            <span className="ml-2 text-gray-400 dark:text-gray-500">vs last month</span>
           </div>
         </div>
 
+        {/* Active Courses */}
         <div className="card">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Courses</p>
-              <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">
-                {loading ? '...' : stats.activeCourses}
-              </p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Courses</p>
+              {loading
+                ? <div className="loading-skeleton h-8 w-20 rounded-md mt-1" />
+                : <p className="text-2xl lg:text-3xl font-semibold text-gray-900 dark:text-white truncate mt-1">{stats.activeCourses.toLocaleString()}</p>
+              }
             </div>
-            <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#34a853] rounded-xl flex items-center justify-center flex-shrink-0">
-              <span className="text-xl lg:text-2xl text-white">📚</span>
+            <div className="w-11 h-11 bg-green-600 rounded-xl flex items-center justify-center flex-shrink-0 ml-3">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-[#34a853] font-medium">↗ 8%</span>
-            <span className="ml-2 text-gray-500 dark:text-gray-400">vs last month</span>
+            <span className="text-green-600 dark:text-green-400 font-medium">↗ 8%</span>
+            <span className="ml-2 text-gray-400 dark:text-gray-500">vs last month</span>
           </div>
         </div>
 
+        {/* Pending Approvals */}
         <div
           className="card clickable-card"
           onClick={() => router.push('/admin/approvals')}
         >
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Pending Approvals
-              </p>
-              <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">
-                {loading ? '...' : stats.pendingApprovals}
-              </p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Approvals</p>
+              {loading
+                ? <div className="loading-skeleton h-8 w-16 rounded-md mt-1" />
+                : <p className="text-2xl lg:text-3xl font-semibold text-gray-900 dark:text-white truncate mt-1">{stats.pendingApprovals.toLocaleString()}</p>
+              }
             </div>
-            <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#fbbc05] rounded-xl flex items-center justify-center flex-shrink-0">
-              <span className="text-xl lg:text-2xl text-white">⏳</span>
+            <div className="w-11 h-11 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0 ml-3">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
             </div>
           </div>
           <div className="mt-4">
@@ -252,22 +272,27 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* System Health */}
         <div className="card">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">System Health</p>
-              <p className="text-2xl lg:text-3xl font-semibold text-gray-800 dark:text-gray-200 truncate">
-                98%
-              </p>
+              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">System Health</p>
+              {loading
+                ? <div className="loading-skeleton h-8 w-16 rounded-md mt-1" />
+                : <p className="text-2xl lg:text-3xl font-semibold text-gray-900 dark:text-white truncate mt-1">{stats.systemHealth}%</p>
+              }
             </div>
-            <div className="w-12 h-12 lg:w-14 lg:h-14 bg-[#34a853] rounded-xl flex items-center justify-center flex-shrink-0">
-              <span className="text-xl lg:text-2xl text-white">❤️</span>
+            <div className="w-11 h-11 bg-green-600 rounded-xl flex items-center justify-center flex-shrink-0 ml-3">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 016.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
+              </svg>
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-[#34a853] font-medium">All services online</span>
+            <span className="text-green-600 dark:text-green-400 font-medium">All services online</span>
           </div>
         </div>
+
       </div>
 
       {/* Faculty Availability Management */}
@@ -370,10 +395,12 @@ export default function AdminDashboard() {
               className="btn-secondary text-left p-3 disabled:opacity-50"
             >
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">📥</span>
+                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4 4m0 0L8 8m4 4V4" />
+                </svg>
                 <span className="text-sm font-medium">Import CSV</span>
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Bulk upload data</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Bulk upload data</p>
             </button>
             <button
               onClick={() => handleDataAction('export')}
@@ -381,10 +408,12 @@ export default function AdminDashboard() {
               className="btn-secondary text-left p-3 disabled:opacity-50"
             >
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">📤</span>
+                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 12m4-4v12" />
+                </svg>
                 <span className="text-sm font-medium">Export PDF</span>
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Generate reports</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Generate reports</p>
             </button>
             <button
               onClick={() => handleDataAction('backup')}
@@ -392,10 +421,12 @@ export default function AdminDashboard() {
               className="btn-secondary text-left p-3 disabled:opacity-50"
             >
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">💾</span>
+                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
                 <span className="text-sm font-medium">Backup DB</span>
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-400">Create snapshot</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Create snapshot</p>
             </button>
             <button
               onClick={() => handleDataAction('restore')}
@@ -403,10 +434,12 @@ export default function AdminDashboard() {
               className="btn-secondary text-left p-3 disabled:opacity-50"
             >
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg">🔄</span>
+                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
                 <span className="text-sm font-medium">Restore</span>
               </div>
-              <p className="text-xs text-gray-600 dark:text-gray-400">From backup</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">From backup</p>
             </button>
           </div>
         </div>
@@ -508,28 +541,24 @@ export default function AdminDashboard() {
           <div className="space-y-3">
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                  Academic Year
-                </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">2024-25</p>
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Academic Year</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">2024-25</p>
               </div>
-              <button className="text-xs text-[#1a73e8] hover:underline">Edit</button>
+              <button className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
             </div>
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                  Semester Dates
-                </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Jul 1 - Dec 15</p>
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Semester Dates</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Jul 1 – Dec 15</p>
               </div>
-              <button className="text-xs text-[#1a73e8] hover:underline">Edit</button>
+              <button className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
             </div>
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Holiday List</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">15 holidays configured</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">15 holidays configured</p>
               </div>
-              <button className="text-xs text-[#1a73e8] hover:underline">Edit</button>
+              <button className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
             </div>
           </div>
         </div>
@@ -540,25 +569,23 @@ export default function AdminDashboard() {
             <p className="card-description">Resource usage analytics</p>
           </div>
           <div className="space-y-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400 font-medium">Classroom Usage</span>
-              <span className="font-semibold text-[#34a853]">87%</span>
+            <div>
+              <div className="flex items-center justify-between text-sm mb-1.5">
+                <span className="text-gray-600 dark:text-gray-400 font-medium">Classroom Usage</span>
+                <span className="font-semibold text-green-600 dark:text-green-400">87%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="bg-green-500 h-2 rounded-full transition-all duration-500 w-[87%]" />
+              </div>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-[#34a853] h-2 rounded-full transition-all duration-300"
-                style={{ width: '87%' }}
-              ></div>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400 font-medium">Faculty Load</span>
-              <span className="font-semibold text-[#fbbc05]">73%</span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-[#fbbc05] h-2 rounded-full transition-all duration-300"
-                style={{ width: '73%' }}
-              ></div>
+            <div>
+              <div className="flex items-center justify-between text-sm mb-1.5">
+                <span className="text-gray-600 dark:text-gray-400 font-medium">Faculty Load</span>
+                <span className="font-semibold text-amber-600 dark:text-amber-400">73%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="bg-amber-400 h-2 rounded-full transition-all duration-500 w-[73%]" />
+              </div>
             </div>
           </div>
         </div>
@@ -631,54 +658,67 @@ export default function AdminDashboard() {
           <h3 className="card-title">Strategic Actions</h3>
           <p className="card-description">Administrative control center</p>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
           <button
             onClick={() => handleStrategicAction('addUser')}
             disabled={isLoading}
-            className="btn-primary flex flex-col items-center gap-2 p-4 disabled:opacity-50"
+            className="btn-primary flex flex-col items-center gap-2 py-4 px-3 disabled:opacity-50"
           >
-            <span className="text-2xl">👤</span>
-            <span className="text-xs sm:text-sm font-medium">Add User</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+            </svg>
+            <span className="text-xs font-medium">Add User</span>
           </button>
           <button
             onClick={() => handleStrategicAction('roles')}
             disabled={isLoading}
-            className="btn-secondary flex flex-col items-center gap-2 p-4 disabled:opacity-50"
+            className="btn-secondary flex flex-col items-center gap-2 py-4 px-3 disabled:opacity-50"
           >
-            <span className="text-2xl">🔐</span>
-            <span className="text-xs sm:text-sm font-medium">Roles</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span className="text-xs font-medium">Roles</span>
           </button>
           <button
             onClick={() => handleStrategicAction('audit')}
             disabled={isLoading}
-            className="btn-secondary flex flex-col items-center gap-2 p-4 disabled:opacity-50"
+            className="btn-secondary flex flex-col items-center gap-2 py-4 px-3 disabled:opacity-50"
           >
-            <span className="text-2xl">📊</span>
-            <span className="text-xs sm:text-sm font-medium">Audit</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span className="text-xs font-medium">Audit</span>
           </button>
           <button
             onClick={() => handleStrategicAction('config')}
             disabled={isLoading}
-            className="btn-secondary flex flex-col items-center gap-2 p-4 disabled:opacity-50"
+            className="btn-secondary flex flex-col items-center gap-2 py-4 px-3 disabled:opacity-50"
           >
-            <span className="text-2xl">⚙️</span>
-            <span className="text-xs sm:text-sm font-medium">Config</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="text-xs font-medium">Config</span>
           </button>
           <button
             onClick={() => handleStrategicAction('backup')}
             disabled={isLoading}
-            className="btn-secondary flex flex-col items-center gap-2 p-4 disabled:opacity-50"
+            className="btn-secondary flex flex-col items-center gap-2 py-4 px-3 disabled:opacity-50"
           >
-            <span className="text-2xl">{isLoading ? '⏳' : '💾'}</span>
-            <span className="text-xs sm:text-sm font-medium">Backup</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            <span className="text-xs font-medium">{isLoading ? 'Working…' : 'Backup'}</span>
           </button>
           <button
             onClick={() => handleStrategicAction('reports')}
             disabled={isLoading}
-            className="btn-secondary flex flex-col items-center gap-2 p-4 disabled:opacity-50"
+            className="btn-secondary flex flex-col items-center gap-2 py-4 px-3 disabled:opacity-50"
           >
-            <span className="text-2xl">{isLoading ? '⏳' : '📈'}</span>
-            <span className="text-xs sm:text-sm font-medium">Reports</span>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className="text-xs font-medium">{isLoading ? 'Working…' : 'Reports'}</span>
           </button>
         </div>
       </div>

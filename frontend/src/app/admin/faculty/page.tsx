@@ -205,12 +205,19 @@ export default function FacultyManagePage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+
+      {/* ── Page Header ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Total: {filteredFaculty.length} faculty members
-        </p>
-        <button onClick={handleAddFaculty} className="btn-primary w-full sm:w-auto px-6 py-3">
-          <span className="mr-2 text-lg">➕</span>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Faculty</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            {isLoading ? 'Loading…' : `${totalCount.toLocaleString()} faculty members`}
+          </p>
+        </div>
+        <button onClick={handleAddFaculty} className="btn-primary w-full sm:w-auto">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
           Add Faculty
         </button>
       </div>
@@ -223,8 +230,10 @@ export default function FacultyManagePage() {
               <label htmlFor="faculty-search" className="sr-only">
                 Search faculty
               </label>
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                🔍
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+                </svg>
               </span>
               <input
                 id="faculty-search"
@@ -255,12 +264,12 @@ export default function FacultyManagePage() {
         {isLoading && <TableSkeleton rows={5} columns={8} />}
 
         {!isLoading && filteredFaculty.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-4xl sm:text-6xl mb-4">👨</div>
-            <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">
-              No Faculty Found
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
+          <div className="text-center py-16">
+            <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No faculty found</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
               {faculty.length === 0
                 ? 'No faculty data has been imported yet.'
                 : 'No faculty match your search criteria.'}
@@ -275,7 +284,7 @@ export default function FacultyManagePage() {
               {filteredFaculty.map(member => (
                 <div
                   key={member.id}
-                  className="interactive-element p-4 border border-gray-200 dark:border-[#3c4043]"
+                  className="interactive-element p-4 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
@@ -413,7 +422,7 @@ export default function FacultyManagePage() {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-[#3c4043]">
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}

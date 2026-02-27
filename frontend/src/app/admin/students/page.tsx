@@ -190,14 +190,19 @@ export default function StudentsPage() {
   return (
     <div className="space-y-6">
 
-      {/* Header */}
+      {/* ── Page Header ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <p className="text-sm text-gray-600">
-          Total: {totalCount} students | Page {currentPage} of {totalPages}
-        </p>
-
-        <button onClick={handleAddStudent} className="btn-primary px-6 py-3">
-          ➕ Add Student
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Students</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            {isLoading ? 'Loading…' : `${totalCount.toLocaleString()} students · Page ${currentPage} of ${totalPages}`}
+          </p>
+        </div>
+        <button onClick={handleAddStudent} className="btn-primary w-full sm:w-auto">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add Student
         </button>
       </div>
 
@@ -209,7 +214,11 @@ export default function StudentsPage() {
 
           <div className="flex flex-col sm:flex-row gap-3 mt-4">
             <div className="relative flex-1">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+                </svg>
+              </span>
 
               <input
                 placeholder="Search students..."
@@ -248,53 +257,49 @@ export default function StudentsPage() {
         {isLoading && <TableSkeleton rows={5} columns={9} />}
 
         {!isLoading && filteredStudents.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-600 dark:text-gray-400">No students found</p>
+          <div className="text-center py-16">
+            <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No students found</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              {students.length === 0 ? 'No student data has been imported yet.' : 'Try adjusting your search or filters.'}
+            </p>
           </div>
         )}
 
         {!isLoading && filteredStudents.length > 0 && (
           <>
             {/* Mobile List */}
-            <div className="block sm:hidden space-y-3">
+            <div className="block lg:hidden space-y-3">
               {filteredStudents.map(student => (
                 <div
                   key={student.id}
-                  className="interactive-element p-4 border border-gray-200"
-                >
-                  <div className="font-medium text-gray-800">{student.name}</div>
-                  <div className="text-sm">{student.student_id}</div>
-                  <div className="text-xs text-gray-500">
-                    {student.course?.course_name}
+                  className="interactive-element p-4 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-white">{student.name}</div>
+                      <div className="text-xs font-mono text-gray-500 dark:text-gray-400 mt-0.5">{student.student_id}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{student.course?.course_name}</div>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button onClick={() => handleEditStudent(student)} className="btn-ghost text-xs px-2 py-1">Edit</button>
+                      <button onClick={() => handleDeleteStudent(student.id, student.name)} className="btn-danger text-xs px-2 py-1" disabled={isDeleting === student.id}>
+                        {isDeleting === student.id ? 'Deleting…' : 'Delete'}
+                      </button>
+                    </div>
                   </div>
-
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
                     <span className="badge badge-neutral text-xs">{student.department?.department_name}</span>
                     <span className="badge badge-info text-xs">Year {student.year}</span>
                     <span className="badge badge-success text-xs">Sem {student.semester}</span>
-                  </div>
-
-                  <div className="flex gap-1 mt-2">
-                    <button
-                      onClick={() => handleEditStudent(student)}
-                      className="btn-ghost text-xs px-2 py-1"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteStudent(student.id, student.name)}
-                      className="btn-danger text-xs px-2 py-1"
-                      disabled={isDeleting === student.id}
-                    >
-                      {isDeleting === student.id ? 'Deleting...' : 'Delete'}
-                    </button>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Desktop Table */}
-            <div className="hidden sm:block overflow-x-auto relative">
+            <div className="hidden lg:block overflow-x-auto relative">
               {isTableLoading && (
                 <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
                   <TableSkeleton rows={3} columns={9} />
@@ -303,37 +308,39 @@ export default function StudentsPage() {
               <table className="table">
                 <thead className="table-header">
                   <tr>
-                    <th>Student ID</th>
-                    <th>Name</th>
-                    <th>Department</th>
-                    <th>Course</th>
-                    <th>Year</th>
-                    <th>Semester</th>
-                    <th>Electives</th>
-                    <th>Faculty</th>
-                    <th>Actions</th>
+                    <th className="table-header-cell">Student ID</th>
+                    <th className="table-header-cell">Name</th>
+                    <th className="table-header-cell">Department</th>
+                    <th className="table-header-cell">Course</th>
+                    <th className="table-header-cell">Year</th>
+                    <th className="table-header-cell">Semester</th>
+                    <th className="table-header-cell">Electives</th>
+                    <th className="table-header-cell">Faculty Advisor</th>
+                    <th className="table-header-cell">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredStudents.map(student => (
-                    <tr key={student.id}>
-                      <td>{student.student_id}</td>
-                      <td>{student.name}</td>
-                      <td>
+                    <tr key={student.id} className="table-row">
+                      <td className="table-cell">
+                        <span className="font-mono text-sm">{student.student_id}</span>
+                      </td>
+                      <td className="table-cell font-medium">{student.name}</td>
+                      <td className="table-cell">
                         <span className="badge badge-neutral text-xs">
                           {student.department?.department_name}
                         </span>
                       </td>
-                      <td>{student.course?.course_name}</td>
-                      <td>
+                      <td className="table-cell">{student.course?.course_name}</td>
+                      <td className="table-cell">
                         <span className="badge badge-info text-xs">Year {student.year}</span>
                       </td>
-                      <td>
+                      <td className="table-cell">
                         <span className="badge badge-success text-xs">Sem {student.semester}</span>
                       </td>
-                      <td className="truncate max-w-xs">{student.electives || 'None'}</td>
-                      <td>{student.faculty_advisor?.faculty_name || 'Not assigned'}</td>
-                      <td>
+                      <td className="table-cell max-w-[160px] truncate">{student.electives || <span className="text-gray-400">None</span>}</td>
+                      <td className="table-cell">{student.faculty_advisor?.faculty_name || <span className="text-gray-400">Unassigned</span>}</td>
+                      <td className="table-cell">
                         <div className="flex gap-1">
                           <button
                             onClick={() => handleEditStudent(student)}
@@ -346,7 +353,7 @@ export default function StudentsPage() {
                             className="btn-danger text-xs px-2 py-1"
                             disabled={isDeleting === student.id}
                           >
-                            {isDeleting === student.id ? 'Deleting...' : 'Del'}
+                            {isDeleting === student.id ? 'Deleting…' : 'Delete'}
                           </button>
                         </div>
                       </td>
@@ -358,7 +365,7 @@ export default function StudentsPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
