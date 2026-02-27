@@ -41,6 +41,10 @@ def dashboard_stats(request):
     def _fetch():
         from django.db import connection
         with connection.cursor() as cursor:
+            # Hard cap: kill the query after 8 s instead of hanging the worker.
+            # On cold Render.com free-tier DB the indexes help but SSL connection
+            # setup alone can add seconds; a runaway plan must not block forever.
+            cursor.execute("SET LOCAL statement_timeout = '8000'")
             # Single round-trip; each sub-select hits its org-indexed column.
             # users        → user_org_role_idx  (org_id, role, is_active)
             # courses      → idx_course_org_active  (org_id, is_active)

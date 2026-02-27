@@ -257,22 +257,19 @@ export default function TimetableReviewPage() {
   const entryAbortRef = useRef<AbortController | null>(null)
 
   // ── Lazy-render the timetable grid via IntersectionObserver ─────────────
-  // The grid section is below the fold. We skip building the 2000-row DOM table
-  // until it actually enters the viewport, keeping initial paint fast.
+  // BUG FIX: The previous code put the observer in useEffect([gridInView]).
+  // On first load: activeVariant=null → section not in DOM → ref is null →
+  // effect returned early with no observer. Then setActiveVariant() mounted the
+  // section, but useEffect([activeVariant?.id]) called setGridInView(false) which
+  // was already false → React skipped re-render → observer effect never re-ran →
+  // section sat in DOM with no observer → skeleton showed forever.
+  //
+  // FIX: use activeVariant?.id as the sole dep so the effect re-runs exactly
+  // when the section transitions from unmounted → mounted (null → variant set).
+  // gridInView stays true across variant switches (renderTimetableGrid handles
+  // its own loading skeleton), so there is no reason to reset it.
   const gridSectionRef = useRef<HTMLElement>(null)
   const [gridInView, setGridInView] = useState(false)
-
-  useEffect(() => {
-    if (gridInView) return  // once visible, always keep rendered
-    const el = gridSectionRef.current
-    if (!el) return
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setGridInView(true) },
-      { rootMargin: '400px' },  // start building 400px before it scrolls into view
-    )
-    obs.observe(el)
-    return () => obs.disconnect()
-  }, [gridInView])
 
   // Modals
   const [showApprovalModal, setShowApprovalModal] = useState(false)
@@ -285,11 +282,18 @@ export default function TimetableReviewPage() {
   const [activeDay, setActiveDay] = useState<number | 'all'>('all')
   const [departmentFilter, setDepartmentFilter] = useState<string>('all')
 
-  // Reset gridInView when the active variant changes so the grid re-observes
-  // for the new content (must come after activeVariant is declared above).
+  // Re-attach observer whenever the active variant changes (including null → first variant).
+  // rootMargin 400px means the grid starts building before it even enters the viewport.
   useEffect(() => {
-    setGridInView(false)
-  }, [activeVariant?.id])
+    const el = gridSectionRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setGridInView(true) },
+      { rootMargin: '400px' },
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [activeVariant?.id])  // ← key fix: runs when section first mounts (null→id transition)
 
   useEffect(() => {
     if (workflowId) {
@@ -367,18 +371,25 @@ export default function TimetableReviewPage() {
           entryCache.current.set(variantToLoad.id, cached) // re-warm in-memory cache
           setActiveVariant({ ...variantToLoad, timetable_entries: cached })
         } else {
-          const entriesRes = await authenticatedFetch(
-            `${API_BASE}/timetable/variants/${variantToLoad.id}/entries/?job_id=${variantToLoad.job_id}`,
-            { credentials: 'include' }
-          )
-          if (entriesRes.ok) {
-            const entriesData = await entriesRes.json()
-            const entries: TimetableEntry[] = entriesData.timetable_entries
-            entryCache.current.set(variantToLoad.id, entries)
-            lsWriteEntries(variantToLoad.id, entries) // persist across navigations
-            setActiveVariant(prev =>
-              prev?.id === variantToLoad.id ? { ...prev, timetable_entries: entries } : prev
+          // 45 s hard timeout — remote DB can hang indefinitely without this
+          const r2Controller = new AbortController()
+          const r2Timeout = setTimeout(() => r2Controller.abort(), 45_000)
+          try {
+            const entriesRes = await authenticatedFetch(
+              `${API_BASE}/timetable/variants/${variantToLoad.id}/entries/?job_id=${variantToLoad.job_id}`,
+              { credentials: 'include', signal: r2Controller.signal }
             )
+            if (entriesRes.ok) {
+              const entriesData = await entriesRes.json()
+              const entries: TimetableEntry[] = entriesData.timetable_entries
+              entryCache.current.set(variantToLoad.id, entries)
+              lsWriteEntries(variantToLoad.id, entries) // persist across navigations
+              setActiveVariant(prev =>
+                prev?.id === variantToLoad.id ? { ...prev, timetable_entries: entries } : prev
+              )
+            }
+          } finally {
+            clearTimeout(r2Timeout)
           }
         }
       } catch {
@@ -533,6 +544,10 @@ export default function TimetableReviewPage() {
     const controller = new AbortController()
     entryAbortRef.current = controller
 
+    // Hard timeout: abort if the server hasn't responded in 45 s.
+    // Remote DBs (Render free tier) can hang indefinitely without this.
+    const timeoutId = setTimeout(() => controller.abort(), 45_000)
+
     try {
       const response = await authenticatedFetch(
         `${API_BASE}/timetable/variants/${variant.id}/entries/?job_id=${variant.job_id}`,
@@ -553,6 +568,7 @@ export default function TimetableReviewPage() {
         console.error('Failed to load entries:', err)
       }
     } finally {
+      clearTimeout(timeoutId)
       if (!controller.signal.aborted) setLoadingVariantId(null)
       setTimeout(() => {
         document.getElementById('timetable-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -575,7 +591,14 @@ export default function TimetableReviewPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
               d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
           </svg>
-          <p className="text-sm">No timetable entries available for this variant.</p>
+          <p className="text-sm font-medium">No timetable entries loaded.</p>
+          <p className="text-xs mt-1 opacity-70">The server may be slow. Click retry to try again.</p>
+          <button
+            onClick={() => loadVariantEntries(variant)}
+            className="mt-4 px-4 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+          >
+            Retry
+          </button>
         </div>
       )
     }
