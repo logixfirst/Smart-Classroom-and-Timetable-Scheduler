@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X, ArrowRight } from 'lucide-react'
@@ -52,34 +53,15 @@ export function MarketingNav() {
       >
         <nav className="h-full max-w-[1200px] mx-auto px-6 flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 text-decoration-none" aria-label="Cadence home">
-            {/* SVG C-arc mark */}
-            <svg width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <defs>
-                <linearGradient id="logo-grad" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%"   stopColor="#1B3A5C" />
-                  <stop offset="50%"  stopColor="#1E4D6B" />
-                  <stop offset="100%" stopColor="#2A9D8F" />
-                </linearGradient>
-              </defs>
-              {/* Outer arc */}
-              <path stroke="url(#logo-grad)" strokeWidth="3.5" fill="none" strokeLinecap="round"
-                d="M33 12 A15 15 0 1 0 33 28" />
-              {/* Mid arc */}
-              <path stroke="url(#logo-grad)" strokeWidth="2.5" fill="none" strokeLinecap="round"
-                d="M28 13.5 A10 10 0 1 0 28 26.5" />
-              {/* Inner arc */}
-              <path stroke="#2A9D8F" strokeWidth="2" fill="none" strokeLinecap="round"
-                d="M23 16 A6 6 0 1 0 23 24" />
-              {/* Horizontal grid lines */}
-              <line x1="8" y1="18" x2="36" y2="18" stroke="white" strokeWidth="1" opacity="0.6" />
-              <line x1="8" y1="22" x2="36" y2="22" stroke="white" strokeWidth="1" opacity="0.6" />
-              {/* Vertical grid line */}
-              <line x1="20" y1="5"  x2="20" y2="35" stroke="white" strokeWidth="1" opacity="0.6" />
-            </svg>
-            <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '20px', color: 'var(--cadence-navy)', letterSpacing: '-0.01em' }}>
-              Cadence
-            </span>
+          <Link href="/" className="flex items-center gap-2" style={{ textDecoration: 'none' }} aria-label="Cadence home">
+            <Image
+              src="/logo2.png"
+              alt="Cadence logo"
+              width={120}
+              height={36}
+              style={{ objectFit: 'contain', mixBlendMode: 'multiply' }}
+              priority
+            />
           </Link>
 
           {/* Desktop links */}
@@ -157,25 +139,14 @@ export function MarketingNav() {
         >
           {/* Close button */}
           <div className="flex items-center justify-between mb-12">
-            <Link href="/" onClick={() => setMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
-              <svg width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="logo-grad-m" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%"   stopColor="#3BBFB0" />
-                    <stop offset="100%" stopColor="#2A9D8F" />
-                  </linearGradient>
-                </defs>
-                <path stroke="url(#logo-grad-m)" strokeWidth="3.5" fill="none" strokeLinecap="round"
-                  d="M33 12 A15 15 0 1 0 33 28" />
-                <path stroke="url(#logo-grad-m)" strokeWidth="2.5" fill="none" strokeLinecap="round"
-                  d="M28 13.5 A10 10 0 1 0 28 26.5" />
-                <path stroke="#3BBFB0" strokeWidth="2" fill="none" strokeLinecap="round"
-                  d="M23 16 A6 6 0 1 0 23 24" />
-                <line x1="8" y1="18" x2="36" y2="18" stroke="white" strokeWidth="1" opacity="0.3" />
-                <line x1="8" y1="22" x2="36" y2="22" stroke="white" strokeWidth="1" opacity="0.3" />
-                <line x1="20" y1="5"  x2="20" y2="35" stroke="white" strokeWidth="1" opacity="0.3" />
-              </svg>
-              <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '20px', color: 'white' }}>Cadence</span>
+            <Link href="/" onClick={() => setMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+              <Image
+                src="/logo2.png"
+                alt="Cadence logo"
+                width={120}
+                height={36}
+                style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+              />
             </Link>
             <button
               onClick={() => setMenuOpen(false)}

@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { Linkedin, Twitter, Github } from 'lucide-react'
 
@@ -36,27 +37,14 @@ export function MarketingFooter() {
 
           {/* Column 1 — Brand */}
           <div className="lg:col-span-1">
-            <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', textDecoration: 'none', marginBottom: '16px' }}>
-              <svg width="30" height="30" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="footer-logo" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%"   stopColor="#3BBFB0" />
-                    <stop offset="100%" stopColor="#2A9D8F" />
-                  </linearGradient>
-                </defs>
-                <path stroke="url(#footer-logo)" strokeWidth="3.5" fill="none" strokeLinecap="round"
-                  d="M33 12 A15 15 0 1 0 33 28" />
-                <path stroke="url(#footer-logo)" strokeWidth="2.5" fill="none" strokeLinecap="round"
-                  d="M28 13.5 A10 10 0 1 0 28 26.5" />
-                <path stroke="#2A9D8F" strokeWidth="2" fill="none" strokeLinecap="round"
-                  d="M23 16 A6 6 0 1 0 23 24" />
-                <line x1="8" y1="18" x2="36" y2="18" stroke="white" strokeWidth="1" opacity="0.25" />
-                <line x1="8" y1="22" x2="36" y2="22" stroke="white" strokeWidth="1" opacity="0.25" />
-                <line x1="20" y1="5"  x2="20" y2="35" stroke="white" strokeWidth="1" opacity="0.25" />
-              </svg>
-              <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: '18px', color: 'white' }}>
-                Cadence
-              </span>
+            <Link href="/" style={{ display: 'inline-block', textDecoration: 'none', marginBottom: '16px' }}>
+              <Image
+                src="/logo2.png"
+                alt="Cadence logo"
+                width={130}
+                height={40}
+                style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+              />
             </Link>
             <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', lineHeight: '1.7', color: 'rgba(255,255,255,0.55)', marginBottom: '24px', maxWidth: '220px' }}>
               AI-powered academic scheduling for institutions that refuse to waste time on spreadsheets.
