@@ -89,10 +89,7 @@ export default function BlogIndexPage() {
             href={`/blog/${featured.slug}`}
             style={{ textDecoration: 'none', display: 'block' }}
           >
-            <div style={{ background: 'white', borderRadius: '20px', border: '1px solid rgba(27,58,92,0.08)', overflow: 'hidden', transition: 'box-shadow 200ms, border-color 200ms' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(27,58,92,0.10)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(42,157,143,0.25)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(27,58,92,0.08)' }}
-            >
+            <div className="mk-hover-card" style={{ background: 'white', borderRadius: '20px', overflow: 'hidden' }}>
               {/* Featured image placeholder */}
               <div style={{ height: '240px', background: 'linear-gradient(135deg, var(--cadence-navy) 0%, var(--cadence-teal) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontFamily: 'Poppins, sans-serif', fontSize: '14px', fontWeight: 600, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>

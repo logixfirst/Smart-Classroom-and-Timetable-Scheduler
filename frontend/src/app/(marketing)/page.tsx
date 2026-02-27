@@ -208,6 +208,7 @@ export default function HomePage() {
           </p>
           <Link
             href="/contact"
+            className="mk-cta-lift"
             style={{
               display:        'inline-flex',
               alignItems:     'center',
@@ -221,11 +222,7 @@ export default function HomePage() {
               fontSize:       '17px',
               fontWeight:     700,
               textDecoration: 'none',
-              boxShadow:      '0 4px 24px rgba(0,0,0,0.15)',
-              transition:     'transform 150ms, box-shadow 150ms',
             }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,0.20)' }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,0.15)' }}
           >
             Book a Free Demo
             <ArrowRight size={18} />

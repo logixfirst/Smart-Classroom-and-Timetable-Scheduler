@@ -1295,3 +1295,23 @@
 .mk-tag-ai        { background: rgba(27,58,92,0.10);   color: #1B3A5C; }
 .mk-tag-education { background: rgba(249,115,22,0.10); color: #ea580c; }
 .mk-tag-policy    { background: rgba(139,92,246,0.10); color: #7c3aed; }
+
+/* ── Hover-lift CTA button (for server-component pages) ──────── */
+.mk-cta-lift {
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.mk-cta-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.20) !important;
+}
+
+/* ── Card hover (no JS required) ────────────────────────────── */
+.mk-hover-card {
+  border: 1px solid rgba(27,58,92,0.08);
+  transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+.mk-hover-card:hover {
+  box-shadow: 0 8px 32px rgba(27,58,92,0.10);
+  border-color: rgba(42,157,143,0.25);
+}
