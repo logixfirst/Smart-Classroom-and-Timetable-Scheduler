@@ -95,7 +95,18 @@ export default function LoginPage() {
           {/* Logo + brand */}
           <div className="flex flex-col items-center gap-3 mb-6">
             {/* Logo mark — large, centered */}
-            <Image src="/logo.png" alt="Cadence logo" width={56} height={56} priority />
+            <Image
+              src="/logo2.png"
+              alt="Cadence logo"
+              width={72}
+              height={72}
+              priority
+              style={{
+                objectFit: 'contain',
+                borderRadius: '50%',
+                mixBlendMode: 'multiply',
+              }}
+            />
             {/* Wordmark */}
             <span
               style={{

@@ -37,14 +37,15 @@ export function MarketingFooter() {
 
           {/* Column 1 — Brand */}
           <div className="lg:col-span-1">
-            <Link href="/" style={{ display: 'inline-block', textDecoration: 'none', marginBottom: '16px' }}>
+            <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', textDecoration: 'none', marginBottom: '16px' }}>
               <Image
                 src="/logo2.png"
                 alt="Cadence logo"
-                width={130}
+                width={40}
                 height={40}
-                style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+                style={{ objectFit: 'contain', borderRadius: '50%', filter: 'brightness(0) invert(1)', flexShrink: 0 }}
               />
+              <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: '18px', color: 'white' }}>Cadence</span>
             </Link>
             <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', lineHeight: '1.7', color: 'rgba(255,255,255,0.55)', marginBottom: '24px', maxWidth: '220px' }}>
               AI-powered academic scheduling for institutions that refuse to waste time on spreadsheets.

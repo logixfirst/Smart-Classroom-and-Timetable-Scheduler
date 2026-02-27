@@ -139,7 +139,14 @@ export default function DashboardLayout({
                 </button>
 
                 {/* Logo — mobile only; sidebar owns branding on desktop */}
-                <Image className="md:hidden" src="/logo.png" alt="Cadence logo" width={28} height={28} style={{ flexShrink: 0 }} />
+                <Image
+                  className="md:hidden"
+                  src="/logo2.png"
+                  alt="Cadence logo"
+                  width={32}
+                  height={32}
+                  style={{ flexShrink: 0, objectFit: 'contain', borderRadius: '50%', mixBlendMode: 'multiply' }}
+                />
 
                 <span
                   className="hidden sm:inline md:hidden"

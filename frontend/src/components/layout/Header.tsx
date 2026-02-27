@@ -56,7 +56,13 @@ export default function Header({
           </button>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <Image src="/logo.png" alt="Cadence logo" width={32} height={32} />
+            <Image
+              src="/logo2.png"
+              alt="Cadence logo"
+              width={36}
+              height={36}
+              style={{ objectFit: 'contain', borderRadius: '50%', mixBlendMode: 'multiply' }}
+            />
             <span className="text-lg sm:text-xl font-semibold text-[#0f0f0f] dark:text-white">
               Cadence
             </span>

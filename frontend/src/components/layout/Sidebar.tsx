@@ -165,7 +165,13 @@ export default function Sidebar({
           style={{ height: 'var(--header-height)', borderBottom: '1px solid var(--color-sidebar-border)' }}
         >
           {/* Logo — always visible, infinite resolution, transparent bg */}
-          <Image src="/logo.png" alt="Cadence logo" width={28} height={28} style={{ flexShrink: 0 }} />
+          <Image
+            src="/logo2.png"
+            alt="Cadence logo"
+            width={32}
+            height={32}
+            style={{ flexShrink: 0, objectFit: 'contain', borderRadius: '50%', mixBlendMode: 'multiply' }}
+          />
 
           {/* Wordmark — hidden only when collapsed on desktop; always shown in mobile drawer */}
           {(!sidebarCollapsed || sidebarOpen) && (

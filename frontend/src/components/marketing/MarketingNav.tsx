@@ -57,11 +57,14 @@ export function MarketingNav() {
             <Image
               src="/logo2.png"
               alt="Cadence logo"
-              width={120}
-              height={36}
-              style={{ objectFit: 'contain', mixBlendMode: 'multiply' }}
+              width={40}
+              height={40}
+              style={{ objectFit: 'contain', borderRadius: '50%', mixBlendMode: 'multiply', flexShrink: 0 }}
               priority
             />
+            <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: '18px', color: 'var(--cadence-navy)', letterSpacing: '-0.01em' }}>
+              Cadence
+            </span>
           </Link>
 
           {/* Desktop links */}
@@ -139,14 +142,15 @@ export function MarketingNav() {
         >
           {/* Close button */}
           <div className="flex items-center justify-between mb-12">
-            <Link href="/" onClick={() => setMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <Link href="/" onClick={() => setMenuOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
               <Image
                 src="/logo2.png"
                 alt="Cadence logo"
-                width={120}
-                height={36}
-                style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+                width={40}
+                height={40}
+                style={{ objectFit: 'contain', borderRadius: '50%', filter: 'brightness(0) invert(1)', flexShrink: 0 }}
               />
+              <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, fontSize: '18px', color: 'white' }}>Cadence</span>
             </Link>
             <button
               onClick={() => setMenuOpen(false)}
