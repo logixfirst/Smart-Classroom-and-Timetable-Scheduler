@@ -256,6 +256,24 @@ export default function TimetableReviewPage() {
   // AbortController ref so switching variants cancels the in-flight request
   const entryAbortRef = useRef<AbortController | null>(null)
 
+  // ── Lazy-render the timetable grid via IntersectionObserver ─────────────
+  // The grid section is below the fold. We skip building the 2000-row DOM table
+  // until it actually enters the viewport, keeping initial paint fast.
+  const gridSectionRef = useRef<HTMLElement>(null)
+  const [gridInView, setGridInView] = useState(false)
+
+  useEffect(() => {
+    if (gridInView) return  // once visible, always keep rendered
+    const el = gridSectionRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setGridInView(true) },
+      { rootMargin: '400px' },  // start building 400px before it scrolls into view
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [activeVariant?.id, gridInView])
+
   // Modals
   const [showApprovalModal, setShowApprovalModal] = useState(false)
   const [showRejectionModal, setShowRejectionModal] = useState(false)
@@ -994,7 +1012,7 @@ export default function TimetableReviewPage() {
 
         {/* ── Timetable View ── */}
         {activeVariant && (
-          <section id="timetable-view" className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+          <section id="timetable-view" ref={gridSectionRef} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
             {/* Section header */}
             <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-gray-100 dark:border-gray-700">
               <div>
@@ -1071,9 +1089,17 @@ export default function TimetableReviewPage() {
               ))}
             </div>
 
-            {/* Grid */}
+            {/* Grid — only built once the section enters the viewport */}
             <div className="px-4 py-4 sm:px-5 sm:py-5">
-              {renderTimetableGrid(activeVariant)}
+              {gridInView
+                ? renderTimetableGrid(activeVariant)
+                : (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400 dark:text-gray-500">
+                    <GoogleSpinner size={32} />
+                    <p className="text-xs">Scroll down to view timetable grid…</p>
+                  </div>
+                )
+              }
             </div>
           </section>
         )}

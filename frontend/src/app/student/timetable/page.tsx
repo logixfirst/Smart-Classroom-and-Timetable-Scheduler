@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import DashboardLayout from '@/components/dashboard-layout'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
@@ -8,6 +8,22 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 const TIME_SLOTS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00']
 
 function TimetableGrid({ schedule }: { schedule: any[] }) {
+  // Lazy-render via IntersectionObserver — defers table DOM until in-viewport
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [inView, setInView] = useState(false)
+
+  useEffect(() => {
+    if (inView) return
+    const el = wrapRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setInView(true) },
+      { rootMargin: '300px' },
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [inView])
+
   if (!schedule || schedule.length === 0) {
     return (
       <div className="p-8 text-center text-gray-500 dark:text-gray-400">
@@ -17,7 +33,10 @@ function TimetableGrid({ schedule }: { schedule: any[] }) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div ref={wrapRef} className="overflow-x-auto">
+      {!inView ? (
+        <div style={{ minHeight: '200px' }} />
+      ) : (
       <table className="w-full border-collapse">
         <thead>
           <tr>
@@ -49,6 +68,7 @@ function TimetableGrid({ schedule }: { schedule: any[] }) {
           ))}
         </tbody>
       </table>
+      )}
     </div>
   )
 }

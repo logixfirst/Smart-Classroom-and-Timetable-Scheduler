@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 interface TimeSlot {
   day: string
@@ -49,6 +49,24 @@ export default function TimetableGrid({
     .toLowerCase()
   const defaultDay = days.includes(todayName) ? todayName : days[0]
   const [selectedDay, setSelectedDay] = useState<string>(defaultDay)
+
+  // Lazy-render the desktop table via IntersectionObserver.
+  // The mobile pill-view is cheap (one day at a time), so only the full
+  // week table (6 cols × 7 rows) is deferred until it enters the viewport.
+  const tableWrapRef = useRef<HTMLDivElement>(null)
+  const [tableInView, setTableInView] = useState(false)
+
+  useEffect(() => {
+    if (tableInView) return
+    const el = tableWrapRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setTableInView(true) },
+      { rootMargin: '300px' },
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [tableInView])
 
   return (
     <div className={`w-full ${className}`}>
@@ -143,7 +161,12 @@ export default function TimetableGrid({
       </div>
 
       {/* ── Tablet / Desktop Table View (sm+) ─────────────────────────── */}
-      <div className="hidden sm:block overflow-x-auto">
+      <div ref={tableWrapRef} className="hidden sm:block overflow-x-auto">
+        {!tableInView && (
+          <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
+        )}
+        {/* Only build the full week DOM once the section enters the viewport */}
+        {!tableInView ? null : (
         <table className="table text-xs sm:text-sm min-w-full">
           <thead className="table-header">
             <tr>
@@ -258,6 +281,7 @@ export default function TimetableGrid({
             ))}
           </tbody>
         </table>
+        )}
       </div>
     </div>
   )
