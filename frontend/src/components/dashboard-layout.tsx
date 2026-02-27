@@ -139,10 +139,7 @@ export default function DashboardLayout({
 
                 {/* Logo — mobile only; sidebar owns branding on desktop */}
                 <svg className="md:hidden" width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
-                  <rect x="2" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)"/>
-                  <rect x="13" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
-                  <rect x="2" y="13" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
-                  <rect x="13" y="13" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.5"/>
+                  <path d="M2 12h4l2.5-6 3 12 3-8 2 4h5.5" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
 
                 <span

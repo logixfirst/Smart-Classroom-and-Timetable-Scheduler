@@ -269,7 +269,7 @@ export default function AdminUsersPage() {
         {isLoading && <TableSkeleton rows={5} columns={7} />}
 
         {/* Mobile Card View */}
-        <div className="block sm:hidden space-y-3 relative">
+        {!isLoading && <div className="block sm:hidden space-y-3 relative">
           {/* Mobile Loading Overlay */}
           {isTableLoading && (
             <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
@@ -322,10 +322,10 @@ export default function AdminUsersPage() {
               </div>
             </div>
           ))}
-        </div>
+        </div>}
 
-        {/* Desktop Table View */}
-        <div className="hidden sm:block overflow-x-auto relative">
+        {/* Desktop Table View */}}
+        {!isLoading && <div className="hidden sm:block overflow-x-auto relative">
           {/* Table Loading Overlay */}
           {isTableLoading && (
             <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
@@ -403,7 +403,7 @@ export default function AdminUsersPage() {
   }
 </tbody>
  </table>
-        </div>
+        </div>}
 
         {/* Pagination Controls */}
         {totalPages > 1 && (

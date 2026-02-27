@@ -101,10 +101,7 @@ export default function LoginPage() {
               fill="none"
               aria-hidden="true"
             >
-              <rect x="2" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)"/>
-              <rect x="13" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
-              <rect x="2" y="13" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
-              <rect x="13" y="13" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.5"/>
+              <path d="M2 12h4l2.5-6 3 12 3-8 2 4h5.5" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             {/* Wordmark */}
             <span
@@ -133,7 +130,7 @@ export default function LoginPage() {
                 htmlFor="username"
                 style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '6px' }}
               >
-                Username or Email
+                Username or Email <span style={{ color: 'var(--color-danger)' }}>*</span>
               </label>
               <FormField
                 name="username"
@@ -142,7 +139,6 @@ export default function LoginPage() {
                 placeholder="Enter username or email"
                 register={register}
                 error={errors.username}
-                required
               />
               {errors.username && (
                 <p style={{ fontSize: '12px', color: 'var(--color-danger)', marginTop: '4px' }}>
@@ -156,7 +152,7 @@ export default function LoginPage() {
                 htmlFor="password"
                 style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '6px' }}
               >
-                Password
+                Password <span style={{ color: 'var(--color-danger)' }}>*</span>
               </label>
               <div className="relative">
                 <FormField
@@ -166,7 +162,6 @@ export default function LoginPage() {
                   placeholder="Enter your password"
                   register={register}
                   error={errors.password}
-                  required
                 />
                 <button
                   type="button"

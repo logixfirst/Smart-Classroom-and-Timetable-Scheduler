@@ -270,7 +270,7 @@ export default function FacultyManagePage() {
 
         {!isLoading && filteredFaculty.length > 0 && (
           <>
-            {/* Mobile Card View */}}
+            {/* Mobile Card View */}
             <div className="block lg:hidden space-y-3">
               {filteredFaculty.map(member => (
                 <div
