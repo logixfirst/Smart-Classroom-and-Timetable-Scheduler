@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Sidebar from '@/components/layout/Sidebar'
@@ -138,9 +139,7 @@ export default function DashboardLayout({
                 </button>
 
                 {/* Logo — mobile only; sidebar owns branding on desktop */}
-                <svg className="md:hidden" width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
-                  <path d="M2 12h4l2.5-6 3 12 3-8 2 4h5.5" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <Image className="md:hidden" src="/logo.png" alt="Cadence logo" width={28} height={28} style={{ flexShrink: 0 }} />
 
                 <span
                   className="hidden sm:inline md:hidden"

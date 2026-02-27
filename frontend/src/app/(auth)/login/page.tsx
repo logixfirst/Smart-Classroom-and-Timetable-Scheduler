@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useForm } from 'react-hook-form'
@@ -94,15 +95,7 @@ export default function LoginPage() {
           {/* Logo + brand */}
           <div className="flex flex-col items-center gap-3 mb-6">
             {/* Logo mark — large, centered */}
-            <svg
-              width="56"
-              height="56"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path d="M2 12h4l2.5-6 3 12 3-8 2 4h5.5" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <Image src="/logo.png" alt="Cadence logo" width={56} height={56} priority />
             {/* Wordmark */}
             <span
               style={{

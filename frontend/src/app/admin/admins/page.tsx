@@ -324,7 +324,7 @@ export default function AdminUsersPage() {
           ))}
         </div>}
 
-        {/* Desktop Table View */}}
+        {/* Desktop Table View */}
         {!isLoading && <div className="hidden sm:block overflow-x-auto relative">
           {/* Table Loading Overlay */}
           {isTableLoading && (

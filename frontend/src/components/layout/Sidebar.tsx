@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
@@ -164,9 +165,7 @@ export default function Sidebar({
           style={{ height: 'var(--header-height)', borderBottom: '1px solid var(--color-sidebar-border)' }}
         >
           {/* Logo — always visible, infinite resolution, transparent bg */}
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
-            <path d="M2 12h4l2.5-6 3 12 3-8 2 4h5.5" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <Image src="/logo.png" alt="Cadence logo" width={28} height={28} style={{ flexShrink: 0 }} />
 
           {/* Wordmark — hidden only when collapsed on desktop; always shown in mobile drawer */}
           {(!sidebarCollapsed || sidebarOpen) && (

@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useState } from 'react'
+import Image from 'next/image'
 
 interface HeaderProps {
   sidebarOpen: boolean
@@ -55,9 +56,7 @@ export default function Header({
           </button>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M2 12h4l2.5-6 3 12 3-8 2 4h5.5" stroke="var(--color-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <Image src="/logo.png" alt="Cadence logo" width={32} height={32} />
             <span className="text-lg sm:text-xl font-semibold text-[#0f0f0f] dark:text-white">
               Cadence
             </span>
