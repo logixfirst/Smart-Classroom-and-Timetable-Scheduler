@@ -8,7 +8,7 @@ import { subjectSchema, type SubjectInput } from '@/lib/validations'
 import { FormField } from '@/components/FormFields'
 import { useToast } from '@/components/Toast'
 import Pagination from '@/components/Pagination'
-import { TableSkeleton } from '@/components/LoadingSkeletons'
+import { TableSkeleton, TableRowsSkeleton } from '@/components/LoadingSkeletons'
 
 interface Course {
   course_id: string
@@ -166,6 +166,23 @@ export default function SubjectsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+
+      {/* ── Page Header ───────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Courses</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            {isLoading ? 'Loading…' : `${totalCount.toLocaleString()} courses`}
+          </p>
+        </div>
+        <button onClick={() => setShowForm(true)} className="btn-primary w-full sm:w-auto">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add Course
+        </button>
+      </div>
+
       {showForm && (
         <div className="card">
           <div className="card-header">
@@ -265,20 +282,15 @@ export default function SubjectsPage() {
 
       <div className="card">
         <div className="card-header">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h3 className="card-title">Courses</h3>
-              <p className="card-description">Total: {totalCount} courses</p>
-            </div>
-            <button onClick={() => setShowForm(true)} className="btn-primary w-full sm:w-auto">
-              Add Course
-            </button>
-          </div>
-          <div className="relative mt-4">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+              </svg>
+            </span>
             <input
               type="text"
-              placeholder="Search by course name, code, or department..."
+              placeholder="Search by course name, code, or department…"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="input-primary pl-10 w-full"
@@ -288,19 +300,19 @@ export default function SubjectsPage() {
         {isLoading && <TableSkeleton rows={5} columns={6} />}
 
         {!isLoading && courses.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-600 dark:text-gray-400">No courses found</p>
+          <div className="text-center py-16">
+            <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No courses found</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              {courses.length === 0 ? 'No courses have been added yet.' : 'Try adjusting your search.'}
+            </p>
           </div>
         )}
 
         {!isLoading && courses.length > 0 && (
-          <div className="overflow-x-auto relative">
-            {isTableLoading && (
-            <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
-              <TableSkeleton rows={3} columns={6} />
-            </div>
-          )}
-
+          <div className="overflow-x-auto">
           <table className="table">
             <thead className="table-header">
               <tr>
@@ -313,7 +325,9 @@ export default function SubjectsPage() {
               </tr>
             </thead>
             <tbody>
-              {courses.map(course => (
+              {isTableLoading
+                ? <TableRowsSkeleton rows={itemsPerPage} columns={6} />
+                : courses.map(course => (
                 <tr key={course.course_id} className="table-row">
                   <td className="table-cell font-medium">{course.course_name}</td>
                   <td className="table-cell"><span className="badge badge-neutral">{course.course_code}</span></td>
@@ -331,7 +345,7 @@ export default function SubjectsPage() {
             </tbody>
           </table>
           {totalPages > 1 && (
-            <div className="mt-6 pt-4 border-t border-gray-200">
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}

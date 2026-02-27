@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import apiClient from '@/lib/api'
-import { TableSkeleton } from '@/components/LoadingSkeletons'
+import { TableSkeleton, TableRowsSkeleton } from '@/components/LoadingSkeletons'
 import Pagination from '@/components/Pagination'
 import { useToast } from '@/components/Toast'
 
@@ -138,6 +138,23 @@ export default function ClassroomsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+
+      {/* ── Page Header ───────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Rooms</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            {isLoading ? 'Loading…' : `${totalCount.toLocaleString()} rooms`}
+          </p>
+        </div>
+        <button onClick={() => setShowForm(true)} className="btn-primary w-full sm:w-auto">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add Room
+        </button>
+      </div>
+
       {showForm && (
         <div className="card">
           <div className="card-header">
@@ -185,20 +202,15 @@ export default function ClassroomsPage() {
 
       <div className="card">
         <div className="card-header">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h3 className="card-title">Rooms</h3>
-              <p className="card-description">Total: {totalCount} rooms</p>
-            </div>
-            <button onClick={() => setShowForm(true)} className="btn-primary w-full sm:w-auto">
-              Add Room
-            </button>
-          </div>
-          <div className="relative mt-4">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+              </svg>
+            </span>
             <input
               type="text"
-              placeholder="Search by room code, number, type, or department..."
+              placeholder="Search by room code, number, type, or department…"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="input-primary pl-10 w-full"
@@ -208,21 +220,19 @@ export default function ClassroomsPage() {
         {isLoading && <TableSkeleton rows={5} columns={7} />}
 
         {!isLoading && rooms.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-600 dark:text-gray-400">No rooms found</p>
+          <div className="text-center py-16">
+            <svg className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No rooms found</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              {rooms.length === 0 ? 'No rooms have been added yet.' : 'Try adjusting your search.'}
+            </p>
           </div>
         )}
 
         {!isLoading && rooms.length > 0 && (
-          <div className="overflow-x-auto relative">
-            {isTableLoading && (
-              <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
-                <div className="flex flex-col items-center">
-                  <TableSkeleton rows={3} columns={7} />
-                </div>
-              </div>
-            )}
-
+          <div className="overflow-x-auto">
             <table className="table">
             <thead className="table-header">
               <tr>
@@ -236,7 +246,9 @@ export default function ClassroomsPage() {
               </tr>
             </thead>
             <tbody>
-              {rooms.map(room => (
+              {isTableLoading
+                ? <TableRowsSkeleton rows={itemsPerPage} columns={7} />
+                : rooms.map(room => (
                 <tr key={room.room_id} className="table-row">
                   <td className="table-cell font-medium">{room.room_code}</td>
                   <td className="table-cell">{room.room_number}</td>
@@ -255,7 +267,7 @@ export default function ClassroomsPage() {
             </tbody>
           </table>
             {totalPages > 1 && (
-              <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}

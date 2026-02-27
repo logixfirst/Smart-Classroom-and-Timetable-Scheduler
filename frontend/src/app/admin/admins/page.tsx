@@ -5,7 +5,7 @@ import Pagination from '@/components/Pagination'
 import apiClient from '@/lib/api'
 import AddEditUserModal from './components/AddEditUserModal'
 import { useToast } from '@/components/Toast'
-import { TableSkeleton } from '@/components/LoadingSkeletons'
+import { TableSkeleton, TableRowsSkeleton, MobileCardsSkeleton } from '@/components/LoadingSkeletons'
 
 interface User {
   id: number
@@ -228,9 +228,7 @@ export default function AdminUsersPage() {
 
       <div className="card">
         <div className="card-header">
-          <h3 className="card-title">Admin Users</h3>
-          <p className="card-description">Administrative personnel only</p>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="relative flex-1">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -293,13 +291,10 @@ export default function AdminUsersPage() {
 
         {/* Mobile Card View */}
         {!isLoading && filteredUsers.length > 0 && (
-          <div className="block lg:hidden space-y-3 relative">
-            {isTableLoading && (
-              <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
-                <TableSkeleton rows={3} columns={7} />
-              </div>
-            )}
-            {filteredUsers.map((user, index) => (
+          <div className="block lg:hidden space-y-3">
+            {isTableLoading
+              ? <MobileCardsSkeleton cards={itemsPerPage} />
+              : filteredUsers.map((user, index) => (
               <div
                 key={user.id}
                 className="interactive-element p-4 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50"
@@ -330,12 +325,7 @@ export default function AdminUsersPage() {
 
         {/* Desktop Table View */}
         {!isLoading && filteredUsers.length > 0 && (
-          <div className="hidden lg:block overflow-x-auto relative">
-            {isTableLoading && (
-              <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
-                <TableSkeleton rows={3} columns={7} />
-              </div>
-            )}
+          <div className="hidden lg:block overflow-x-auto">
             <table className="table">
               <thead className="table-header">
                 <tr>
@@ -349,7 +339,9 @@ export default function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((user, index) => (
+                {isTableLoading
+                  ? <TableRowsSkeleton rows={itemsPerPage} columns={7} />
+                  : filteredUsers.map((user, index) => (
                   <tr key={user.id} className="table-row">
                     <td className="table-cell">
                       <span className="text-sm text-gray-500 dark:text-gray-400">

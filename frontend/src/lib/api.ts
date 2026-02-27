@@ -166,6 +166,18 @@ class ApiClient {
     return this.request<any>(`/departments/${id}/`);
   }
 
+  async createDepartment(data: any) {
+    return this.request<any>('/departments/', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateDepartment(id: string, data: any) {
+    return this.request<any>(`/departments/${id}/`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteDepartment(id: string) {
+    return this.request<any>(`/departments/${id}/`, { method: 'DELETE' });
+  }
+
   // Buildings
   async getBuildings(page = 1, pageSize = 25, search = '') {
     const params = new URLSearchParams({
@@ -178,6 +190,18 @@ class ApiClient {
 
   async getBuilding(id: string) {
     return this.request<any>(`/buildings/${id}/`);
+  }
+
+  async createBuilding(data: any) {
+    return this.request<any>('/buildings/', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateBuilding(id: string, data: any) {
+    return this.request<any>(`/buildings/${id}/`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteBuilding(id: string) {
+    return this.request<any>(`/buildings/${id}/`, { method: 'DELETE' });
   }
 
   // Schools
@@ -194,6 +218,18 @@ class ApiClient {
     return this.request<any>(`/schools/${id}/`);
   }
 
+  async createSchool(data: any) {
+    return this.request<any>('/schools/', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateSchool(id: string, data: any) {
+    return this.request<any>(`/schools/${id}/`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteSchool(id: string) {
+    return this.request<any>(`/schools/${id}/`, { method: 'DELETE' });
+  }
+
   // Programs
   async getPrograms(page = 1, pageSize = 25, search = '') {
     const params = new URLSearchParams({
@@ -208,6 +244,18 @@ class ApiClient {
     return this.request<any>(`/programs/${id}/`);
   }
 
+  async createProgram(data: any) {
+    return this.request<any>('/programs/', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateProgram(id: string, data: any) {
+    return this.request<any>(`/programs/${id}/`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteProgram(id: string) {
+    return this.request<any>(`/programs/${id}/`, { method: 'DELETE' });
+  }
+
   // Courses
   async getCourses(page = 1, pageSize = 25, search = '') {
     const params = new URLSearchParams({
@@ -220,6 +268,18 @@ class ApiClient {
 
   async getCourse(id: string) {
     return this.request<any>(`/courses/${id}/`);
+  }
+
+  async createCourse(data: any) {
+    return this.request<any>('/courses/', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateCourse(id: string, data: any) {
+    return this.request<any>(`/courses/${id}/`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteCourse(id: string) {
+    return this.request<any>(`/courses/${id}/`, { method: 'DELETE' });
   }
 
   // Subjects

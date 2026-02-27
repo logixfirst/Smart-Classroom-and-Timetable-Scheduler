@@ -67,6 +67,74 @@ export function TableSkeleton({ rows = 5, columns = 6 }: { rows?: number; column
   )
 }
 
+/**
+ * TableRowsSkeleton — renders shimmer <tr> rows INSIDE a <tbody>.
+ * Columns align perfectly with the real table and there is no floating overlay.
+ * Pass the same `columns` count as the real table. The last column always gets
+ * two button-shaped placeholders to represent action buttons.
+ */
+export function TableRowsSkeleton({ rows = 5, columns = 4 }: { rows?: number; columns?: number }) {
+  const widths = ['72%', '88%', '63%', '79%', '68%', '84%', '59%', '91%', '76%', '66%']
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <tr key={rowIndex} className="table-row">
+          {Array.from({ length: columns }).map((_, colIndex) => (
+            <td key={colIndex} className="table-cell">
+              {colIndex === columns - 1 ? (
+                <div className="flex gap-1.5">
+                  <Skeleton style={{ height: '26px', width: '38px', borderRadius: '5px' }} />
+                  <Skeleton style={{ height: '26px', width: '46px', borderRadius: '5px' }} />
+                </div>
+              ) : (
+                <Skeleton
+                  style={{
+                    height: '13px',
+                    width: widths[(rowIndex * columns + colIndex) % widths.length],
+                  }}
+                />
+              )}
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  )
+}
+
+/**
+ * MobileCardsSkeleton — shimmer placeholder cards for list/card views
+ * (used on small screens in admin/students/faculty/admins pages).
+ */
+export function MobileCardsSkeleton({ cards = 5 }: { cards?: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: cards }).map((_, i) => (
+        <div
+          key={i}
+          className="p-4 rounded-lg border border-gray-200 dark:border-gray-700"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 space-y-1.5">
+              <Skeleton style={{ height: '15px', width: '52%' }} />
+              <Skeleton style={{ height: '12px', width: '72%' }} />
+              <Skeleton style={{ height: '12px', width: '38%' }} />
+            </div>
+            <div className="flex gap-1 shrink-0">
+              <Skeleton style={{ height: '28px', width: '38px', borderRadius: '6px' }} />
+              <Skeleton style={{ height: '28px', width: '48px', borderRadius: '6px' }} />
+            </div>
+          </div>
+          <div className="flex gap-1.5 mt-2.5">
+            <Skeleton style={{ height: '20px', width: '58px', borderRadius: '20px' }} />
+            <Skeleton style={{ height: '20px', width: '48px', borderRadius: '20px' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // Card Skeleton
 export function CardSkeleton() {
   return (

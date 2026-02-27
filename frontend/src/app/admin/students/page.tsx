@@ -6,7 +6,7 @@ import AddEditStudentModal from './components/AddEditStudentModal'
 import { SimpleStudentInput } from '@/lib/validations'
 import apiClient from '@/lib/api'
 import { useToast } from '@/components/Toast'
-import { TableSkeleton } from '@/components/LoadingSkeletons'
+import { TableSkeleton, TableRowsSkeleton } from '@/components/LoadingSkeletons'
 
 interface Student {
   id: number
@@ -177,8 +177,10 @@ export default function StudentsPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="text-4xl mb-4">⚠️</div>
-          <p className="text-red-600">{error}</p>
+          <svg className="w-12 h-12 mx-auto mb-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           <button onClick={fetchStudents} className="btn-primary mt-4">
             Try Again
           </button>
@@ -208,11 +210,9 @@ export default function StudentsPage() {
 
       <div className="card">
 
-        {/* Filters */}
+        {/* Search & Filters */}
         <div className="card-header">
-          <h3 className="card-title">Students</h3>
-
-          <div className="flex flex-col sm:flex-row gap-3 mt-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,12 +299,7 @@ export default function StudentsPage() {
             </div>
 
             {/* Desktop Table */}
-            <div className="hidden lg:block overflow-x-auto relative">
-              {isTableLoading && (
-                <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
-                  <TableSkeleton rows={3} columns={9} />
-                </div>
-              )}
+            <div className="hidden lg:block overflow-x-auto">
               <table className="table">
                 <thead className="table-header">
                   <tr>
@@ -320,7 +315,9 @@ export default function StudentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredStudents.map(student => (
+                  {isTableLoading
+                    ? <TableRowsSkeleton rows={itemsPerPage} columns={9} />
+                    : filteredStudents.map(student => (
                     <tr key={student.id} className="table-row">
                       <td className="table-cell">
                         <span className="font-mono text-sm">{student.student_id}</span>

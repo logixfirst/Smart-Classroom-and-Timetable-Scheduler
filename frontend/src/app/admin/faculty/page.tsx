@@ -6,7 +6,7 @@ import AddEditFacultyModal from './components/AddEditFacultyModal'
 import { SimpleFacultyInput } from '@/lib/validations'
 import apiClient from '@/lib/api'
 import { useToast } from '@/components/Toast'
-import { TableSkeleton } from '@/components/LoadingSkeletons'
+import { TableSkeleton, TableRowsSkeleton } from '@/components/LoadingSkeletons'
 
 interface Faculty {
   id: number
@@ -123,7 +123,7 @@ export default function FacultyManagePage() {
         if (response.error) {
           showToast('error', response.error)
         } else {
-          showToast('success', '✅ Faculty updated successfully')
+          showToast('success', 'Faculty updated successfully')
           await fetchFaculty()
         }
       } else {
@@ -144,7 +144,7 @@ export default function FacultyManagePage() {
         if (response.error) {
           showToast('error', response.error)
         } else {
-          showToast('success', '✅ Faculty created successfully! User account also created.')
+        showToast('success', 'Faculty created successfully. User account also created.')
           await fetchFaculty()
         }
       }
@@ -157,7 +157,7 @@ export default function FacultyManagePage() {
   const handleDeleteFaculty = async (id: number, facultyName: string) => {
     if (
       !confirm(
-        `⚠️ Are you sure you want to delete ${facultyName}?\n\nThis will also delete their user account and cannot be undone.`
+        `Delete ${facultyName}?\n\nThis will also delete their user account and cannot be undone.`
       )
     ) {
       return
@@ -169,7 +169,7 @@ export default function FacultyManagePage() {
       if (response.error) {
         showToast('error', response.error)
       } else {
-        showToast('success', '✅ Faculty deleted successfully')
+        showToast('success', 'Faculty deleted successfully')
         await fetchFaculty()
       }
     } catch (error) {
@@ -193,8 +193,10 @@ export default function FacultyManagePage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <div className="text-4xl mb-4">⚠️</div>
-          <p className="text-red-600 dark:text-red-400">{error}</p>
+          <svg className="w-12 h-12 mx-auto mb-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           <button onClick={() => fetchFaculty()} className="btn-primary mt-4">
             Try Again
           </button>
@@ -224,8 +226,7 @@ export default function FacultyManagePage() {
 
       <div className="card">
         <div className="card-header">
-          <h3 className="card-title">Faculty Members</h3>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="relative flex-1">
               <label htmlFor="faculty-search" className="sr-only">
                 Search faculty
@@ -335,12 +336,7 @@ export default function FacultyManagePage() {
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden lg:block overflow-x-auto relative">
-              {isTableLoading && (
-                <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
-                  <TableSkeleton rows={3} columns={8} />
-                </div>
-              )}
+            <div className="hidden lg:block overflow-x-auto">
               <table className="table">
                 <thead className="table-header">
                   <tr>
@@ -355,7 +351,9 @@ export default function FacultyManagePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredFaculty.map(member => (
+                  {isTableLoading
+                    ? <TableRowsSkeleton rows={itemsPerPage} columns={8} />
+                    : filteredFaculty.map(member => (
                       <tr key={member.id} className="table-row">
                         <td className="table-cell">
                           <span className="font-mono text-sm">
@@ -409,7 +407,7 @@ export default function FacultyManagePage() {
                               disabled={isDeleting === member.id}
                               className="btn-danger text-xs px-2 py-1"
                             >
-                              {isDeleting === member.id ? 'Deleting...' : 'Del'}
+                              {isDeleting === member.id ? 'Deleting...' : 'Delete'}
                             </button>
                           </div>
                         </td>
