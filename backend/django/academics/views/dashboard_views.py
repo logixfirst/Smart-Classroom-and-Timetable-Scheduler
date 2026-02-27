@@ -13,46 +13,47 @@ Caching strategy (Google / Netflix grade):
 import logging
 
 from core.cache_service import CacheService
-from django.contrib.auth import get_user_model
-from django.db import transaction
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from ..models import Student, Faculty, CourseOffering, Course
+from ..models import Student, Faculty, CourseOffering
 
 logger = logging.getLogger(__name__)
 
 
-@transaction.non_atomic_requests  # read-only — skip per-request transaction overhead
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
     """
-    Org-scoped dashboard stats — ORM-based, Redis-cached 5 min.
+    Org-scoped dashboard stats — single SQL round-trip, Redis-cached 5 min.
 
-    FIX 1: Uses Django ORM filtered by organisation_id (was unfiltered raw SQL).
-    FIX 2: TTL raised to 300 s (was 90 s) — aggregates don't change per-second.
-    FIX 3: X-Cache determined by explicit cache.get() BEFORE get_or_set(),
-            not by a wasteful second cache.get() AFTER (was an extra round-trip).
-    FIX 4: @non_atomic_requests opts out of ATOMIC_REQUESTS transaction wrapping
-            (read-only view has no business opening a DB transaction).
+    FIX 1: Raw SQL now filters by org_id (was cross-tenant full-table scan).
+    FIX 2: Still 1 round-trip — avoids 4× SSL latency of separate ORM calls.
+    FIX 3: TTL raised to 300 s (was 90 s); aggregates don't change per-second.
+    FIX 4: Cache checked BEFORE get_or_set() to avoid extra Redis round-trip.
     """
-    User = get_user_model()
-    org_pk    = request.user.organization_id   # UUID — no DB hit
+    org_pk    = request.user.organization_id   # UUID attribute — no DB hit
     cache_key = CacheService.generate_cache_key("stats", "dashboard", org_id=str(org_pk))
-    TTL = 300  # 5 min — aggregate totals don't change per-second
+    TTL = 300  # 5 min
 
     def _fetch():
-        # Four individual .count() calls each become a single indexed lookup.
-        # Django generates: SELECT COUNT(*) FROM <table> WHERE org_id = %s [AND is_active]
-        # Faculty already has idx on (org, dept, is_active); Course has idx_course_org_active;
-        # Student gets idx_student_org_active via migration 0013.
-        total_users    = User.objects.filter(organization_id=org_pk).count()
-        active_courses = Course.objects.filter(organization_id=org_pk, is_active=True).count()
-        total_students = Student.objects.filter(organization_id=org_pk, is_active=True).count()
-        total_faculty  = Faculty.objects.filter(organization_id=org_pk, is_active=True).count()
+        from django.db import connection
+        with connection.cursor() as cursor:
+            # Single round-trip; each sub-select hits its org-indexed column.
+            # users        → user_org_role_idx  (org_id, role, is_active)
+            # courses      → idx_course_org_active  (org_id, is_active)
+            # students     → idx_student_org_active (org_id, is_active) [migration 0013]
+            # faculty      → fac_org_dept_avail_idx (org_id, dept_id, is_active)
+            cursor.execute("""
+                SELECT
+                    (SELECT COUNT(*) FROM users    WHERE org_id = %s)                       AS total_users,
+                    (SELECT COUNT(*) FROM courses  WHERE org_id = %s AND is_active = TRUE)  AS active_courses,
+                    (SELECT COUNT(*) FROM students WHERE org_id = %s AND is_active = TRUE)  AS total_students,
+                    (SELECT COUNT(*) FROM faculty  WHERE org_id = %s AND is_active = TRUE)  AS total_faculty
+            """, [org_pk, org_pk, org_pk, org_pk])
+            total_users, active_courses, total_students, total_faculty = cursor.fetchone()
 
         return {
             "stats": {
@@ -67,7 +68,7 @@ def dashboard_stats(request):
         }
 
     try:
-        # Check cache first — single round-trip, determines X-Cache without extra call
+        # Check cache first — determines X-Cache without an extra round-trip
         cached = CacheService.get(cache_key)
         if cached is not None:
             resp = Response(cached)
