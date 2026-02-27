@@ -80,6 +80,10 @@
   --space-8:  32px;
   --space-10: 40px;
   --space-12: 48px;
+
+  /* Spinner — exact Google Material values */
+  --spinner-color: #1A73E8;
+  --spinner-track: #E8F0FE;
 }
 
 .dark {
@@ -124,6 +128,10 @@
 
   --color-header-bg:     #242526;
   --color-header-border: #3C3E41;
+
+  /* Spinner — exact Google Material values for dark surfaces */
+  --spinner-color: #8AB4F8;
+  --spinner-track: #3C4043;
 
   --shadow-card:     0 1px 2px rgba(0,0,0,0.30), 0 1px 3px 1px rgba(0,0,0,0.25);
   --shadow-dropdown: 0 1px 2px rgba(0,0,0,0.40), 0 2px 6px 2px rgba(0,0,0,0.30);
@@ -673,10 +681,8 @@
     display: inline-block;
     border-radius: 9999px;
     border-style: solid;
-    /* Track ring: 15 % Google blue — visible on white, gray-50, and dark surfaces */
-    border-color: rgba(66, 133, 244, 0.15);
-    /* Arc: Google blue #4285F4 */
-    border-top-color: #4285F4;
+    border-color: var(--spinner-track);
+    border-top-color: var(--spinner-color);
     animation: gsp-rotate 2s linear infinite;
   }
 
@@ -684,9 +690,8 @@
     display: inline-block;
     border-radius: 9999px;
     border-style: solid;
-    /* Track on dark surfaces — slightly brighter so it reads */
-    border-color: rgba(66, 133, 244, 0.25);
-    border-top-color: #4285F4;
+    border-color: var(--spinner-track);
+    border-top-color: var(--spinner-color);
     animation: gsp-rotate 2s linear infinite;
   }
 
