@@ -2,18 +2,18 @@
 Dashboard views: Stats, student profile, faculty profile
 User-specific dashboard data and course information
 
-Caching strategy (Google / Netflix grade):
-  - dashboard_stats      : org-scoped stats, 90 s (live-ish counters)
-  - student_profile      : per-user, 5 min
-  - faculty_profile      : per-user, 5 min
-  All views use CacheService.get_or_set() for stampede-safe fills.
-  X-Cache: HIT | MISS headers let frontend devtools show cache state.
+Caching strategy:
+  L1 — process-local dict (microseconds, survives Redis outages)
+  L2 — Redis via CacheService (cross-process, cross-worker)
+  L3 — PostgreSQL (authoritative)
+  TTL = 5 min at every layer.
 """
 
 import logging
+import time
+from typing import Any
 
 from core.cache_service import CacheService
-from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -22,34 +22,64 @@ from ..models import Student, Faculty, CourseOffering
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# L1 — Process-local in-memory cache
+# ---------------------------------------------------------------------------
+# Completely independent of Redis.  On a cold start (or Render free-tier spin-up)
+# the first request hits L3; every subsequent request within _L1_TTL seconds
+# returns in <1 ms without any network I/O.
+# Key format: "dashboard_stats:<org_id>"  Value: (payload_dict, expire_at)
+# ---------------------------------------------------------------------------
+_L1_STORE: dict[str, tuple[Any, float]] = {}
+_L1_TTL = 300  # seconds (5 min — same as Redis TTL)
+
+
+def _l1_get(key: str) -> Any:
+    entry = _L1_STORE.get(key)
+    if entry and time.monotonic() < entry[1]:
+        return entry[0]
+    _L1_STORE.pop(key, None)  # evict expired entry
+    return None
+
+
+def _l1_set(key: str, value: Any) -> None:
+    _L1_STORE[key] = (value, time.monotonic() + _L1_TTL)
+
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
     """
-    Org-scoped dashboard stats — single SQL round-trip, Redis-cached 5 min.
-
-    FIX 1: Raw SQL now filters by org_id (was cross-tenant full-table scan).
-    FIX 2: Still 1 round-trip — avoids 4× SSL latency of separate ORM calls.
-    FIX 3: TTL raised to 300 s (was 90 s); aggregates don't change per-second.
-    FIX 4: Cache checked BEFORE get_or_set() to avoid extra Redis round-trip.
+    Org-scoped dashboard stats with 3-tier caching:
+      L1 (process dict) → L2 (Redis) → L3 (PostgreSQL single round-trip)
     """
-    org_pk    = request.user.organization_id   # UUID attribute — no DB hit
-    cache_key = CacheService.generate_cache_key("stats", "dashboard", org_id=str(org_pk))
-    TTL = 300  # 5 min
+    org_pk    = request.user.organization_id
+    l1_key    = f"dashboard_stats:{org_pk}"
+    redis_key = CacheService.generate_cache_key("stats", "dashboard", org_id=str(org_pk))
 
-    def _fetch():
+    # ── L1: process-local (fastest, no network) ────────────────────────────
+    l1_hit = _l1_get(l1_key)
+    if l1_hit is not None:
+        resp = Response(l1_hit)
+        resp["X-Cache"] = "L1-HIT"
+        return resp
+
+    # ── L2: Redis ────────────────────────────────────────────────────
+    try:
+        redis_hit = CacheService.get(redis_key)
+        if redis_hit is not None:
+            _l1_set(l1_key, redis_hit)  # warm L1
+            resp = Response(redis_hit)
+            resp["X-Cache"] = "L2-HIT"
+            return resp
+    except Exception:
+        pass  # Redis down — fall through to DB
+
+    # ── L3: Database (single SQL round-trip with indexed counts) ──────────
+    try:
         from django.db import connection
         with connection.cursor() as cursor:
-            # Hard cap: kill the query after 8 s instead of hanging the worker.
-            # On cold Render.com free-tier DB the indexes help but SSL connection
-            # setup alone can add seconds; a runaway plan must not block forever.
             cursor.execute("SET LOCAL statement_timeout = '8000'")
-            # Single round-trip; each sub-select hits its org-indexed column.
-            # users        → user_org_role_idx  (org_id, role, is_active)
-            # courses      → idx_course_org_active  (org_id, is_active)
-            # students     → idx_student_org_active (org_id, is_active) [migration 0013]
-            # faculty      → fac_org_dept_avail_idx (org_id, dept_id, is_active)
             cursor.execute("""
                 SELECT
                     (SELECT COUNT(*) FROM users    WHERE org_id = %s)                       AS total_users,
@@ -57,41 +87,43 @@ def dashboard_stats(request):
                     (SELECT COUNT(*) FROM students WHERE org_id = %s AND is_active = TRUE)  AS total_students,
                     (SELECT COUNT(*) FROM faculty  WHERE org_id = %s AND is_active = TRUE)  AS total_faculty
             """, [org_pk, org_pk, org_pk, org_pk])
-            total_users, active_courses, total_students, total_faculty = cursor.fetchone()
+            row = cursor.fetchone()
 
-        return {
+        payload = {
             "stats": {
-                "total_users":       total_users,
-                "active_courses":    active_courses,
-                "total_students":    total_students,
-                "total_faculty":     total_faculty,
+                "total_users":       row[0],
+                "active_courses":    row[1],
+                "total_students":    row[2],
+                "total_faculty":     row[3],
                 "pending_approvals": 0,
                 "system_health":     98,
             },
             "faculty": [],
         }
 
-    try:
-        # Check cache first — determines X-Cache without an extra round-trip
-        cached = CacheService.get(cache_key)
-        if cached is not None:
-            resp = Response(cached)
-            resp["X-Cache"]     = "HIT"
-            resp["X-Cache-Key"] = cache_key
-            return resp
+        # Write to both L1 and L2
+        _l1_set(l1_key, payload)
+        try:
+            CacheService.set(redis_key, payload, timeout=300)
+        except Exception:
+            pass  # Redis write failure is non-fatal; L1 will serve next requests
 
-        payload = CacheService.get_or_set(cache_key, _fetch, timeout=TTL)
         resp = Response(payload)
-        resp["X-Cache"]     = "MISS"
-        resp["X-Cache-Key"] = cache_key
+        resp["X-Cache"] = "L3-MISS"
         return resp
+
     except Exception as exc:
-        logger.warning("dashboard_stats query failed: %s", exc)
+        logger.warning("dashboard_stats DB query failed: %s", exc)
+        # Return whatever is in L1 even if expired, beats returning zeros
+        stale = _L1_STORE.get(l1_key)
+        if stale:
+            resp = Response(stale[0])
+            resp["X-Cache"] = "L1-STALE"
+            return resp
         return Response({
             "stats": {
-                "total_users": 0, "active_courses": 0,
-                "total_students": 0, "total_faculty": 0,
-                "pending_approvals": 0, "system_health": 98,
+                "total_users": 0, "active_courses": 0, "total_students": 0,
+                "total_faculty": 0, "pending_approvals": 0, "system_health": 0,
             },
             "faculty": [],
         })

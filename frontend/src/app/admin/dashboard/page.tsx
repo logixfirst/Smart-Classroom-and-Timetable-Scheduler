@@ -9,21 +9,31 @@ export default function AdminDashboard() {
   const router = useRouter()
   const { showToast } = useToast()
   const STATS_CACHE_KEY = 'admin_dashboard_stats'
-  const STATS_CACHE_TTL = 2 * 60 * 1000 // 2 minutes — matches backend cache
+  const STATS_CACHE_TTL = 5 * 60 * 1000 // 5 min — matches backend TTL
 
-  const [isLoading, setIsLoading] = useState(false)
-  const [stats, setStats] = useState(() => {
-    // Stale-while-revalidate: show cached numbers instantly
+  // Stale-while-revalidate: always show whatever we have cached;
+  // hasStaleCache controls whether we show a subtle refresh indicator
+  // instead of a full "..." loading placeholder.
+  const getCachedStats = () => {
     try {
       const raw = sessionStorage.getItem(STATS_CACHE_KEY)
       if (raw) {
         const { data, ts } = JSON.parse(raw)
-        if (Date.now() - ts < STATS_CACHE_TTL) return data
+        if (Date.now() - ts < STATS_CACHE_TTL) return { data, fresh: true }
+        return { data, fresh: false }  // expired but usable as stale
       }
     } catch { /* storage unavailable */ }
-    return { totalUsers: 0, activeCourses: 0, pendingApprovals: 0, systemHealth: 98 }
-  })
-  const [loading, setLoading] = useState(true)
+    return null
+  }
+  const _cached = getCachedStats()
+
+  const [isLoading, setIsLoading] = useState(false)
+  const [stats, setStats] = useState(
+    _cached?.data ?? { totalUsers: 0, activeCourses: 0, pendingApprovals: 0, systemHealth: 98 }
+  )
+  // loading = true only when we have NO cached data (shows skeleton)
+  // if we have stale data, we show it immediately and refresh silently
+  const [loading, setLoading] = useState(!_cached)
   const [faculty, setFaculty] = useState<any[]>([])
 
   useEffect(() => {
@@ -31,9 +41,18 @@ export default function AdminDashboard() {
   }, [])
 
   const fetchDashboardData = async () => {
-    setLoading(true)
+    // Only show full loading spinner if we have no cached data at all
+    if (!getCachedStats()) setLoading(true)
     try {
-      const response = await apiClient.request('/dashboard/stats/')
+      // 20 s timeout — Render.com free-tier DB can be slow on cold start
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 20_000)
+      let response: any
+      try {
+        response = await apiClient.request('/dashboard/stats/', { signal: controller.signal } as any)
+      } finally {
+        clearTimeout(timeoutId)
+      }
       const data = response.data as any
 
       if (data.stats) {
@@ -62,14 +81,8 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       console.error('Failed to fetch dashboard stats:', error)
-      // Set default values if endpoint fails
-      setStats({
-        totalUsers: 0,
-        activeCourses: 0,
-        pendingApprovals: 0,
-        systemHealth: 98,
-      })
-      setFaculty([])
+      // Do NOT reset stats to zeros — stale cached data is more useful than zeros
+      // The user already sees the stale values; just stop the loading indicator.
     } finally {
       setLoading(false)
     }
