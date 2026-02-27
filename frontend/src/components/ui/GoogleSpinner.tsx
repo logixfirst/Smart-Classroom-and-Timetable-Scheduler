@@ -30,9 +30,12 @@ export function GoogleSpinner({
   /** @deprecated */
   singleColor?: string
 }) {
-  // Google's exact spinner blue: #4285F4
-  // Pass color="white" for spinners inside coloured buttons.
-  const arcColor = color ?? singleColor ?? '#4285F4'
+  // When an explicit color is passed (e.g. color="white" on a coloured button),
+  // apply it via the SVG's `color` CSS property so `currentColor` picks it up.
+  // When nothing is passed, CSS vars --spinner-color / --spinner-track handle
+  // both light (#1A73E8 / #E8F0FE) and dark (#8AB4F8 / #3C4043) automatically.
+  const explicitColor = color ?? singleColor
+  const isWhite = explicitColor === 'white' || explicitColor === '#FFFFFF'
 
   // strokeWidth scales with size so thin spinners look thin, large ones look bold.
   // Clamped between 2.5 (min readability) and 4 (max Material weight).
@@ -47,23 +50,23 @@ export function GoogleSpinner({
       role="status"
       aria-label="Loading"
       className={`gsp-rotate${className ? ` ${className}` : ''}`}
-      style={{ flexShrink: 0, display: 'inline-block' }}
+      style={{
+        flexShrink: 0,
+        display: 'inline-block',
+        // Inject explicit color into the SVG's color cascade so currentColor works.
+        // When no color prop given, CSS vars on :root / .dark handle theming.
+        ...(explicitColor ? { color: explicitColor } : {}),
+      }}
     >
-      {/*
-        Track ring — always visible on every background:
-        • On white/light-gray: 12 % opacity blue tint = visible but not distracting
-        • On dark surfaces (#121212 / #1E1E1E / #2A2A2A): same 12% sits lighter
-          than the surface so it still reads as a circle
-        • For white arcs on blue buttons: 30% white track so it shows on blue
-      */}
+      {/* Track ring — uses --spinner-track var (or explicit color at low opacity) */}
       <circle
         cx="50"
         cy="50"
         r="20"
         fill="none"
-        stroke={arcColor}
+        stroke={explicitColor ? explicitColor : 'var(--spinner-track)'}
         strokeWidth={strokeWidth}
-        opacity={arcColor === 'white' || arcColor === '#FFFFFF' ? 0.3 : 0.15}
+        opacity={explicitColor ? (isWhite ? 0.3 : 0.18) : 1}
       />
       {/* Animated arc — gsp-dash keyframe in globals.css */}
       <circle
@@ -71,7 +74,7 @@ export function GoogleSpinner({
         cy="50"
         r="20"
         fill="none"
-        stroke={arcColor}
+        stroke={explicitColor ? explicitColor : 'var(--spinner-color)'}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
         strokeDasharray="1, 200"
