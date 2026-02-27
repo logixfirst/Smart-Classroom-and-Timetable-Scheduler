@@ -120,6 +120,8 @@ export default function DashboardLayout({
             <div className="flex items-center justify-between px-4 lg:px-6 h-full gap-3">
               {/* Left: Hamburger + Logo + Title */}
               <div className="flex items-center gap-2 flex-shrink-0">
+                {/* On desktop: only visible when sidebar is collapsed (the sidebar chevron handles expand).
+                    On mobile: always visible to open the drawer. */}
                 <button
                   onClick={() => {
                     if (window.matchMedia('(min-width: 768px)').matches) {
@@ -128,7 +130,7 @@ export default function DashboardLayout({
                       setSidebarOpen(true)
                     }
                   }}
-                  className="icon-button"
+                  className={`icon-button ${sidebarCollapsed ? '' : 'md:hidden'}`}
                   aria-label="Toggle navigation"
                 >
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
