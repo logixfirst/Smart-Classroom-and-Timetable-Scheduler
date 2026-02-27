@@ -6,7 +6,7 @@ import AddEditStudentModal from './components/AddEditStudentModal'
 import { SimpleStudentInput } from '@/lib/validations'
 import apiClient from '@/lib/api'
 import { useToast } from '@/components/Toast'
-import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
+import { TableSkeleton } from '@/components/LoadingSkeletons'
 
 interface Student {
   id: number
@@ -245,135 +245,132 @@ export default function StudentsPage() {
           </div>
         </div>
 
-        {/* Mobile List (unchanged) */}
-        <div className="block sm:hidden space-y-3">
-          {filteredStudents.map(student => (
-            <div
-              key={student.id}
-              className="interactive-element p-4 border border-gray-200"
-            >
-              <div className="font-medium text-gray-800">{student.name}</div>
-              <div className="text-sm">{student.student_id}</div>
-              <div className="text-xs text-gray-500">
-                {student.course?.course_name}
-              </div>
+        {isLoading && <TableSkeleton rows={5} columns={9} />}
 
-              <div className="flex gap-2 mt-2">
-                <span className="badge badge-neutral text-xs">{student.department?.department_name}</span>
-                <span className="badge badge-info text-xs">Year {student.year}</span>
-                <span className="badge badge-success text-xs">Sem {student.semester}</span>
-              </div>
-
-              <div className="flex gap-1 mt-2">
-                <button
-                  onClick={() => handleEditStudent(student)}
-                  className="btn-ghost text-xs px-2 py-1"
-                >
-                  Edit
-                </button>
-
-                <button
-                  onClick={() => handleDeleteStudent(student.id, student.name)}
-                  className="btn-danger text-xs px-2 py-1"
-                  disabled={isDeleting === student.id}
-                >
-                  {isDeleting === student.id ? 'Deleting...' : 'Delete'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Desktop Table */}
-        <div className="hidden sm:block">
-          <table className="table">
-            <thead className="table-header">
-              <tr>
-                <th>Student ID</th>
-                <th>Name</th>
-                <th>Department</th>
-                <th>Course</th>
-                <th>Year</th>
-                <th>Semester</th>
-                <th>Electives</th>
-                <th>Faculty</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {/* LOADING SPINNER (works for initial + pagination) */}
-              {(isLoading || isTableLoading) && (
-                <tr key="loading-spinner">
-                  <td colSpan={9}>
-                    <div className="flex justify-center items-center py-10">
-                      <GoogleSpinner size={48} className="mr-2" />
-                      <span className="text-gray-500">
-                        Loading students...
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-
-              {/* Rows (only show when NOT loading) */}
-              {!isLoading && !isTableLoading &&
-                filteredStudents.map(student => (
-                  <tr key={student.id}>
-                    <td>{student.student_id}</td>
-                    <td>{student.name}</td>
-                    <td>
-                      <span className="badge badge-neutral text-xs">
-                        {student.department?.department_name}
-                      </span>
-                    </td>
-                    <td>{student.course?.course_name}</td>
-                    <td>
-                      <span className="badge badge-info text-xs">Year {student.year}</span>
-                    </td>
-                    <td>
-                      <span className="badge badge-success text-xs">Sem {student.semester}</span>
-                    </td>
-                    <td className="truncate max-w-xs">{student.electives || 'None'}</td>
-                    <td>{student.faculty_advisor?.faculty_name || 'Not assigned'}</td>
-
-                    <td>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => handleEditStudent(student)}
-                          className="btn-ghost text-xs px-2 py-1"
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          onClick={() => handleDeleteStudent(student.id, student.name)}
-                          className="btn-danger text-xs px-2 py-1"
-                          disabled={isDeleting === student.id}
-                        >
-                          {isDeleting === student.id ? 'Deleting...' : 'Del'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalCount={totalCount}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
-              onItemsPerPageChange={setItemsPerPage}
-              showItemsPerPage={true}
-            />
+        {!isLoading && filteredStudents.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-600 dark:text-gray-400">No students found</p>
           </div>
+        )}
+
+        {!isLoading && filteredStudents.length > 0 && (
+          <>
+            {/* Mobile List */}
+            <div className="block sm:hidden space-y-3">
+              {filteredStudents.map(student => (
+                <div
+                  key={student.id}
+                  className="interactive-element p-4 border border-gray-200"
+                >
+                  <div className="font-medium text-gray-800">{student.name}</div>
+                  <div className="text-sm">{student.student_id}</div>
+                  <div className="text-xs text-gray-500">
+                    {student.course?.course_name}
+                  </div>
+
+                  <div className="flex gap-2 mt-2">
+                    <span className="badge badge-neutral text-xs">{student.department?.department_name}</span>
+                    <span className="badge badge-info text-xs">Year {student.year}</span>
+                    <span className="badge badge-success text-xs">Sem {student.semester}</span>
+                  </div>
+
+                  <div className="flex gap-1 mt-2">
+                    <button
+                      onClick={() => handleEditStudent(student)}
+                      className="btn-ghost text-xs px-2 py-1"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStudent(student.id, student.name)}
+                      className="btn-danger text-xs px-2 py-1"
+                      disabled={isDeleting === student.id}
+                    >
+                      {isDeleting === student.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden sm:block overflow-x-auto relative">
+              {isTableLoading && (
+                <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
+                  <TableSkeleton rows={3} columns={9} />
+                </div>
+              )}
+              <table className="table">
+                <thead className="table-header">
+                  <tr>
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Course</th>
+                    <th>Year</th>
+                    <th>Semester</th>
+                    <th>Electives</th>
+                    <th>Faculty</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStudents.map(student => (
+                    <tr key={student.id}>
+                      <td>{student.student_id}</td>
+                      <td>{student.name}</td>
+                      <td>
+                        <span className="badge badge-neutral text-xs">
+                          {student.department?.department_name}
+                        </span>
+                      </td>
+                      <td>{student.course?.course_name}</td>
+                      <td>
+                        <span className="badge badge-info text-xs">Year {student.year}</span>
+                      </td>
+                      <td>
+                        <span className="badge badge-success text-xs">Sem {student.semester}</span>
+                      </td>
+                      <td className="truncate max-w-xs">{student.electives || 'None'}</td>
+                      <td>{student.faculty_advisor?.faculty_name || 'Not assigned'}</td>
+                      <td>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleEditStudent(student)}
+                            className="btn-ghost text-xs px-2 py-1"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteStudent(student.id, student.name)}
+                            className="btn-danger text-xs px-2 py-1"
+                            disabled={isDeleting === student.id}
+                          >
+                            {isDeleting === student.id ? 'Deleting...' : 'Del'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalCount={totalCount}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                  onItemsPerPageChange={setItemsPerPage}
+                  showItemsPerPage={true}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
 

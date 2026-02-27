@@ -137,8 +137,8 @@ export default function DashboardLayout({
                   </svg>
                 </button>
 
-                {/* Logo — mobile only; sidebar owns branding on desktop (always visible there) */}
-                <svg className="md:hidden" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                {/* Logo — mobile only; sidebar owns branding on desktop */}
+                <svg className="md:hidden" width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
                   <rect x="2" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)"/>
                   <rect x="13" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
                   <rect x="2" y="13" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
@@ -149,7 +149,7 @@ export default function DashboardLayout({
                   className="hidden sm:inline md:hidden"
                   style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}
                 >
-                  SIH28
+                  Cadence
                 </span>
 
                 {/* UUID Job ID badge */}

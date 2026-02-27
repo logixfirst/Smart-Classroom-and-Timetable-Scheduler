@@ -150,7 +150,8 @@ export default function Sidebar({
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
         style={{
-          width: sidebarCollapsed ? '60px' : '240px',
+          // Mobile drawer always full-width; sidebarCollapsed only applies on desktop
+          width: sidebarOpen ? '240px' : sidebarCollapsed ? '60px' : '240px',
           backgroundColor: 'var(--color-sidebar-bg)',
           borderRight: '1px solid var(--color-sidebar-border)',
           transition: 'width 150ms ease-out',
@@ -162,25 +163,25 @@ export default function Sidebar({
           className="flex items-center flex-shrink-0 px-3 gap-2"
           style={{ height: 'var(--header-height)', borderBottom: '1px solid var(--color-sidebar-border)' }}
         >
-          {/* Logo mark — always visible; wordmark only when expanded */}
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+          {/* Logo — always visible, infinite resolution, transparent bg */}
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
             <rect x="2" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)"/>
             <rect x="13" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
             <rect x="2" y="13" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
             <rect x="13" y="13" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.5"/>
           </svg>
 
-          {/* Wordmark — hidden when sidebar is collapsed */}
-          {!sidebarCollapsed && (
+          {/* Wordmark — hidden only when collapsed on desktop; always shown in mobile drawer */}
+          {(!sidebarCollapsed || sidebarOpen) && (
             <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap' }}>
-              SIH28
+              Cadence
             </span>
           )}
 
-          {/* Flex spacer when collapsed so buttons sit flush right */}
-          {sidebarCollapsed && <div style={{ flex: 1 }} />}
+          {/* Flex spacer — only when icon-only on desktop */}
+          {sidebarCollapsed && !sidebarOpen && <div style={{ flex: 1 }} />}
 
-          {/* Collapse chevron — desktop only */}
+          {/* Collapse chevron — desktop only; tap-outside-backdrop closes mobile drawer */}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="hidden md:flex icon-button flex-shrink-0"
@@ -206,18 +207,6 @@ export default function Sidebar({
               <polyline points="10 4 6 8 10 12"/>
             </svg>
           </button>
-
-          {/* Close button — mobile drawer only */}
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="flex md:hidden icon-button flex-shrink-0"
-            aria-label="Close sidebar"
-            style={{ width: '28px', height: '28px' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" style={{ color: 'var(--color-text-muted)' }}>
-              <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
-            </svg>
-          </button>
         </div>
 
         {/* Navigation */}
@@ -229,9 +218,9 @@ export default function Sidebar({
                 key={item.name}
                 href={item.href}
                 className={isActive ? 'nav-link-active' : 'nav-link'}
-                title={sidebarCollapsed ? item.name : undefined}
+                title={(sidebarCollapsed && !sidebarOpen) ? item.name : undefined}
                 onClick={() => setSidebarOpen(false)}
-                style={sidebarCollapsed ? { justifyContent: 'center', padding: '8px' } : {}}
+                style={(sidebarCollapsed && !sidebarOpen) ? { justifyContent: 'center', padding: '8px' } : {}}
               >
                 <span
                   style={{
@@ -246,7 +235,7 @@ export default function Sidebar({
                 >
                   {item.icon}
                 </span>
-                {!sidebarCollapsed && (
+                {(!sidebarCollapsed || sidebarOpen) && (
                   <span className="truncate ml-2">{item.name}</span>
                 )}
               </Link>
@@ -260,7 +249,7 @@ export default function Sidebar({
         {/* User info + sign-out */}
         <button
           className="p-3 flex items-center gap-2 w-full text-left transition-colors"
-          style={sidebarCollapsed ? { justifyContent: 'center' } : {}}
+          style={(sidebarCollapsed && !sidebarOpen) ? { justifyContent: 'center' } : {}}
           onClick={() => setShowSignOutDialog(true)}
           title="Sign out"
         >
@@ -278,7 +267,7 @@ export default function Sidebar({
           >
             {(userName || 'U').charAt(0).toUpperCase()}
           </div>
-          {!sidebarCollapsed && (
+          {(!sidebarCollapsed || sidebarOpen) && (
             <div className="flex-1 min-w-0">
               <p
                 className="truncate"
@@ -290,11 +279,11 @@ export default function Sidebar({
                 className="truncate"
                 style={{ fontSize: '11px', color: 'var(--color-text-muted)', margin: 0 }}
               >
-                {userEmail || `${role}@sih28.edu`}
+                {userEmail || `${role}@cadence.edu`}
               </p>
             </div>
           )}
-          {!sidebarCollapsed && (
+          {(!sidebarCollapsed || sidebarOpen) && (
             <span style={{ flexShrink: 0, color: 'var(--color-text-muted)' }}>
               {Icons.signout}
             </span>

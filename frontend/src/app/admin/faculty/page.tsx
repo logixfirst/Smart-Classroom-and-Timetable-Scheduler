@@ -6,7 +6,7 @@ import AddEditFacultyModal from './components/AddEditFacultyModal'
 import { SimpleFacultyInput } from '@/lib/validations'
 import apiClient from '@/lib/api'
 import { useToast } from '@/components/Toast'
-import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
+import { TableSkeleton } from '@/components/LoadingSkeletons'
 
 interface Faculty {
   id: number
@@ -252,7 +252,9 @@ export default function FacultyManagePage() {
             </select>
           </div>
         </div>
-        {!isLoading && filteredFaculty.length === 0 ? (
+        {isLoading && <TableSkeleton rows={5} columns={8} />}
+
+        {!isLoading && filteredFaculty.length === 0 && (
           <div className="text-center py-12">
             <div className="text-4xl sm:text-6xl mb-4">👨</div>
             <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">
@@ -264,9 +266,11 @@ export default function FacultyManagePage() {
                 : 'No faculty match your search criteria.'}
             </p>
           </div>
-        ) : (
+        )}
+
+        {!isLoading && filteredFaculty.length > 0 && (
           <>
-            {/* Mobile Card View */}
+            {/* Mobile Card View */}}
             <div className="block lg:hidden space-y-3">
               {filteredFaculty.map(member => (
                 <div
@@ -322,7 +326,12 @@ export default function FacultyManagePage() {
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden lg:block">
+            <div className="hidden lg:block overflow-x-auto relative">
+              {isTableLoading && (
+                <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
+                  <TableSkeleton rows={3} columns={8} />
+                </div>
+              )}
               <table className="table">
                 <thead className="table-header">
                   <tr>
@@ -337,19 +346,7 @@ export default function FacultyManagePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan="8">
-                        <div className="flex items-center justify-center py-8">
-                          <GoogleSpinner size={48} className="mr-2" />
-                          <span className="text-gray-600 dark:text-gray-400">
-                            Loading Faculty...
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredFaculty.map(member => (
+                  {filteredFaculty.map(member => (
                       <tr key={member.id} className="table-row">
                         <td className="table-cell">
                           <span className="font-mono text-sm">
@@ -409,7 +406,7 @@ export default function FacultyManagePage() {
                         </td>
                       </tr>
                     ))
-                  )}
+                  }
                 </tbody>
                 </table>
             </div>

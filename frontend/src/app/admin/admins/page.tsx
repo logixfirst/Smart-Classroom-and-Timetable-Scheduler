@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Pagination from '@/components/Pagination'
 import apiClient from '@/lib/api'
 import AddEditUserModal from './components/AddEditUserModal'
 import { useToast } from '@/components/Toast'
-import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
+import { TableSkeleton } from '@/components/LoadingSkeletons'
 
 interface User {
   id: number
@@ -265,15 +266,14 @@ export default function AdminUsersPage() {
 
         
 
+        {isLoading && <TableSkeleton rows={5} columns={7} />}
+
         {/* Mobile Card View */}
         <div className="block sm:hidden space-y-3 relative">
           {/* Mobile Loading Overlay */}
           {isTableLoading && (
             <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
-              <div className="flex flex-col items-center">
-                <GoogleSpinner size={48} />
-                <span className="text-sm text-gray-600 dark:text-gray-400 mt-3">Loading...</span>
-              </div>
+              <TableSkeleton rows={3} columns={7} />
             </div>
           )}
 
@@ -329,10 +329,7 @@ export default function AdminUsersPage() {
           {/* Table Loading Overlay */}
           {isTableLoading && (
             <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
-              <div className="flex flex-col items-center">
-                <GoogleSpinner size={48} />
-                <span className="text-sm text-gray-600 dark:text-gray-400 mt-3">Loading...</span>
-              </div>
+              <TableSkeleton rows={3} columns={7} />
             </div>
           )}
 
@@ -350,19 +347,7 @@ export default function AdminUsersPage() {
             </thead>
         
             <tbody>
-  {isLoading ? (
-    <tr>
-      <td colSpan={7}>
-        <div className="flex items-center justify-center py-8">
-          <GoogleSpinner size={48} className="mr-2" />
-          <span className="text-gray-600 dark:text-gray-400">
-            Loading Users...
-          </span>
-        </div>
-      </td>
-    </tr>
-  ) : (
-    filteredUsers.map((user, index) => (
+  {filteredUsers.map((user, index) => (
       <tr key={user.id} className="table-row">
         <td className="table-cell">
           <div className="font-medium text-gray-800 dark:text-gray-200">
@@ -415,114 +400,23 @@ export default function AdminUsersPage() {
         </td>
       </tr>
     ))
-  )}
+  }
 </tbody>
  </table>
         </div>
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200 dark:border-[#3c4043]">
-            <button
-              onClick={handlePreviousPage}
-              disabled={currentPage === 1 || isTableLoading}
-              className="btn-secondary px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isTableLoading && currentPage > 1 ? (
-                <div className="flex items-center">
-                  <GoogleSpinner size={16} className="mr-2" />
-                  Loading...
-                </div>
-              ) : (
-                '← Previous'
-              )}
-            </button>
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600 dark:text-gray-400">
-                Page {currentPage} of {totalPages}
-              </span>
-              {totalPages <= 10 ? (
-                // Show all pages if 10 or less
-                <div className="flex gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                    <button
-                      key={page}
-                      onClick={() => handlePageChange(page)}
-                      disabled={isTableLoading}
-                      className={`px-3 py-1 rounded text-sm disabled:opacity-50 ${
-                        currentPage === page
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-200 dark:bg-[#3c4043] text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-[#4c5053]'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                // Show limited pages with ellipsis
-                <div className="flex gap-1">
-                  {currentPage > 3 && (
-                    <>
-                      <button
-                        onClick={() => handlePageChange(1)}
-                        disabled={isTableLoading}
-                        className="px-3 py-1 rounded text-sm bg-gray-200 dark:bg-[#3c4043] disabled:opacity-50"
-                      >
-                        1
-                      </button>
-                      <span className="px-2">...</span>
-                    </>
-                  )}
-                  {Array.from({ length: 5 }, (_, i) => {
-                    const page = currentPage - 2 + i
-                    if (page < 1 || page > totalPages) return null
-                    return (
-                      <button
-                        key={page}
-                        onClick={() => handlePageChange(page)}
-                        disabled={isTableLoading}
-                        className={`px-3 py-1 rounded text-sm disabled:opacity-50 ${
-                          currentPage === page
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-200 dark:bg-[#3c4043] text-gray-700 dark:text-gray-300'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    )
-                  })}
-                  {currentPage < totalPages - 2 && (
-                    <>
-                      <span className="px-2">...</span>
-                      <button
-                        onClick={() => handlePageChange(totalPages)}
-                        disabled={isTableLoading}
-                        className="px-3 py-1 rounded text-sm bg-gray-200 dark:bg-[#3c4043] disabled:opacity-50"
-                      >
-                        {totalPages}
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={handleNextPage}
-              disabled={currentPage === totalPages || isTableLoading}
-              className="btn-secondary px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isTableLoading && currentPage < totalPages ? (
-                <div className="flex items-center">
-                  <GoogleSpinner size={16} className="mr-2" />
-                  Loading...
-                </div>
-              ) : (
-                'Next →'
-              )}
-            </button>
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-[#3c4043]">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalCount={totalCount}
+              itemsPerPage={100}
+              onPageChange={handlePageChange}
+              onItemsPerPageChange={() => {}}
+              showItemsPerPage={false}
+            />
           </div>
         )}
       </div>

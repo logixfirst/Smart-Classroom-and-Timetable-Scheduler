@@ -413,7 +413,7 @@ export default function AdminDashboard() {
                   Timetable Approved
                 </p>
                 <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  priya.patel@sih28.edu
+                  priya.patel@cadence.edu
                 </p>
               </div>
               <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
@@ -426,7 +426,7 @@ export default function AdminDashboard() {
                   User Role Changed
                 </p>
                 <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  harsh.sharma@sih28.edu
+                  harsh.sharma@cadence.edu
                 </p>
               </div>
               <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
@@ -439,7 +439,7 @@ export default function AdminDashboard() {
                   Course Updated
                 </p>
                 <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                  rajesh.kumar@sih28.edu
+                  rajesh.kumar@cadence.edu
                 </p>
               </div>
               <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">1h ago</span>

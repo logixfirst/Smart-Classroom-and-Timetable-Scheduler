@@ -7,7 +7,7 @@ export default function LogsPage() {
       timestamp: '2023-10-15 14:30:25',
       level: 'INFO',
       action: 'User Login',
-      user: 'harsh.sharma@sih28.edu',
+      user: 'harsh.sharma@cadence.edu',
       details: 'Admin login successful',
     },
     {
@@ -23,7 +23,7 @@ export default function LogsPage() {
       timestamp: '2023-10-15 14:20:08',
       level: 'WARNING',
       action: 'Failed Login',
-      user: 'unknown@sih28.edu',
+      user: 'unknown@cadence.edu',
       details: 'Invalid credentials attempt',
     },
     {
@@ -31,7 +31,7 @@ export default function LogsPage() {
       timestamp: '2023-10-15 14:15:45',
       level: 'INFO',
       action: 'User Created',
-      user: 'harsh.sharma@sih28.edu',
+      user: 'harsh.sharma@cadence.edu',
       details: 'New faculty member added: Dr. Rajesh Kumar',
     },
     {

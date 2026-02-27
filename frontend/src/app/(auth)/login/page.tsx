@@ -92,33 +92,33 @@ export default function LoginPage() {
           }}
         >
           {/* Logo + brand */}
-          <div className="flex flex-col items-center gap-2 mb-6">
-            <div className="flex items-center gap-3">
-              {/* Grid-of-squares SVG logo */}
-              <svg
-                width="32"
-                height="32"
-                viewBox="0 0 32 32"
-                fill="none"
-                aria-label="SIH28 logo"
-              >
-                <rect x="2"  y="2"  width="12" height="12" rx="2.5" fill="var(--color-primary)" />
-                <rect x="18" y="2"  width="12" height="12" rx="2.5" fill="var(--color-primary)" opacity="0.75" />
-                <rect x="2"  y="18" width="12" height="12" rx="2.5" fill="var(--color-primary)" opacity="0.75" />
-                <rect x="18" y="18" width="12" height="12" rx="2.5" fill="var(--color-primary)" opacity="0.5" />
-              </svg>
-              <span
-                style={{
-                  fontWeight: 700,
-                  fontSize: '22px',
-                  color: 'var(--color-text-primary)',
-                  letterSpacing: '-0.02em',
-                  fontFamily: "'Poppins', 'Inter', sans-serif",
-                }}
-              >
-                SIH28
-              </span>
-            </div>
+          <div className="flex flex-col items-center gap-3 mb-6">
+            {/* Logo mark — large, centered */}
+            <svg
+              width="56"
+              height="56"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <rect x="2" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)"/>
+              <rect x="13" y="2" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
+              <rect x="2" y="13" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.75"/>
+              <rect x="13" y="13" width="9" height="9" rx="1.5" fill="var(--color-primary)" opacity="0.5"/>
+            </svg>
+            {/* Wordmark */}
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: '26px',
+                color: 'var(--color-text-primary)',
+                letterSpacing: '-0.03em',
+                fontFamily: "'Poppins', 'Inter', sans-serif",
+                lineHeight: 1,
+              }}
+            >
+              Cadence
+            </span>
             <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0 }}>
               Timetable Optimization Platform
             </p>
@@ -233,7 +233,7 @@ export default function LoginPage() {
           className="text-center"
           style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '24px' }}
         >
-          &copy; {new Date().getFullYear()} SIH28 Platform
+          &copy; {new Date().getFullYear()} Cadence Platform
         </p>
       </div>
     </div>

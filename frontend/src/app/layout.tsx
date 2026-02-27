@@ -9,7 +9,7 @@ import { ToastProvider } from '@/components/Toast'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'SIH28 - Timetable Optimization Platform',
+  title: 'Cadence - Timetable Optimization Platform',
   description: 'AI-powered timetable optimization for educational institutions',
 }
 
