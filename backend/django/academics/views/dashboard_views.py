@@ -13,39 +13,46 @@ Caching strategy (Google / Netflix grade):
 import logging
 
 from core.cache_service import CacheService
+from django.contrib.auth import get_user_model
+from django.db import transaction
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from ..models import Student, Faculty, CourseOffering
+from ..models import Student, Faculty, CourseOffering, Course
 
 logger = logging.getLogger(__name__)
 
 
+@transaction.non_atomic_requests  # read-only — skip per-request transaction overhead
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def dashboard_stats(request):
     """
-    Org-scoped dashboard stats — single-query, Redis-cached 90 s.
+    Org-scoped dashboard stats — ORM-based, Redis-cached 5 min.
 
-    Key includes the organisation_id so different orgs never share counts.
+    FIX 1: Uses Django ORM filtered by organisation_id (was unfiltered raw SQL).
+    FIX 2: TTL raised to 300 s (was 90 s) — aggregates don't change per-second.
+    FIX 3: X-Cache determined by explicit cache.get() BEFORE get_or_set(),
+            not by a wasteful second cache.get() AFTER (was an extra round-trip).
+    FIX 4: @non_atomic_requests opts out of ATOMIC_REQUESTS transaction wrapping
+            (read-only view has no business opening a DB transaction).
     """
-    org_id = str(getattr(request.user, "organization_id", "global"))
-    cache_key = CacheService.generate_cache_key("stats", "dashboard", org_id=org_id)
-    TTL = 90   # 90 s — near-real-time; fast enough for a live dashboard
+    User = get_user_model()
+    org_pk    = request.user.organization_id   # UUID — no DB hit
+    cache_key = CacheService.generate_cache_key("stats", "dashboard", org_id=str(org_pk))
+    TTL = 300  # 5 min — aggregate totals don't change per-second
 
     def _fetch():
-        from django.db import connection
-        with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT
-                    (SELECT COUNT(*) FROM users)                         AS total_users,
-                    (SELECT COUNT(*) FROM courses WHERE is_active = TRUE) AS active_courses,
-                    (SELECT COUNT(*) FROM students WHERE is_active = TRUE) AS total_students,
-                    (SELECT COUNT(*) FROM faculty)                       AS total_faculty
-            """)
-            total_users, active_courses, total_students, total_faculty = cursor.fetchone()
+        # Four individual .count() calls each become a single indexed lookup.
+        # Django generates: SELECT COUNT(*) FROM <table> WHERE org_id = %s [AND is_active]
+        # Faculty already has idx on (org, dept, is_active); Course has idx_course_org_active;
+        # Student gets idx_student_org_active via migration 0013.
+        total_users    = User.objects.filter(organization_id=org_pk).count()
+        active_courses = Course.objects.filter(organization_id=org_pk, is_active=True).count()
+        total_students = Student.objects.filter(organization_id=org_pk, is_active=True).count()
+        total_faculty  = Faculty.objects.filter(organization_id=org_pk, is_active=True).count()
 
         return {
             "stats": {
@@ -60,10 +67,17 @@ def dashboard_stats(request):
         }
 
     try:
+        # Check cache first — single round-trip, determines X-Cache without extra call
+        cached = CacheService.get(cache_key)
+        if cached is not None:
+            resp = Response(cached)
+            resp["X-Cache"]     = "HIT"
+            resp["X-Cache-Key"] = cache_key
+            return resp
+
         payload = CacheService.get_or_set(cache_key, _fetch, timeout=TTL)
-        hit = CacheService.get(cache_key) is not None
         resp = Response(payload)
-        resp["X-Cache"]     = "HIT" if hit else "MISS"
+        resp["X-Cache"]     = "MISS"
         resp["X-Cache-Key"] = cache_key
         return resp
     except Exception as exc:

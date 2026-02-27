@@ -131,6 +131,14 @@ class Student(models.Model):
 
     class Meta:
         db_table = "students"
+        indexes = [
+            # FIX: was missing — org-scoped COUNT(*) on 19k+ rows did full seq scan.
+            # Used by dashboard_stats, student list views filtered by org+active.
+            models.Index(
+                fields=["organization", "is_active"],
+                name="idx_student_org_active",
+            ),
+        ]
 
     @property
     def batch_name(self):

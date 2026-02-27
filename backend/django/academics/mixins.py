@@ -96,7 +96,10 @@ class SmartCachedViewSet(viewsets.ModelViewSet):
             if k not in ("page", "page_size")
         }
 
-        key = CacheService.generate_cache_key(
+        # versioned_generate_cache_key embeds the current model generation
+        # counter so a single bump_model_version() call (O(1) INCR) makes
+        # every key for this model logically invisible without a SCAN.
+        key = CacheService.versioned_generate_cache_key(
             CacheService.PREFIX_LIST, model_name,
             organization_id=org_id, page=page, page_size=page_size, **filters,
         )
@@ -106,8 +109,6 @@ class SmartCachedViewSet(viewsets.ModelViewSet):
             resp = Response(cached)
             return self._apply_cache_headers(resp, hit=True, key=key, ttl=self.cache_list_timeout)
 
-        # Cache MISS -- fetch from DB (stampede guard: get_or_set called by callers
-        # who need the full Response object; here we build it directly)
         logger.debug("Cache MISS: %s", key)
         response = super().list(request, *args, **kwargs)
         if response.status_code == 200:
@@ -116,13 +117,14 @@ class SmartCachedViewSet(viewsets.ModelViewSet):
 
     # -- Retrieve -------------------------------------------------------------
     def retrieve(self, request, *args, **kwargs):
-        """Cached detail view with Dogpile stampede prevention."""
+        """Cached detail view with versioned key for O(1) invalidation."""
         model_name = self.queryset.model.__name__.lower()
         pk         = kwargs.get("pk")
         org_id     = self._org_id()
 
-        key = CacheService.generate_cache_key(
-            CacheService.PREFIX_DETAIL, model_name, organization_id=org_id, pk=pk,
+        key = CacheService.versioned_generate_cache_key(
+            CacheService.PREFIX_DETAIL, model_name,
+            organization_id=org_id, pk=pk,
         )
 
         cached = CacheService.get(key)

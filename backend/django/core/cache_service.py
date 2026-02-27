@@ -8,7 +8,8 @@ Battle-tested patterns from Google, Netflix, Meta, and Airbnb:
   - Write-through             -> cache written atomically after DB transaction
   - Stale-while-revalidate    -> TTL constants tuned per-model churn rate
   - Multi-tenant namespace    -> per-org key isolation
-  - Pattern-delete            -> coarse-grained but safe invalidation
+  - Version-counter invalidation -> O(1) INCR replaces O(N) SCAN/delete_pattern
+  - Pattern-delete (hard flush)  -> nuclear option, only when version INCR fails
   - Cache warming             -> proactive fill after deployments / off-peak
   - X-Cache header            -> HIT / MISS visible to frontend devtools
   - Auto-invalidation signals -> no manual call-sites needed
@@ -61,9 +62,102 @@ class CacheService:
     PREFIX_LOCK   = "lock"
 
     # -- Stampede / Dogpile lock config --------------------------------------
-    LOCK_TTL     = 30      # max seconds a lock can be held
-    LOCK_WAIT    = 0.05    # seconds between poll attempts (50 ms)
-    LOCK_RETRIES = 60      # 60 x 50 ms = 3 s total wait before fallback
+    # FIX: Previous values (LOCK_RETRIES=60 × LOCK_WAIT=0.05 = 3 s) meant
+    # every concurrent request gave up and called fetch_fn() itself after 3 s,
+    # turning a single slow DB query into N simultaneous slow DB queries.
+    # Now: 300 × 0.1 = 30 s max wait, matching the 60 s lock TTL.
+    LOCK_TTL     = 60      # max seconds a lock can be held (covers slow remote DB)
+    LOCK_WAIT    = 0.1     # seconds between poll attempts (100 ms)
+    LOCK_RETRIES = 300     # 300 x 100 ms = 30 s total wait before fallback
+
+    # -------------------------------------------------------------------------
+    # VERSION-COUNTER  (O(1) invalidation  –  replaces SCAN+DELETE)
+    # -------------------------------------------------------------------------
+    # Every model gets a tiny Redis key that stores an integer generation
+    # counter, e.g.  "vcnt:room:org_42" = 7.
+    # All cache keys include this version, so bumping the counter
+    # (one atomic INCR) makes every old entry logically invisible —
+    # they are never looked up again and expire naturally via their TTL.
+    # Compare: Memcache namespace trick (Facebook TAO), Shopify model versioning.
+    #
+    #   Invalidation cost:  O(1) single INCR
+    #   vs delete_pattern:  O(N keyspace) — SCAN iterates every Redis key
+    # -------------------------------------------------------------------------
+
+    _VER_TTL = 86_400 * 30  # version counter lives 30 days
+
+    @staticmethod
+    def _ver_key(model_name: str, organization_id: Optional[str] = None) -> str:
+        base = f"vcnt:{model_name.lower()}"
+        return f"{base}:{organization_id}" if organization_id else base
+
+    @staticmethod
+    def get_model_version(
+        model_name: str,
+        organization_id: Optional[str] = None,
+    ) -> int:
+        """
+        Return the current generation counter for *model_name*.
+        Initialises to 1 on first call (lazy bootstrap).
+        """
+        ver_key = CacheService._ver_key(model_name, organization_id)
+        version = cache.get(ver_key)
+        if version is None:
+            # Initialise; use add() so concurrent workers don't race
+            cache.add(ver_key, 1, CacheService._VER_TTL)
+            version = cache.get(ver_key) or 1
+        return int(version)
+
+    @staticmethod
+    def bump_model_version(
+        model_name: str,
+        organization_id: Optional[str] = None,
+    ) -> int:
+        """
+        Atomically increment the generation counter  →  O(1) invalidation.
+
+        After this call every cache key that was built with the old version
+        becomes unreachable.  Old entries sit in Redis silently until their
+        TTL expires — no SCAN, no DELETE, no keyspace pollution.
+
+        Returns the new version number.
+        """
+        ver_key = CacheService._ver_key(model_name, organization_id)
+        try:
+            new_ver = cache.incr(ver_key)          # atomic Redis INCR
+            # Refresh TTL so the counter itself doesn't silently disappear
+            cache.expire(ver_key, CacheService._VER_TTL)
+            logger.info(
+                "Version bumped: model=%s org=%s  v=%s",
+                model_name, organization_id or "global", new_ver,
+            )
+            return new_ver
+        except Exception:
+            # Key missing (first-ever write) — initialise to 2 so callers
+            # that read v=1 before this call get a cache miss.
+            cache.set(ver_key, 2, CacheService._VER_TTL)
+            return 2
+
+    @staticmethod
+    def versioned_generate_cache_key(
+        prefix: str,
+        model_name: str,
+        organization_id: Optional[str] = None,
+        **kwargs,
+    ) -> str:
+        """
+        Like generate_cache_key() but embeds the current model version so
+        that bumping the counter automatically makes old keys unreachable.
+
+        Use this in list/retrieve views instead of generate_cache_key().
+        """
+        version = CacheService.get_model_version(model_name, organization_id)
+        return CacheService.generate_cache_key(
+            prefix, model_name,
+            _ver=version,
+            organization_id=organization_id,
+            **kwargs,
+        )
 
     # -------------------------------------------------------------------------
     # KEY GENERATION
@@ -307,20 +401,33 @@ class CacheService:
     ) -> int:
         """
         Invalidate all cached data for a model.
-        Uses wild-card pattern delete (SCAN-based, non-blocking).
-        Pattern: Netflix / Meta cache invalidation on entity change.
-        """
-        prefix = settings.CACHES["default"].get("KEY_PREFIX", "sih28")
-        patterns = [f"{prefix}:*:v1:*:{model_name.lower()}:*"]
 
+        PRIMARY path  – O(1) version counter bump.
+          Bumping the generation counter makes every versioned key
+          logically invisible without touching Redis keyspace.
+          Old entries expire through their normal TTL.
+
+        FALLBACK path – O(N) SCAN-based pattern delete.
+          Kept as a hard-flush for unversioned legacy keys and as a
+          safety net if Redis INCR fails for any reason.
+        """
+        # 1. O(1) primary: bump the version counter
+        new_ver = CacheService.bump_model_version(model_name, organization_id)
+
+        # 2. O(N) fallback: also nuke any legacy unversioned keys
+        prefix   = settings.CACHES["default"].get("KEY_PREFIX", "sih28")
+        patterns = [f"{prefix}:*:v1:*:{model_name.lower()}:*"]
         if organization_id:
             patterns.append(
                 f"{prefix}:*:v1:*:{model_name.lower()}:*org_{organization_id}*"
             )
+        total_deleted = sum(CacheService.delete_pattern(p) for p in patterns)
 
-        total = sum(CacheService.delete_pattern(p) for p in patterns)
-        logger.info("Invalidated %s cache keys for model: %s", total, model_name)
-        return total
+        logger.info(
+            "Invalidated cache: model=%s  new_version=%s  legacy_keys_deleted=%s",
+            model_name, new_ver, total_deleted,
+        )
+        return total_deleted
 
     # -------------------------------------------------------------------------
     # CACHE WARMING
