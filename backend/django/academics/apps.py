@@ -94,17 +94,29 @@ class AcademicsConfig(AppConfig):
                 ]
 
                 for model_cls, name, ttl in warm_tasks:
+                    # Warm page=1 / page_size=25 — matches the admin default.
+                    # Keys without organization_id cover super-admin / anon reads;
+                    # per-org keys populate automatically on first real request.
                     key = CacheService.generate_cache_key(
-                        CacheService.PREFIX_LIST, name, page="1", page_size="500"
+                        CacheService.PREFIX_LIST, name, page="1", page_size="25",
                     )
-                    # Only warm if the key is not already cached
-                    if CacheService.get(key) is None:
-                        def _make_fetcher(cls):
-                            from django.forms.models import model_to_dict
-                            def fetcher():
-                                return list(cls.objects.values())
-                            return fetcher
-                        CacheService.warm_cache(name, _make_fetcher(model_cls), key, ttl=ttl)
+                    if CacheService.get(key) is not None:
+                        continue  # already warm
+
+                    def _make_fetcher(cls, model_name=name):
+                        def fetcher():
+                            """Produce DRF-compatible paginated payload."""
+                            total = cls.objects.count()
+                            rows  = list(cls.objects.values()[:25])
+                            return {
+                                "count":    total,
+                                "next":     None,
+                                "previous": None,
+                                "results":  rows,
+                            }
+                        return fetcher
+
+                    CacheService.warm_cache(name, _make_fetcher(model_cls), key, ttl=ttl)
 
                 _log.info("Cache warm-up complete for near-static datasets.")
             except Exception as exc:

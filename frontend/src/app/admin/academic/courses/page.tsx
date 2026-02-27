@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import apiClient from '@/lib/api'
 import { subjectSchema, type SubjectInput } from '@/lib/validations'
-import { FormField, SelectField } from '@/components/FormFields'
+import { FormField } from '@/components/FormFields'
 import { useToast } from '@/components/Toast'
 import Pagination from '@/components/Pagination'
 import { TableSkeleton } from '@/components/LoadingSkeletons'
@@ -98,29 +98,34 @@ export default function SubjectsPage() {
   }
 
   const onSubmit = async (data: SubjectInput) => {
-    const url = editingId
-      ? `http://localhost:8000/api/subjects/${editingId}/`
-      : 'http://localhost:8000/api/subjects/'
-
     try {
-      const response = await fetch(url, {
-        method: editingId ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+      const payload = {
+        course_name: data.subject_name,
+        course_code: data.subject_id,
+        department:  data.department_id,
+        credits:     data.credits,
+        lecture_hours_per_week: data.lecture_hours,
+        lab_hours_per_week:     data.lab_hours,
+      }
 
-      if (response.ok) {
-        showSuccessToast(
-          editingId ? 'Subject updated successfully!' : 'Subject created successfully!'
-        )
+      const response = editingId
+        ? await apiClient.request<any>(`/courses/${editingId}/`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+          })
+        : await apiClient.request<any>('/courses/', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          })
+
+      if (response.error) {
+        showErrorToast(response.error)
+      } else {
+        showSuccessToast(editingId ? 'Course updated successfully!' : 'Course created successfully!')
         loadSubjects()
         resetForm()
-      } else {
-        const errorData = await response.json()
-        showErrorToast(errorData.message || 'Failed to save subject')
       }
-    } catch (error) {
-      console.error('Failed to save subject:', error)
+    } catch {
       showErrorToast('Network error. Please try again.')
     }
   }
@@ -138,21 +143,17 @@ export default function SubjectsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this subject?')) return
+    if (!confirm('Delete this course?')) return
 
     try {
-      const response = await fetch(`http://localhost:8000/api/subjects/${id}/`, {
-        method: 'DELETE',
-      })
-
-      if (response.ok) {
-        showSuccessToast('Subject deleted successfully!')
-        loadSubjects()
+      const response = await apiClient.request<any>(`/courses/${id}/`, { method: 'DELETE' })
+      if (response.error) {
+        showErrorToast(response.error)
       } else {
-        showErrorToast('Failed to delete subject')
+        showSuccessToast('Course deleted successfully!')
+        loadSubjects()
       }
-    } catch (error) {
-      console.error('Failed to delete subject:', error)
+    } catch {
       showErrorToast('Network error. Please try again.')
     }
   }
@@ -329,22 +330,20 @@ export default function SubjectsPage() {
               ))}
             </tbody>
           </table>
+          {totalPages > 1 && (
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setCurrentPage}
+                onItemsPerPageChange={setItemsPerPage}
+                showItemsPerPage={true}
+              />
+            </div>
+          )}
         </div>
-        )}
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalCount={totalCount}
-              itemsPerPage={itemsPerPage}
-              onPageChange={setCurrentPage}
-              onItemsPerPageChange={setItemsPerPage}
-              showItemsPerPage={true}
-            />
-          </div>
         )}
       </div>
     </div>

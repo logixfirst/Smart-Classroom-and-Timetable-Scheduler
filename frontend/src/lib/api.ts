@@ -166,6 +166,48 @@ class ApiClient {
     return this.request<any>(`/departments/${id}/`);
   }
 
+  // Buildings
+  async getBuildings(page = 1, pageSize = 25, search = '') {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      ...(search && { search })
+    });
+    return this.request<any>(`/buildings/?${params}`);
+  }
+
+  async getBuilding(id: string) {
+    return this.request<any>(`/buildings/${id}/`);
+  }
+
+  // Schools
+  async getSchools(page = 1, pageSize = 25, search = '') {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      ...(search && { search })
+    });
+    return this.request<any>(`/schools/?${params}`);
+  }
+
+  async getSchool(id: string) {
+    return this.request<any>(`/schools/${id}/`);
+  }
+
+  // Programs
+  async getPrograms(page = 1, pageSize = 25, search = '') {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+      ...(search && { search })
+    });
+    return this.request<any>(`/programs/?${params}`);
+  }
+
+  async getProgram(id: string) {
+    return this.request<any>(`/programs/${id}/`);
+  }
+
   // Courses
   async getCourses(page = 1, pageSize = 25, search = '') {
     const params = new URLSearchParams({

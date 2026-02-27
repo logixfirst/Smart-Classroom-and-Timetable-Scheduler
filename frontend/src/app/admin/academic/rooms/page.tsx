@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import apiClient from '@/lib/api'
 import { TableSkeleton } from '@/components/LoadingSkeletons'
+import Pagination from '@/components/Pagination'
+import { useToast } from '@/components/Toast'
 
 interface Room {
   room_id: string
@@ -23,6 +25,7 @@ interface Room {
 }
 
 export default function ClassroomsPage() {
+  const { showToast } = useToast()
   const [rooms, setRooms] = useState<Room[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isTableLoading, setIsTableLoading] = useState(false)
@@ -40,60 +43,45 @@ export default function ClassroomsPage() {
     dept_id: '',
   })
 
-  useEffect(() => {
-    loadClassrooms()
-  }, [])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [itemsPerPage, setItemsPerPage] = useState(25)
 
+  // Debounced server-side search — resets to page 1
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchTerm) {
-        loadClassrooms(true)
-      }
+    const timer = setTimeout(() => {
+      setCurrentPage(1)
+      fetchRooms()
     }, 500)
-
-    return () => clearTimeout(timeoutId)
+    return () => clearTimeout(timer)
   }, [searchTerm])
 
-  const loadClassrooms = async (isRefresh = false) => {
-    if (isRefresh) {
-      setIsTableLoading(true)
-    } else {
-      setIsLoading(true)
-    }
+  // Fetch on page / page-size change
+  useEffect(() => {
+    fetchRooms()
+  }, [currentPage, itemsPerPage])
+
+  const fetchRooms = async () => {
+    if (currentPage > 1) setIsTableLoading(true)
+    else setIsLoading(true)
     setError(null)
 
     try {
-      const all: Room[] = []
-      let page = 1
-      while (true) {
-        const response = await apiClient.getRooms(page, 100)
-        if (response.error) { setError(response.error); break }
-        if (!response.data) break
-        const items: Room[] = Array.isArray(response.data) ? response.data : response.data.results || []
-        all.push(...items)
-        const hasNext = !Array.isArray(response.data) && (response.data as any).next
-        if (!hasNext) break
-        page++
+      const response = await apiClient.getRooms(currentPage, itemsPerPage, searchTerm)
+      if (response.error) {
+        setError(response.error)
+      } else if (response.data) {
+        const data = response.data
+        setRooms(data.results || data)
+        setTotalCount(data.count || 0)
+        if (data.count) setTotalPages(Math.ceil(data.count / itemsPerPage))
       }
-      let roomData = all
-      if (searchTerm) {
-        roomData = all.filter(
-          (room: Room) =>
-            room.room_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            room.room_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            room.room_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            room.department?.dept_name?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      }
-      setRooms(roomData)
-    } catch (err) {
+    } catch {
       setError('Failed to load rooms')
     } finally {
-      if (isRefresh) {
-        setIsTableLoading(false)
-      } else {
-        setIsLoading(false)
-      }
+      setIsLoading(false)
+      setIsTableLoading(false)
     }
   }
 
@@ -105,13 +93,14 @@ export default function ClassroomsPage() {
         : await apiClient.createRoom(formData)
 
       if (response.error) {
-        alert('Failed to save room: ' + response.error)
+        showToast('error', 'Failed to save room: ' + response.error)
       } else {
-        loadClassrooms()
+        showToast('success', editingId ? 'Room updated successfully' : 'Room created successfully')
+        fetchRooms()
         resetForm()
       }
-    } catch (error) {
-      console.error('Failed to save room:', error)
+    } catch {
+      showToast('error', 'Failed to save room')
     }
   }
 
@@ -134,14 +123,9 @@ export default function ClassroomsPage() {
 
     try {
       const response = await apiClient.deleteRoom(id)
-      if (response.error) {
-        alert('Failed to delete room: ' + response.error)
-      } else {
-        loadClassrooms()
-      }
-    } catch (error) {
-      console.error('Failed to delete room:', error)
-    }
+      if (response.error) showToast('error', 'Failed to delete: ' + response.error)
+      else { showToast('success', 'Room deleted'); fetchRooms() }
+    } catch { showToast('error', 'Failed to delete room') }
   }
 
   const resetForm = () => {
@@ -151,8 +135,6 @@ export default function ClassroomsPage() {
   }
 
 
-
-  const filteredRooms = rooms
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -206,7 +188,7 @@ export default function ClassroomsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <h3 className="card-title">Rooms</h3>
-              <p className="card-description">Total: {filteredRooms.length} rooms</p>
+              <p className="card-description">Total: {totalCount} rooms</p>
             </div>
             <button onClick={() => setShowForm(true)} className="btn-primary w-full sm:w-auto">
               Add Room
@@ -225,13 +207,13 @@ export default function ClassroomsPage() {
         </div>
         {isLoading && <TableSkeleton rows={5} columns={7} />}
 
-        {!isLoading && filteredRooms.length === 0 && (
+        {!isLoading && rooms.length === 0 && (
           <div className="text-center py-12">
             <p className="text-gray-600 dark:text-gray-400">No rooms found</p>
           </div>
         )}
 
-        {!isLoading && filteredRooms.length > 0 && (
+        {!isLoading && rooms.length > 0 && (
           <div className="overflow-x-auto relative">
             {isTableLoading && (
               <div className="absolute inset-0 bg-white/70 dark:bg-gray-900/70 flex items-center justify-center z-10 rounded-lg">
@@ -254,7 +236,7 @@ export default function ClassroomsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredRooms.map(room => (
+              {rooms.map(room => (
                 <tr key={room.room_id} className="table-row">
                   <td className="table-cell font-medium">{room.room_code}</td>
                   <td className="table-cell">{room.room_number}</td>
@@ -272,6 +254,19 @@ export default function ClassroomsPage() {
               ))}
             </tbody>
           </table>
+            {totalPages > 1 && (
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalCount={totalCount}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={setCurrentPage}
+                  onItemsPerPageChange={setItemsPerPage}
+                  showItemsPerPage={true}
+                />
+              </div>
+            )}
         </div>
         )}
       </div>
