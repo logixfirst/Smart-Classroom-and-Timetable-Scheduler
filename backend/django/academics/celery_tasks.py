@@ -302,12 +302,40 @@ def fastapi_callback_task(job_id, status, variants=None, error=None):
             logger.error(f"[CALLBACK] Job {job_id} failed: {error or 'No error message'}")
         
         job.save()
-        
+
         # ── Warm Redis caches proactively on success ──────────────────────────
-        # This ensures the first review-page load is a fast cache hit rather than
-        # a cold read of the 5-50 MB timetable_data JSONField from PostgreSQL.
-        if status == 'completed' and variants:
-            _warm_review_caches(job_id, job, variants)
+        # Two call paths reach here:
+        #
+        # Path A — Django internal (variants supplied):  original flow where
+        #           variants payload is passed in directly.
+        #
+        # Path B — FastAPI fire-and-forget (variants=None):  _enqueue_cache_warm_task
+        #           in saga.py queues this task with no payload to keep the
+        #           Celery message small.  We read variants from the DB row
+        #           that FastAPI already committed before enqueueing the task.
+        #
+        if status == 'completed':
+            _variants_to_warm = variants or []
+            if not _variants_to_warm:
+                try:
+                    _fresh = GenerationJob.objects.only('timetable_data').get(
+                        id=job_id
+                    )
+                    _variants_to_warm = (
+                        _fresh.timetable_data or {}
+                    ).get('variants', [])
+                    logger.info(
+                        "[CALLBACK] Read %d variants from DB for cache warm",
+                        len(_variants_to_warm),
+                        extra={"job_id": str(job_id)},
+                    )
+                except Exception as _db_err:
+                    logger.warning(
+                        "[CALLBACK] Could not read variants from DB for cache warm",
+                        extra={"job_id": str(job_id), "error": str(_db_err)},
+                    )
+            if _variants_to_warm:
+                _warm_review_caches(job_id, job, _variants_to_warm)
 
         # Cleanup temporary Redis keys
         cache.delete(f"generation_queue:{job_id}")

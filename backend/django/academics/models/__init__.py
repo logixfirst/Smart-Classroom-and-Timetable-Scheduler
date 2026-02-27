@@ -63,6 +63,9 @@ from .timetable import (
 # User model
 from .user import User, UserSession
 
+# Timetable configuration model
+from .timetable_config import TimetableConfiguration
+
 # Export all models for backward compatibility
 __all__ = [
     # Base
@@ -95,4 +98,6 @@ __all__ = [
     # User
     'User',
     'UserSession',
+    # Config
+    'TimetableConfiguration',
 ]

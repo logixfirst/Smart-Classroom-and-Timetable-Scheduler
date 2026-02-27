@@ -3,9 +3,9 @@ Timetable Generation API Views
 Handles timetable generation, progress tracking, and approval workflow
 """
 import logging
-import os
 
 import requests
+from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 from rest_framework import status, viewsets
@@ -13,8 +13,8 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 
-from .models import Batch, Department, GenerationJob, Timetable
-from .serializers import (
+from ..models import Batch, Department, GenerationJob, Timetable
+from ..serializers import (
     GenerationJobCreateSerializer,
     GenerationJobSerializer,
     GenerationJobListSerializer,
@@ -68,7 +68,7 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         """List jobs with short-lived HTTP cache hint for the browser."""
         response = super().list(request, *args, **kwargs)
-        # Short TTL: job statuses can change (running → completed).
+        # Short TTL: job statuses can change (running -> completed).
         # 10 s is enough to benefit navigating back/forward without stale data.
         response['Cache-Control'] = 'private, max-age=10'
         return response
@@ -113,144 +113,44 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Create generation job
-        try:
-            # Get organization object
-            from .models import Organization
-            org = Organization.objects.filter(org_name=org_id).first()
-            if not org:
-                return Response(
-                    {"success": False, "error": f"Organization '{org_id}' not found"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-            
-            # Set priority value
-            priority_value = {'high': 9, 'normal': 5, 'low': 1}.get(priority, 5)
-            
-            # Get time configuration: PRIORITY ORDER
-            # 1. Use form data from request.data['config'] if provided (user just filled form)
-            # 2. Fall back to database TimetableConfiguration (cached from previous generation)
-            # 3. Use hardcoded defaults as last resort
-            from .timetable_config_models import TimetableConfiguration
-            
-            form_config = request.data.get("config")  # From generation form
-            
-            try:
-                if form_config:
-                    # User provided form data - use it directly
-                    time_config_dict = {
-                        'working_days': form_config.get('working_days', 6),
-                        'slots_per_day': form_config.get('slots_per_day', 9),
-                        'start_time': form_config.get('start_time', '08:00'),
-                        'end_time': form_config.get('end_time', '17:00'),
-                        'slot_duration_minutes': 60,
-                        'lunch_break_enabled': form_config.get('lunch_break_enabled', True),
-                        'lunch_break_start': form_config.get('lunch_break_start', '12:00'),
-                        'lunch_break_end': form_config.get('lunch_break_end', '13:00'),
-                    }
-                    logger.info(f"Using form config from request: {time_config_dict}")
-                else:
-                    # No form data - try database cache
-                    time_config = TimetableConfiguration.objects.filter(
-                        organization=org,
-                        academic_year=academic_year,
-                        semester=1 if semester == 'odd' else 2
-                    ).order_by('-last_used_at').first()
-                    
-                    if not time_config:
-                        # Fallback to latest config for this org
-                        time_config = TimetableConfiguration.objects.filter(
-                            organization=org
-                        ).order_by('-last_used_at').first()
-                    
-                    if time_config:
-                        time_config_dict = {
-                            'working_days': time_config.working_days,
-                            'slots_per_day': time_config.slots_per_day,
-                            'start_time': time_config.start_time.strftime('%H:%M'),
-                            'end_time': time_config.end_time.strftime('%H:%M'),
-                            'slot_duration_minutes': time_config.slot_duration_minutes,
-                            'lunch_break_enabled': time_config.lunch_break_enabled,
-                            'lunch_break_start': time_config.lunch_break_start.strftime('%H:%M') if time_config.lunch_break_enabled else None,
-                            'lunch_break_end': time_config.lunch_break_end.strftime('%H:%M') if time_config.lunch_break_enabled else None,
-                        }
-                        logger.info(f"Using cached config from database: {time_config_dict}")
-                        time_config.save(update_fields=['last_used_at'])
-                    else:
-                        # Use default config if none found
-                        time_config_dict = {
-                            'working_days': 6,
-                            'slots_per_day': 9,
-                            'start_time': '08:00',
-                            'end_time': '17:00',
-                            'slot_duration_minutes': 60,
-                            'lunch_break_enabled': True,
-                            'lunch_break_start': '12:00',
-                            'lunch_break_end': '13:00',
-                        }
-                        logger.warning(f"No TimetableConfiguration found, using defaults: {time_config_dict}")
-            except Exception as config_error:
-                logger.error(f"Error fetching time config: {config_error}, using defaults")
-                time_config_dict = {
-                    'working_days': 6,
-                    'slots_per_day': 9,
-                    'start_time': '08:00',
-                    'end_time': '17:00',
-                    'slot_duration_minutes': 60,
-                    'lunch_break_enabled': True,
-                    'lunch_break_start': '12:00',
-                    'lunch_break_end': '13:00',
-                }
-            
-            # Create job entry for university-wide generation
-            job = GenerationJob.objects.create(
-                organization=org,
-                status="running",  # Set to running immediately
-                progress=0,
-                # PERFORMANCE: Store in indexed fields for fast queries
-                academic_year=academic_year,
-                semester=1 if semester == 'odd' else 2,  # Normalize to int
-                timetable_data={
-                    'academic_year': academic_year,
-                    'semester': semester,
-                    'org_id': str(org_id),
-                    'priority': priority_value,
-                    'generation_type': 'full',
-                    'scope': 'university',
-                    'time_config': time_config_dict  # CRITICAL: Include time configuration
-                }
+        from ..models import Organization
+        from ..services.generation_job_service import (
+            resolve_time_config,
+            create_generation_job,
+            enqueue_job_background,
+        )
+
+        org = Organization.objects.filter(org_name=org_id).first()
+        if not org:
+            return Response(
+                {"success": False, "error": f"Organization '{org_id}' not found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
-            
-            # Return IMMEDIATELY to frontend (don't wait for Celery/FastAPI)
-            job_serializer = GenerationJobSerializer(job)
-            response_data = {
+
+        try:
+            time_config = resolve_time_config(
+                org, academic_year, semester, request.data.get("config")
+            )
+            job = create_generation_job(org, academic_year, semester, priority, time_config)
+        except Exception as exc:
+            logger.error("Error creating generation job", extra={"error": str(exc)})
+            return Response(
+                {"success": False, "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        enqueue_job_background(job, org_id, priority)
+        job_serializer = GenerationJobSerializer(job)
+        return Response(
+            {
                 "success": True,
-                "message": "Timetable generation started for all 127 departments",
+                "message": "Timetable generation started for all departments",
                 "job_id": str(job.id),
                 "estimated_time": "8-11 minutes",
                 "job": job_serializer.data,
-            }
-            
-            # CRITICAL: Return response FIRST, then queue job in background
-            # This prevents frontend from waiting for FastAPI connection
-            response = Response(response_data, status=status.HTTP_201_CREATED)
-            
-            # Queue job AFTER response is created (async, non-blocking)
-            import threading
-            threading.Thread(
-                target=self._queue_generation_job,
-                args=(job, org_id, priority),
-                daemon=True
-            ).start()
-            
-            return response
-
-        except Exception as e:
-            logger.error(f"Error creating generation job: {str(e)}")
-            return Response(
-                {"success": False, "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["get"], url_path="status")
     def get_status(self, request, pk=None):
@@ -296,7 +196,7 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
             
             # Also call FastAPI cancel endpoint
             try:
-                fastapi_url = os.getenv("FASTAPI_AI_SERVICE_URL", "http://localhost:8001")
+                fastapi_url = settings.FASTAPI_URL
                 response = requests.post(
                     f"{fastapi_url}/api/cancel/{job.id}",
                     timeout=5

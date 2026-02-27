@@ -287,52 +287,126 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/1")
 # Upstash Redis uses TLS - detect and configure accordingly
 REDIS_USE_TLS = REDIS_URL.startswith("rediss://")
 
-CACHE_OPTIONS = {
-    "CLIENT_CLASS": "django_redis.client.DefaultClient",
-    "IGNORE_EXCEPTIONS": DEBUG == False,  # Only ignore exceptions in production
-    "CONNECTION_POOL_KWARGS": {
-        "max_connections": 50,
-        "retry_on_timeout": True,
-        "socket_keepalive": True,
-        "socket_keepalive_options": {
-            1: 1,  # TCP_KEEPIDLE
-            2: 1,  # TCP_KEEPINTVL  
-            3: 3,  # TCP_KEEPCNT
-        } if os.name != 'nt' else {},  # Windows doesn't support these options
-    },
-    "SOCKET_CONNECT_TIMEOUT": 30,  # Increased timeout for Upstash
-    "SOCKET_TIMEOUT": 30,
-    "RETRY_ON_TIMEOUT": True,
-}
+# ============================================================
+# ENTERPRISE REDIS CONFIGURATION  (Google / Netflix grade)
+# ============================================================
+# DB layout:
+#   DB 1  — application cache  (default alias)
+#   DB 2  — session store      (session alias)
+#
+# Tuning knobs:
+#   max_connections   200   — sustain ~200 concurrent Django workers
+#   socket_timeout     5 s  — fail-fast; don't block workers on a dead Redis
+#   COMPRESSOR zlib        — ~3-5× size reduction for large querysets
+#   VERSION             1   — bump to invalidate the whole keyspace without
+#                             touching Redis (zero-downtime schema migration)
+# ============================================================
 
-# Add TLS/SSL support for Upstash Redis
+def _build_pool_kwargs(max_conn: int) -> dict:
+    """Build connection-pool kwargs; keep Windows-safe."""
+    kwargs: dict = {
+        "max_connections": max_conn,
+        "retry_on_timeout": True,
+        "socket_connect_timeout": 5,
+        "socket_timeout": 5,
+        "health_check_interval": 30,   # ping idle connections every 30 s
+    }
+    if os.name != "nt":   # Linux/macOS: enable TCP keepalive to detect dead peers
+        kwargs["socket_keepalive"] = True
+        kwargs["socket_keepalive_options"] = {
+            1: 10,   # TCP_KEEPIDLE  – start probing after 10 s idle
+            2: 5,    # TCP_KEEPINTVL – probe every 5 s
+            3: 3,    # TCP_KEEPCNT   – drop after 3 missed probes
+        }
+    return kwargs
+
+
+_POOL_KWARGS_APP     = _build_pool_kwargs(200)
+_POOL_KWARGS_SESSION = _build_pool_kwargs(50)
+
+# TLS override for Upstash / Redis Cloud
 if REDIS_USE_TLS:
-    import ssl
-    CACHE_OPTIONS["CONNECTION_POOL_KWARGS"]["ssl_cert_reqs"] = ssl.CERT_NONE
-    CACHE_OPTIONS["CONNECTION_POOL_KWARGS"]["ssl_check_hostname"] = False
+    import ssl as _ssl
+    _TLS_EXTRAS = {
+        "ssl_cert_reqs": _ssl.CERT_NONE,
+        "ssl_check_hostname": False,
+    }
+    _POOL_KWARGS_APP.update(_TLS_EXTRAS)
+    _POOL_KWARGS_SESSION.update(_TLS_EXTRAS)
+
+
+def _redis_db(url: str, db: int) -> str:
+    """Return the URL with a specific Redis DB index."""
+    import re
+    return re.sub(r"/\d+$", f"/{db}", url) if re.search(r"/\d+$", url) else f"{url}/{db}"
+
 
 CACHES = {
+    # ── Application cache (DB 1) ──────────────────────────────────────────────
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": REDIS_URL,
-        "OPTIONS": CACHE_OPTIONS,
-        "KEY_PREFIX": "sih28",
-        "TIMEOUT": 300,  # 5 minutes default
-    }
+        "LOCATION": _redis_db(REDIS_URL, 1),
+        "TIMEOUT": 300,          # 5-min global default; each view overrides per-model
+        "VERSION": 1,            # bump → whole keyspace instantly obsolete
+        "KEY_PREFIX": "sih28",   # sih28:1:<key> – avoids collisions with other apps
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            # Silently return None on Redis failure → app degrades gracefully
+            "IGNORE_EXCEPTIONS": True,
+            "CONNECTION_POOL_KWARGS": _POOL_KWARGS_APP,
+            "SOCKET_CONNECT_TIMEOUT": 5,
+            "SOCKET_TIMEOUT": 5,
+            "RETRY_ON_TIMEOUT": True,
+            # zlib compression – transparent to callers, saves ~70 % on JSON payloads
+            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+            # Pickle serialiser supports all Python types (datetime, Decimal, UUID …)
+            "SERIALIZER": "django_redis.serializers.pickle.PickleSerializer",
+        },
+    },
+    # ── Session store (DB 2) — kept on Redis for sub-ms auth lookups ─────────
+    "session": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": _redis_db(REDIS_URL, 2),
+        "TIMEOUT": 1_209_600,    # 14 days — matches SESSION_COOKIE_AGE
+        "KEY_PREFIX": "sih28:sess",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "IGNORE_EXCEPTIONS": True,
+            "CONNECTION_POOL_KWARGS": _POOL_KWARGS_SESSION,
+            "SOCKET_CONNECT_TIMEOUT": 5,
+            "SOCKET_TIMEOUT": 5,
+            "RETRY_ON_TIMEOUT": True,
+            "SERIALIZER": "django_redis.serializers.pickle.PickleSerializer",
+        },
+    },
 }
+
+# Use Redis-backed sessions (sub-ms lookups vs. DB sessions)
+SESSION_ENGINE      = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "session"
 
 # Cache key prefix for different environments
 CACHE_MIDDLEWARE_ALIAS = "default"
 CACHE_MIDDLEWARE_SECONDS = 300
 CACHE_MIDDLEWARE_KEY_PREFIX = f"sih28_{SENTRY_ENVIRONMENT}"
 
+# ── TTL constants shared with cache_service.py ─────────────────────────────
+#   Imported via: from django.conf import settings → settings.CACHE_TTL_*
+CACHE_TTL_FLASH     = 30          # live stats (never stale for long)
+CACHE_TTL_SHORT     = 60          # 1 min  – rapidly changing data
+CACHE_TTL_MEDIUM    = 300         # 5 min  – moderate churn (students, faculty)
+CACHE_TTL_LONG      = 900         # 15 min – stable lists (courses, rooms)
+CACHE_TTL_VERY_LONG = 3_600       # 1 hr   – near-static (buildings, schools)
+CACHE_TTL_ETERNAL   = 86_400      # 24 hr  – config / lookup tables
+
 # FastAPI AI Service URL
 FASTAPI_URL = os.getenv("FASTAPI_URL", "http://localhost:8001")
 
-# Celery Configuration
+# Celery Configuration  (DB 3 – isolated from app cache and sessions)
 import ssl
-CELERY_BROKER_URL = REDIS_URL
-CELERY_RESULT_BACKEND = REDIS_URL
+_CELERY_REDIS_URL = _redis_db(REDIS_URL, 3)
+CELERY_BROKER_URL = _CELERY_REDIS_URL
+CELERY_RESULT_BACKEND = _CELERY_REDIS_URL
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'

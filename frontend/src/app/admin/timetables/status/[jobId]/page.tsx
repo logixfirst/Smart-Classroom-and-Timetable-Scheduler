@@ -320,31 +320,59 @@ export default function TimetableStatusPage() {
     return () => { cancelled = true; clearInterval(id) }
   }, [sseTimedOut, progress, jobId])
 
-  // ── Success countdown + redirect ─────────────────────────────────────────────
+  // ── Success: warm caches, then redirect ────────────────────────────────────
+  //
+  // Strategy (Google SRE "cache-aside + preflight" pattern):
+  //   1. Start warmup fetch for both Django cache endpoints immediately.
+  //   2. Run a 3-second minimum display timer concurrently.
+  //   3. Redirect when BOTH (a) 3 s elapsed AND (b) warmup responded.
+  //   4. Cap warmup wait at WARMUP_TIMEOUT_MS so UX is never stuck.
+  //
+  // With the Celery pre-warm fix on the backend, warmup typically resolves
+  // in < 500 ms (Redis cache hit), so effective redirect delay ≈ 3 s.
+  // Without the fix (cold cache), warmup resolves in ≤ WARMUP_TIMEOUT_MS,
+  // after which the review page fires its own fresh request and finds a
+  // warmer (or warm by now) cache.
   useEffect(() => {
     if (progress?.status !== 'completed') return
     setCountdown(3)
 
-    // Prefetch the review page shell so Next.js has it ready before we redirect.
+    // Prefetch the review page bundle so Next.js has it ready to paint.
     router.prefetch(`/admin/timetables/${jobId}/review`)
 
-    // Warm the server-side Redis cache during the 3-second idle window.
-    // These are fire-and-forget: we don't await the results because we only
-    // care that Django has a chance to populate its Redis keys before the
-    // review page loads (where workflowId === jobId).
     const API = process.env.NEXT_PUBLIC_DJANGO_API_URL ?? 'http://localhost:8000'
-    Promise.all([
-      fetch(`${API}/api/timetable/workflows/${jobId}/`,          { credentials: 'include' }),
-      fetch(`${API}/api/timetable/variants/?job_id=${jobId}`,    { credentials: 'include' }),
-    ]).catch(() => { /* warm-up is best-effort; ignore transient errors */ })
+    // Cap: so user is never held more than WARMUP_TIMEOUT_MS beyond the 3 s floor
+    const WARMUP_TIMEOUT_MS = 8_000
+    let didRedirect = false
 
+    const warmupPromise = Promise.all([
+      fetch(`${API}/api/timetable/workflows/${jobId}/`,       { credentials: 'include' }),
+      fetch(`${API}/api/timetable/variants/?job_id=${jobId}`, { credentials: 'include' }),
+    ]).catch(() => { /* best-effort; network errors are non-fatal */ })
+
+    // Redirect gate: both the min-display floor AND cache warmup must pass.
+    Promise.all([
+      new Promise<void>(resolve => setTimeout(resolve, 3_000)),
+      Promise.race([
+        warmupPromise,
+        new Promise<void>(resolve => setTimeout(resolve, WARMUP_TIMEOUT_MS)),
+      ]),
+    ]).then(() => {
+      if (!didRedirect) {
+        didRedirect = true
+        router.push(`/admin/timetables/${jobId}/review`)
+      }
+    })
+
+    // Countdown display is cosmetic only — redirect is controlled by the gate.
     const tick = setInterval(() => {
-      setCountdown(c => {
-        if (c <= 1) { clearInterval(tick); router.push(`/admin/timetables/${jobId}/review`); return 0 }
-        return c - 1
-      })
+      setCountdown(c => (c > 1 ? c - 1 : 0))
     }, 1000)
-    return () => clearInterval(tick)
+
+    return () => {
+      didRedirect = true
+      clearInterval(tick)
+    }
   }, [progress?.status, router, jobId])
 
   // ── Derived colour values — blue-deepening (accessible; no red/green) ─────────
@@ -464,7 +492,9 @@ export default function TimetableStatusPage() {
             Timetable Ready
           </h2>
           <p className="text-[#64748B] text-[15px] mb-8">
-            Opening review page{countdown > 0 ? ` in ${countdown}...` : '...'}
+            {countdown > 0
+              ? `Preparing timetable data\u2026 ${countdown}`
+              : 'Opening review page\u2026'}
           </p>
           <div className="w-full overflow-hidden mb-8 complete-track">
             <div className="complete-fill" />

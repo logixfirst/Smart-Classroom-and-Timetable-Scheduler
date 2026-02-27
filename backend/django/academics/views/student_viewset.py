@@ -12,7 +12,7 @@ from ..serializers import StudentSerializer
 
 
 class StudentViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet):
-    """Enhanced Student ViewSet with automatic sync to User"""
+    """Enhanced Student ViewSet with automatic sync to User."""
     
     queryset = Student.objects.all().order_by("roll_number")
     serializer_class = StudentSerializer
@@ -24,6 +24,9 @@ class StudentViewSet(DataSyncMixin, PerformanceMetricsMixin, SmartCachedViewSet)
         "current_year",
         "current_semester",
     ]
+    # Students can be updated (marks, semester promotions) — moderate TTL
+    cache_list_timeout   = 300     # 5 min
+    cache_detail_timeout = 1_800   # 30 min
 
     def get_queryset(self):
         """Optimized queryset to prevent N+1 queries"""

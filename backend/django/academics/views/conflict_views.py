@@ -7,8 +7,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.core.cache import cache
 
-from .models import GenerationJob
-from .conflict_service import ConflictDetectionService
+from ..models import GenerationJob
+from ..services.conflict_service import ConflictDetectionService
 from core.rbac import CanViewTimetable
 
 

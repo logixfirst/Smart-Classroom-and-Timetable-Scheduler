@@ -4,7 +4,7 @@ Stores user preferences for timetable generation
 """
 import uuid
 from django.db import models
-from .models import Organization
+from .base import Organization
 
 
 class TimetableConfiguration(models.Model):

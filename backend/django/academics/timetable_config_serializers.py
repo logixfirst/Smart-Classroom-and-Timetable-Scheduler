@@ -2,7 +2,7 @@
 Timetable Configuration Serializers
 """
 from rest_framework import serializers
-from .timetable_config_models import TimetableConfiguration
+from .models import TimetableConfiguration
 
 
 class TimetableConfigurationSerializer(serializers.ModelSerializer):

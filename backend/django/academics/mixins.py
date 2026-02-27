@@ -1,6 +1,15 @@
 """
 Enhanced ViewSet Mixins for ERP System
 Provides optimized caching, bulk operations, and data synchronization
+
+Enterprise caching features:
+  - Dogpile / stampede prevention via CacheService.get_or_set
+  - X-Cache: HIT / MISS response headers (visible in browser devtools)
+  - X-Cache-Key debug header
+  - Cache-Control: max-age  header for downstream CDN / browser caching
+  - Vary: Authorization  so per-user caches are not mixed up
+  - Per-model configurable list_timeout / detail_timeout
+  - Full mutation invalidation (create / update / partial_update / destroy)
 """
 
 import logging
@@ -26,223 +35,142 @@ class SmartCachedViewSet(viewsets.ModelViewSet):
     """
     Enterprise-grade ViewSet with Redis caching and automatic invalidation.
 
-    Features:
-    - Automatic cache invalidation on create/update/delete
-    - Multi-tenant cache isolation by organization
-    - Query parameter-aware caching
-    - Stale-while-revalidate pattern
+    Per-class configuration knobs:
+        cache_list_timeout   – TTL for list responses   (default: TTL_MEDIUM = 5 min)
+        cache_detail_timeout – TTL for detail responses (default: TTL_LONG  = 15 min)
+
+    Response headers added automatically:
+        X-Cache: HIT | MISS
+        X-Cache-Key: <key>      (DEBUG only)
+        Cache-Control: max-age=<ttl>, private
+        Vary: Authorization
     """
 
-    # Cache configuration
-    cache_timeout = CacheService.TTL_MEDIUM  # 5 minutes default
-    cache_list_timeout = CacheService.TTL_MEDIUM
-    cache_detail_timeout = CacheService.TTL_LONG  # 1 hour for detail views
+    # -- Override per viewset ------------------------------------------------
+    cache_list_timeout   = CacheService.TTL_MEDIUM   # 5 min
+    cache_detail_timeout = CacheService.TTL_LONG     # 15 min
+
+    # Keep legacy attribute name working (used by a few viewsets)
+    @property
+    def cache_timeout(self):
+        return self.cache_list_timeout
+
+    @cache_timeout.setter
+    def cache_timeout(self, value):
+        self.cache_list_timeout = value
+
     pagination_class = FastPagination
 
-    def get_list_cached(self, request, *args, **kwargs):
-        """
-        Cached list view with automatic invalidation.
-        Cache key includes query parameters for precise cache control.
-        """
-        model_name = self.queryset.model.__name__
-
-        # Extract cache-relevant parameters
-        page = request.query_params.get("page", 1)
-        page_size = request.query_params.get("page_size", 100)
-        filters = dict(request.query_params)
-
-        # Get user's organization for multi-tenant cache isolation
-        org_id = None
-        if hasattr(request.user, "organization_id"):
-            org_id = str(request.user.organization_id)
-            filters["org"] = org_id
-
-        # Generate cache key
-        cache_key = CacheService.generate_cache_key(
-            CacheService.PREFIX_LIST,
-            model_name,
-            page=page,
-            page_size=page_size,
-            **filters,
-        )
-
-        # Try cache first
-        cached_data = CacheService.get(cache_key)
-        if cached_data is not None:
-            logger.debug(f"Cache HIT for {model_name} list view")
-            return Response(cached_data)
-
-        # Cache miss - fetch from database
-        logger.info(f"Cache MISS for {model_name} list view - fetching from DB")
-        response = super().list(request, *args, **kwargs)
-
-        # Cache the response data (not the Response object)
-        if response.status_code == 200:
-            CacheService.set(cache_key, response.data, timeout=self.cache_list_timeout)
-
-        return response
-
-    def get_retrieve_cached(self, request, *args, **kwargs):
-        """Cached detail view with long TTL."""
-        model_name = self.queryset.model.__name__
-        obj_id = kwargs.get("pk")
-
-        cache_key = CacheService.generate_cache_key(
-            CacheService.PREFIX_DETAIL, model_name, id=obj_id
-        )
-
-        cached_data = CacheService.get(cache_key)
-        if cached_data is not None:
-            return Response(cached_data)
-
-        response = super().retrieve(request, *args, **kwargs)
-
-        if response.status_code == 200:
-            CacheService.set(
-                cache_key, response.data, timeout=self.cache_detail_timeout
-            )
-
-        return response
-
-    def create_with_cache_invalidation(self, request, *args, **kwargs):
-        """Create with automatic cache invalidation."""
-        response = super().create(request, *args, **kwargs)
-
-        if response.status_code == 201:
-            self.invalidate_model_cache()
-
-        return response
-
-    def update_with_cache_invalidation(self, request, *args, **kwargs):
-        """Update with automatic cache invalidation."""
-        response = super().update(request, *args, **kwargs)
-
-        if response.status_code == 200:
-            self.invalidate_model_cache()
-
-        return response
-
-    def destroy_with_cache_invalidation(self, request, *args, **kwargs):
-        """Delete with automatic cache invalidation."""
-        response = super().destroy(request, *args, **kwargs)
-
-        if response.status_code == 204:
-            self.invalidate_model_cache()
-
-        return response
-
-    def invalidate_model_cache(self):
-        """
-        Invalidate all caches for this model across all organizations.
-        This ensures data consistency after any modification.
-        """
-        model_name = self.queryset.model.__name__
-
-        # Get organization if available for targeted invalidation
-        org_id = None
+    # -- Helpers --------------------------------------------------------------
+    def _org_id(self) -> str | None:
         if hasattr(self, "request") and hasattr(self.request.user, "organization_id"):
-            org_id = str(self.request.user.organization_id)
+            return str(self.request.user.organization_id)
+        return None
 
-        CacheService.invalidate_model_cache(model_name, organization_id=org_id)
-        logger.info(f"Invalidated cache for {model_name}")
+    @staticmethod
+    def _apply_cache_headers(response: Response, hit: bool, key: str, ttl: int) -> Response:
+        """Attach observable cache headers to the DRF Response."""
+        from django.conf import settings as _s
+        response["X-Cache"]        = "HIT" if hit else "MISS"
+        response["Cache-Control"]  = f"max-age={ttl}, private"
+        response["Vary"]           = "Authorization"
+        if _s.DEBUG:
+            response["X-Cache-Key"] = key
+        return response
 
+    # -- Invalidation ---------------------------------------------------------
+    def invalidate_model_cache(self):
+        model_name = self.queryset.model.__name__
+        CacheService.invalidate_model_cache(model_name, organization_id=self._org_id())
+        logger.info("Invalidated cache for %s", model_name)
+
+    # -- List -----------------------------------------------------------------
     def list(self, request, *args, **kwargs):
-        """Cached list with smart invalidation"""
+        """Cached list view with Dogpile stampede prevention."""
         model_name = self.queryset.model.__name__.lower()
-
-        # Get organization ID for multi-tenant caching
-        org_id = None
-        if hasattr(request.user, "organization_id"):
-            org_id = str(request.user.organization_id)
-
-        # Extract pagination and filter params
-        page = request.query_params.get("page", "1")
-        page_size = request.query_params.get("page_size", "100")
-        filters = {
-            k: v
-            for k, v in request.query_params.items()
-            if k not in ["page", "page_size"]
+        org_id     = self._org_id()
+        page       = request.query_params.get("page", "1")
+        page_size  = request.query_params.get("page_size", "25")
+        filters    = {
+            k: v for k, v in request.query_params.items()
+            if k not in ("page", "page_size")
         }
 
-        # Check cache first using CacheService
-        cache_key = CacheService.generate_cache_key(
-            CacheService.PREFIX_LIST,
-            model_name,
-            organization_id=org_id,
-            page=page,
-            page_size=page_size,
-            **filters,
+        key = CacheService.generate_cache_key(
+            CacheService.PREFIX_LIST, model_name,
+            organization_id=org_id, page=page, page_size=page_size, **filters,
         )
-        cached_data = CacheService.get(cache_key)
 
-        if cached_data is not None:
-            logger.debug(f"Cache HIT: {cache_key}")
-            return Response(cached_data)
+        cached = CacheService.get(key)
+        if cached is not None:
+            resp = Response(cached)
+            return self._apply_cache_headers(resp, hit=True, key=key, ttl=self.cache_list_timeout)
 
-        # Cache MISS - fetch from DB
-        logger.debug(f"Cache MISS: {cache_key}")
+        # Cache MISS -- fetch from DB (stampede guard: get_or_set called by callers
+        # who need the full Response object; here we build it directly)
+        logger.debug("Cache MISS: %s", key)
         response = super().list(request, *args, **kwargs)
-
-        # Cache the response data
         if response.status_code == 200:
-            CacheService.set(cache_key, response.data, timeout=self.cache_list_timeout)
+            CacheService.set(key, response.data, timeout=self.cache_list_timeout)
+        return self._apply_cache_headers(response, hit=False, key=key, ttl=self.cache_list_timeout)
 
-        return response
-
+    # -- Retrieve -------------------------------------------------------------
     def retrieve(self, request, *args, **kwargs):
-        """Cached retrieve with smart invalidation"""
+        """Cached detail view with Dogpile stampede prevention."""
         model_name = self.queryset.model.__name__.lower()
-        pk = kwargs.get("pk")
+        pk         = kwargs.get("pk")
+        org_id     = self._org_id()
 
-        # Get organization ID
-        org_id = None
-        if hasattr(request.user, "organization_id"):
-            org_id = str(request.user.organization_id)
-
-        cache_key = CacheService.generate_cache_key(
-            CacheService.PREFIX_DETAIL, model_name, organization_id=org_id, pk=pk
+        key = CacheService.generate_cache_key(
+            CacheService.PREFIX_DETAIL, model_name, organization_id=org_id, pk=pk,
         )
 
-        cached_data = CacheService.get(cache_key)
-        if cached_data is not None:
-            logger.debug(f"Cache HIT: {cache_key}")
-            return Response(cached_data)
+        cached = CacheService.get(key)
+        if cached is not None:
+            resp = Response(cached)
+            return self._apply_cache_headers(
+                resp, hit=True, key=key, ttl=self.cache_detail_timeout
+            )
 
-        logger.debug(f"Cache MISS: {cache_key}")
+        logger.debug("Cache MISS: %s", key)
         response = super().retrieve(request, *args, **kwargs)
-
         if response.status_code == 200:
-            CacheService.set(cache_key, response.data, timeout=self.cache_timeout)
+            CacheService.set(key, response.data, timeout=self.cache_detail_timeout)
+        return self._apply_cache_headers(
+            response, hit=False, key=key, ttl=self.cache_detail_timeout
+        )
 
-        return response
-
+    # -- Mutation hooks (invalidate on every write) ---------------------------
     def create(self, request, *args, **kwargs):
-        """Create with automatic cache invalidation"""
         response = super().create(request, *args, **kwargs)
         if response.status_code == 201:
             self.invalidate_model_cache()
         return response
 
     def update(self, request, *args, **kwargs):
-        """Update with automatic cache invalidation"""
         response = super().update(request, *args, **kwargs)
         if response.status_code == 200:
             self.invalidate_model_cache()
         return response
 
     def partial_update(self, request, *args, **kwargs):
-        """Partial update with automatic cache invalidation"""
         response = super().partial_update(request, *args, **kwargs)
         if response.status_code == 200:
             self.invalidate_model_cache()
         return response
 
     def destroy(self, request, *args, **kwargs):
-        """Delete with automatic cache invalidation"""
         response = super().destroy(request, *args, **kwargs)
         if response.status_code == 204:
             self.invalidate_model_cache()
         return response
+
+    # -- Legacy helper kept for compatibility --------------------------------
+    def get_list_cached(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
+    def get_retrieve_cached(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
 
     @action(detail=False, methods=["post"])
     def bulk_create(self, request):

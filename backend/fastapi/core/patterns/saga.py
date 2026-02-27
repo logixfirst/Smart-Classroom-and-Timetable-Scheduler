@@ -68,6 +68,53 @@ _GREEDY_FALLBACK_SENTINEL = '__UNSCHEDULED__'
 logger = logging.getLogger(__name__)
 
 
+def _enqueue_cache_warm_task(job_id: str) -> None:
+    """Enqueue Django's ``fastapi_callback_task`` immediately after a successful
+    DB persist so that Django's Redis caches (variants_list_*, variant_entries_*)
+    are populated **before** the SSE 'completed' event reaches the frontend.
+
+    Design notes (Google/Meta cache-aside pattern):
+    - FastAPI writes the DB directly via psycopg2, bypassing Celery entirely.
+    - Without this call, ``fastapi_callback_task`` is NEVER queued, so Django
+      caches stay cold — every first review-page visit cold-reads a 5-50 MB
+      JSONB column from Neon, taking 20-30 s.
+    - This function creates a minimal Celery *producer* (no Django app needed)
+      and publishes the task.  The Django Celery worker picks it up in <200 ms
+      on the same Redis broker and warms all cache keys.
+    - Fire-and-forget: a failure here is non-fatal; the review page degrades
+      gracefully to a slower cold read.
+    - ``variants`` is intentionally omitted from the task kwargs so we stay
+      under the Celery Redis message-size limit (~64 KB default).  The task
+      reads variants from the DB itself (see ``fastapi_callback_task``).
+
+    Args:
+        job_id: UUID string of the ``GenerationJob`` row just committed.
+    """
+    try:
+        broker_url = os.getenv(
+            'CELERY_BROKER_URL',
+            os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
+        )
+        from celery import Celery as _CeleryProducer  # lightweight producer only
+        _app = _CeleryProducer(broker=broker_url)
+        _app.send_task(
+            'academics.celery_tasks.fastapi_callback_task',
+            args=[job_id, 'completed'],
+            kwargs={},
+            queue='celery',   # Django's default Celery queue name
+        )
+        logger.info(
+            "[SAGA-PERSIST] Cache-warm task enqueued",
+            extra={"job_id": job_id},
+        )
+    except Exception as exc:
+        logger.warning(
+            "[SAGA-PERSIST] Cache-warm enqueue failed (non-fatal) — "
+            "first review-page load may be slower",
+            extra={"job_id": job_id, "error": str(exc)},
+        )
+
+
 # ---------------------------------------------------------------------------
 # OPT1: Top-level worker for ProcessPoolExecutor.
 # MUST be module-level (not a method) so Python's pickle can find it.
@@ -1073,6 +1120,11 @@ class TimetableGenerationSaga:
                     f"[SAGA-PERSIST] ✅ Job {job_id} updated: "
                     f"{len(timetable_entries)} entries, status=completed"
                 )
+                # ── Step 4: Trigger Django cache warm-up ─────────────────────
+                # Warm Redis caches NOW (before tracker.mark_completed() fires
+                # the SSE 'completed' event).  This gives the Celery worker the
+                # maximum lead time before the browser lands on the review page.
+                _enqueue_cache_warm_task(job_id)
 
         except Exception as db_err:
             logger.error(f"[SAGA-PERSIST] DB write failed: {db_err}")

@@ -5,13 +5,10 @@ Industry-standard JWT authentication with HttpOnly cookies
 
 import hashlib
 import logging
-import secrets
 
 from django.contrib.auth import authenticate
 from django.conf import settings
 from django.core.cache import cache
-from django.core.exceptions import ValidationError
-from django.contrib.auth.password_validation import validate_password
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -35,7 +32,7 @@ def _get_device_fingerprint(request) -> str:
     """
     Derive a short device fingerprint from the User-Agent header.
     Returns the first 16 hex chars of SHA-256(user_agent).
-    Pure function — no DB calls, no side effects.
+    Pure function -- no DB calls, no side effects.
     """
     user_agent = request.META.get("HTTP_USER_AGENT", "")
     return hashlib.sha256(user_agent.encode("utf-8", errors="replace")).hexdigest()[:16]
@@ -99,7 +96,7 @@ def login_view(request):
     # Per-account lockout check (bypasses IP rotation)
     if _is_account_locked(username):
         logger.warning(
-            "Login blocked — account locked",
+            "Login blocked -- account locked",
             extra={"username": username},
         )
         log_security_event("login_locked", request, metadata={"username": username})
@@ -133,14 +130,14 @@ def login_view(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    # Successful login — clear any previous failure counter
+    # Successful login -- clear any previous failure counter
     _clear_failed_attempts(username)
 
     # Generate JWT tokens
     refresh = RefreshToken.for_user(user)
     refresh["device_fp"] = _get_device_fingerprint(request)  # FIX 1: device fingerprint claim
     refresh_jti = str(refresh["jti"])                         # FIX 1: refresh token JTI
-    refresh.access_token["session_jti"] = refresh_jti         # FIX 1: link access → session
+    refresh.access_token["session_jti"] = refresh_jti         # FIX 1: link access -> session
     access_token = str(refresh.access_token)
     refresh_token = str(refresh)
 
@@ -367,191 +364,3 @@ def refresh_token_view(request):
             {"error": f"Token refresh failed: {str(e)}"},
             status=status.HTTP_400_BAD_REQUEST,
         )
-
-
-# =============================================================================
-# FIX 2 — PASSWORD RESET FLOW
-# =============================================================================
-
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def password_reset_request_view(request):
-    """Request a password reset token (15-min TTL, single-use, stored in cache)."""
-    email = request.data.get("email", "").strip().lower()
-    if not email:
-        return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        user = User.objects.get(email=email)
-        token = secrets.token_urlsafe(32)
-        cache.set(f"pwd_reset:{token}", str(user.id), timeout=900)  # 15 min TTL
-        logger.info(
-            "password_reset_requested",
-            extra={"user_id": str(user.id), "ip": request.META.get("REMOTE_ADDR")},
-        )
-        log_security_event("password_reset", request, user=user)
-        # TODO EMAIL SENDING: integrate with Django email backend
-        # send_mail(subject, reset_url, settings.DEFAULT_FROM_EMAIL, [user.email])
-    except User.DoesNotExist:
-        pass  # Never reveal whether the email is registered
-
-    # Always 200 — do not expose email enumeration
-    return Response(
-        {"message": "If that email is registered, a reset link has been sent."},
-        status=status.HTTP_200_OK,
-    )
-
-
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def password_reset_confirm_view(request):
-    """Confirm a password reset; invalidates the token and all active sessions."""
-    token = request.data.get("token", "").strip()
-    new_password = request.data.get("new_password", "")
-
-    if not token or not new_password:
-        return Response(
-            {"error": "token and new_password are required."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    user_id = cache.get(f"pwd_reset:{token}")
-    if not user_id:
-        return Response(
-            {"error": "Invalid or expired token."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    try:
-        user = User.objects.get(id=user_id)
-    except User.DoesNotExist:
-        return Response({"error": "Invalid or expired token."}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        validate_password(new_password, user=user)
-    except ValidationError as exc:
-        return Response({"error": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
-
-    user.set_password(new_password)
-    user.save(update_fields=["password"])
-    cache.delete(f"pwd_reset:{token}")  # single-use: destroy immediately
-
-    # Blacklist every outstanding refresh token so stolen sessions are killed
-    for outstanding in OutstandingToken.objects.filter(user=user):
-        BlacklistedToken.objects.get_or_create(token=outstanding)
-
-    logger.info(
-        "password_reset_completed",
-        extra={"user_id": str(user.id), "ip": request.META.get("REMOTE_ADDR")},
-    )
-    return Response(
-        {"message": "Password reset successful. Please login again."},
-        status=status.HTTP_200_OK,
-    )
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def password_change_view(request):
-    """Change password for the currently authenticated user."""
-    current_password = request.data.get("current_password", "")
-    new_password = request.data.get("new_password", "")
-
-    if not current_password or not new_password:
-        return Response(
-            {"error": "current_password and new_password are required."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    user = request.user
-    if not user.check_password(current_password):
-        logger.warning(
-            "password_change_wrong_current",
-            extra={"user_id": str(user.id), "ip": request.META.get("REMOTE_ADDR")},
-        )
-        return Response({"error": "Current password incorrect."}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        validate_password(new_password, user=user)
-    except ValidationError as exc:
-        return Response({"error": exc.messages}, status=status.HTTP_400_BAD_REQUEST)
-
-    user.set_password(new_password)
-    user.save(update_fields=["password"])
-    logger.info(
-        "password_changed",
-        extra={"user_id": str(user.id), "ip": request.META.get("REMOTE_ADDR")},
-    )
-    log_security_event("password_changed", request, user=user)
-    return Response({"message": "Password changed successfully."}, status=status.HTTP_200_OK)
-
-
-# =============================================================================
-# FIX 1 PART C — SESSION MANAGEMENT
-# =============================================================================
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def list_sessions_view(request):
-    """List all active sessions for the authenticated user."""
-    from rest_framework_simplejwt.tokens import AccessToken as AT
-
-    # Determine the current session jti from the access token cookie
-    current_session_jti = None
-    access_cookie = request.COOKIES.get(getattr(settings, "JWT_AUTH_COOKIE", "access_token"))
-    if access_cookie:
-        try:
-            token_obj = AT(access_cookie)
-            current_session_jti = token_obj.get("session_jti")
-        except Exception:
-            pass
-
-    sessions = (
-        UserSession.objects.filter(user=request.user, is_active=True)
-        .order_by("-last_active")
-        .values("jti", "device_info", "ip_address", "created_at", "last_active")
-    )
-    results = [
-        {
-            "jti": s["jti"],                      # full JTI — needed by revoke endpoint
-            "jti_display": s["jti"][-8:],          # last 8 chars for UI display only
-            "device_info": s["device_info"],
-            "ip_address": s["ip_address"],
-            "created_at": s["created_at"],
-            "last_active": s["last_active"],
-            "is_current": s["jti"] == current_session_jti,
-        }
-        for s in sessions
-    ]
-    return Response({"sessions": results}, status=status.HTTP_200_OK)
-
-
-@api_view(["DELETE"])
-@permission_classes([IsAuthenticated])
-def revoke_session_view(request, jti: str):
-    """Revoke a specific session by its JTI. IDOR-safe: verifies ownership."""
-    try:
-        session = UserSession.objects.get(jti=jti, is_active=True)
-    except UserSession.DoesNotExist:
-        return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
-
-    # IDOR protection: only the session owner may revoke it
-    if session.user_id != request.user.id:
-        logger.warning(
-            "session_revoke_idor_attempt",
-            extra={"requester": str(request.user.id), "owner": str(session.user_id), "jti": jti},
-        )
-        return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
-
-    session.is_active = False
-    session.save(update_fields=["is_active"])
-
-    # Blacklist the corresponding refresh token in SimpleJWT
-    for outstanding in OutstandingToken.objects.filter(jti=jti):
-        BlacklistedToken.objects.get_or_create(token=outstanding)
-
-    logger.info(
-        "session_revoked",
-        extra={"user_id": str(request.user.id), "jti": jti, "ip": _get_client_ip(request)},
-    )
-    return Response({"message": "Session revoked."}, status=status.HTTP_200_OK)

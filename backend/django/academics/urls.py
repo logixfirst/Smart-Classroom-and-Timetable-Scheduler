@@ -1,53 +1,58 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .generation_views import GenerationJobViewSet
-from .timetable_views import (
+from .views import (
+    # Auth
+    login_view,
+    logout_view,
+    current_user_view,
+    refresh_token_view,
+    password_reset_request_view,
+    password_reset_confirm_view,
+    password_change_view,
+    list_sessions_view,
+    revoke_session_view,
+    # Dashboard
+    dashboard_stats,
+    faculty_profile_and_courses,
+    student_profile_and_courses,
+    # Core ViewSets
+    UserViewSet,
+    SchoolViewSet,
+    DepartmentViewSet,
+    ProgramViewSet,
+    BatchViewSet,
+    CourseViewSet,
+    FacultyViewSet,
+    StudentViewSet,
+    RoomViewSet,
+    LabViewSet,
+    BuildingViewSet,
+    TimetableViewSet,
+    TimetableSlotViewSet,
+    # Generation & workflow
+    GenerationJobViewSet,
+    TimetableWorkflowViewSet,
+    TimetableVariantViewSet,
+    # Timetable display
     fastapi_callback,
     get_department_timetable,
     get_faculty_timetable,
     get_student_timetable,
-)
-from .progress_endpoints import get_progress, stream_progress, health_check
-from .workflow_views import TimetableWorkflowViewSet, TimetableVariantViewSet
-from .timetable_config_views import TimetableConfigurationViewSet
-from .conflict_views import ConflictViewSet
-from .views_optimized import (
+    # Progress / SSE
+    get_progress,
+    stream_progress,
+    health_check,
+    # Fast endpoints
     fast_generation_jobs,
     fast_faculty,
     fast_departments,
     fast_courses,
     fast_students,
     fast_rooms,
-)
-from .views import (
-    BatchViewSet,
-    BuildingViewSet,
-    CourseViewSet,
-    DepartmentViewSet,
-    FacultyViewSet,
-    LabViewSet,
-    ProgramViewSet,
-    RoomViewSet,
-    SchoolViewSet,
-    StudentViewSet,
-    TimetableSlotViewSet,
-    TimetableViewSet,
-    UserViewSet,
-    current_user_view,
-    dashboard_stats,
-    faculty_profile_and_courses,
-    student_profile_and_courses,
-    login_view,
-    logout_view,
-    refresh_token_view,
-)
-from .views.auth_views import (
-    password_reset_request_view,
-    password_reset_confirm_view,
-    password_change_view,
-    list_sessions_view,
-    revoke_session_view,
+    # Conflict & config
+    ConflictViewSet,
+    TimetableConfigurationViewSet,
 )
 
 router = DefaultRouter()

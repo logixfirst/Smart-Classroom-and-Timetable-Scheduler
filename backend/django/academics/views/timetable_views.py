@@ -1,18 +1,27 @@
 """
 Timetable Viewing API - RBAC-based timetable access
 HOD, Faculty, and Student views
+
+Caching:
+  - department timetable : 3 min  (cache_key scoped to dept_id)
+  - faculty timetable    : 3 min  (cache_key scoped to faculty pk)
+  - student timetable    : 3 min  (cache_key scoped to student pk + semester)
+  All views emit X-Cache: HIT|MISS headers.
 """
 import logging
 
+from core.cache_service import CacheService
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Department, TimetableSlot
-from .serializers import TimetableSlotSerializer
+from ..models import Department, TimetableSlot
+from ..serializers import TimetableSlotSerializer
 
 logger = logging.getLogger(__name__)
+
+_TIMETABLE_TTL = 180   # 3 minutes — timetables can be regenerated mid-day
 
 
 @api_view(["GET"])
@@ -54,11 +63,12 @@ def get_department_timetable(request, dept_id):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-    try:
-        # Verify department exists
-        department = Department.objects.get(dept_id=dept_id)
+    cache_key = CacheService.generate_cache_key(
+        "timetable", "department", dept_id=str(dept_id)
+    )
 
-        # Get active timetable slots for this department
+    def _fetch():
+        department = Department.objects.get(dept_id=dept_id)
         slots = (
             TimetableSlot.objects.filter(
                 subject__department_id=dept_id, timetable__is_active=True
@@ -66,21 +76,24 @@ def get_department_timetable(request, dept_id):
             .select_related("subject", "faculty", "batch", "classroom", "timetable")
             .order_by("day", "start_time")
         )
+        return {
+            "success": True,
+            "department": {
+                "dept_id":   str(department.dept_id),
+                "dept_code": department.dept_code,
+                "dept_name": department.dept_name,
+            },
+            "total_slots": slots.count(),
+            "slots": TimetableSlotSerializer(slots, many=True).data,
+        }
 
-        serializer = TimetableSlotSerializer(slots, many=True)
-
-        return Response(
-            {
-                "success": True,
-                "department": {
-                    "dept_id": str(department.dept_id),
-                    "dept_code": department.dept_code,
-                    "dept_name": department.dept_name,
-                },
-                "total_slots": slots.count(),
-                "slots": serializer.data,
-            }
-        )
+    try:
+        payload = CacheService.get_or_set(cache_key, _fetch, timeout=_TIMETABLE_TTL)
+        cached_hit = CacheService.get(cache_key) is not None
+        resp = Response(payload)
+        resp["X-Cache"]     = "HIT" if cached_hit else "MISS"
+        resp["X-Cache-Key"] = cache_key
+        return resp
 
     except Department.DoesNotExist:
         return Response(
@@ -88,7 +101,7 @@ def get_department_timetable(request, dept_id):
             status=status.HTTP_404_NOT_FOUND,
         )
     except Exception as e:
-        logger.error(f"Error fetching department timetable: {str(e)}")
+        logger.error("Error fetching department timetable: %s", e)
         return Response(
             {"success": False, "error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -99,11 +112,8 @@ def get_department_timetable(request, dept_id):
 @permission_classes([IsAuthenticated])
 def get_faculty_timetable(request):
     """
-    Faculty views their personal timetable
+    Faculty personal timetable — Redis-cached 3 min per faculty pk.
     GET /api/timetable/faculty/me/
-
-    Access: Faculty only
-    Returns: All classes assigned to this faculty
     """
     user = request.user
 
@@ -114,10 +124,18 @@ def get_faculty_timetable(request):
         )
 
     try:
-        # Get faculty profile
         faculty_profile = user.faculty_profile
+    except Exception:
+        return Response(
+            {"success": False, "error": "Faculty profile not found or error fetching timetable"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
 
-        # Get all slots assigned to this faculty
+    cache_key = CacheService.generate_cache_key(
+        "timetable", "faculty", faculty_pk=str(faculty_profile.pk)
+    )
+
+    def _fetch():
         slots = (
             TimetableSlot.objects.filter(
                 faculty=faculty_profile, timetable__is_active=True
@@ -125,31 +143,30 @@ def get_faculty_timetable(request):
             .select_related("subject", "batch", "classroom", "timetable")
             .order_by("day", "start_time")
         )
-
-        serializer = TimetableSlotSerializer(slots, many=True)
-
-        return Response(
-            {
-                "success": True,
-                "faculty": {
-                    "faculty_id": str(faculty_profile.faculty_id),
-                    "faculty_name": faculty_profile.faculty_name,
-                    "employee_id": faculty_profile.employee_id,
-                    "designation": faculty_profile.designation,
-                    "department": faculty_profile.department.dept_name,
-                },
-                "total_classes": slots.count(),
-                "slots": serializer.data,
-            }
-        )
-
-    except Exception as e:
-        logger.error(f"Error fetching faculty timetable: {str(e)}")
-        return Response(
-            {
-                "success": False,
-                "error": "Faculty profile not found or error fetching timetable",
+        return {
+            "success": True,
+            "faculty": {
+                "faculty_id":   str(faculty_profile.faculty_id),
+                "faculty_name": faculty_profile.faculty_name,
+                "employee_id":  faculty_profile.employee_id,
+                "designation":  faculty_profile.designation,
+                "department":   faculty_profile.department.dept_name,
             },
+            "total_classes": slots.count(),
+            "slots": TimetableSlotSerializer(slots, many=True).data,
+        }
+
+    try:
+        payload    = CacheService.get_or_set(cache_key, _fetch, timeout=_TIMETABLE_TTL)
+        cached_hit = CacheService.get(cache_key) is not None
+        resp = Response(payload)
+        resp["X-Cache"]     = "HIT" if cached_hit else "MISS"
+        resp["X-Cache-Key"] = cache_key
+        return resp
+    except Exception as e:
+        logger.error("Error fetching faculty timetable: %s", e)
+        return Response(
+            {"success": False, "error": "Faculty profile not found or error fetching timetable"},
             status=status.HTTP_404_NOT_FOUND,
         )
 
@@ -158,11 +175,8 @@ def get_faculty_timetable(request):
 @permission_classes([IsAuthenticated])
 def get_student_timetable(request):
     """
-    Student views their personal schedule
+    Student personal schedule — Redis-cached 3 min per student pk + semester.
     GET /api/timetable/student/me/
-
-    Access: Student only
-    Returns: All classes for student's batch
     """
     user = request.user
 
@@ -172,12 +186,26 @@ def get_student_timetable(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    from ..models import Student, Batch
+
     try:
-        # Get student profile by username
-        from .models import Student, Batch
-        student = Student.objects.select_related('department', 'program').get(username=user.username)
-        
-        # Get batch if batch_id exists
+        student = Student.objects.select_related("department", "program").get(
+            username=user.username
+        )
+    except Student.DoesNotExist:
+        logger.error("Student with username %s not found", user.username)
+        return Response(
+            {"success": False, "error": "Student profile not found"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    cache_key = CacheService.generate_cache_key(
+        "timetable", "student",
+        student_pk=str(student.pk),
+        semester=str(student.current_semester),
+    )
+
+    def _fetch():
         batch = None
         batch_name = "N/A"
         if student.batch_id:
@@ -187,7 +215,6 @@ def get_student_timetable(request):
             except Batch.DoesNotExist:
                 pass
 
-        # Get all slots for student's batch
         slots = []
         if batch:
             slots = (
@@ -198,39 +225,34 @@ def get_student_timetable(request):
                 .order_by("day", "start_time")
             )
 
-        serializer = TimetableSlotSerializer(slots, many=True)
-
-        return Response(
-            {
-                "success": True,
-                "student": {
-                    "student_id": str(student.student_id),
-                    "roll_number": student.roll_number or student.enrollment_number,
-                    "student_name": f"{student.first_name} {student.middle_name or ''} {student.last_name}".strip(),
-                    "batch": batch_name,
-                    "semester": student.current_semester,
-                    "department": student.department.dept_name if student.department else "N/A",
-                },
-                "total_classes": len(slots),
-                "slots": serializer.data,
-            }
-        )
-
-    except Student.DoesNotExist:
-        logger.error(f"Student with username {user.username} not found")
-        return Response(
-            {"success": False, "error": "Student profile not found"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-    except Exception as e:
-        logger.error(f"Error fetching student timetable: {str(e)}")
-        return Response(
-            {
-                "success": False,
-                "error": "Student profile not found or error fetching timetable",
+        return {
+            "success": True,
+            "student": {
+                "student_id":   str(student.student_id),
+                "roll_number":  student.roll_number or student.enrollment_number,
+                "student_name": f"{student.first_name} {student.middle_name or ''} {student.last_name}".strip(),
+                "batch":        batch_name,
+                "semester":     student.current_semester,
+                "department":   student.department.dept_name if student.department else "N/A",
             },
+            "total_classes": len(slots),
+            "slots": TimetableSlotSerializer(slots, many=True).data,
+        }
+
+    try:
+        payload    = CacheService.get_or_set(cache_key, _fetch, timeout=_TIMETABLE_TTL)
+        cached_hit = CacheService.get(cache_key) is not None
+        resp = Response(payload)
+        resp["X-Cache"]     = "HIT" if cached_hit else "MISS"
+        resp["X-Cache-Key"] = cache_key
+        return resp
+    except Exception as e:
+        logger.error("Error fetching student timetable: %s", e)
+        return Response(
+            {"success": False, "error": "Student profile not found or error fetching timetable"},
             status=status.HTTP_404_NOT_FOUND,
         )
+
 
 
 @api_view(["POST"])
@@ -249,7 +271,7 @@ def fastapi_callback(request):
     """
     from django.utils import timezone
 
-    from .models import GenerationJob, Timetable, TimetableSlot
+    from ..models import GenerationJob, Timetable, TimetableSlot
 
     try:
         job_id = request.data.get("job_id")
