@@ -1099,12 +1099,7 @@ export default function TimetableReviewPage() {
             <div className="px-4 py-4 sm:px-5 sm:py-5">
               {gridInView
                 ? renderTimetableGrid(activeVariant)
-                : (
-                  <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-400 dark:text-gray-500">
-                    <GoogleSpinner size={32} />
-                    <p className="text-xs">Scroll down to view timetable grid…</p>
-                  </div>
-                )
+                : <TimetableGridSkeleton days={5} slots={8} />
               }
             </div>
           </section>
