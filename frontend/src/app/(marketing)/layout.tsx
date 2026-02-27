@@ -3,6 +3,7 @@ import { MarketingNav } from '@/components/marketing/MarketingNav'
 import { MarketingFooter } from '@/components/marketing/MarketingFooter'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://cadence.edu'),
   title: {
     default: 'Cadence — AI-Powered Academic Timetable Scheduling',
     template: '%s | Cadence',
