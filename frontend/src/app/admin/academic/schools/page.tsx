@@ -5,6 +5,7 @@ import apiClient from '@/lib/api'
 import { useToast } from '@/components/Toast'
 import { TableSkeleton, TableRowsSkeleton } from '@/components/LoadingSkeletons'
 import Pagination from '@/components/Pagination'
+import AddEditSchoolModal from './components/AddEditSchoolModal'
 
 interface School {
   id: number
@@ -21,6 +22,10 @@ export default function SchoolsPage() {
   const [isTableLoading, setIsTableLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+
+  const [showModal, setShowModal] = useState(false)
+  const [editingSchool, setEditingSchool] = useState<School | null>(null)
+  const [isDeleting, setIsDeleting] = useState<number | null>(null)
 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -40,6 +45,30 @@ export default function SchoolsPage() {
   useEffect(() => {
     fetchSchools()
   }, [currentPage, itemsPerPage])
+
+  const handleAdd = () => { setEditingSchool(null); setShowModal(true) }
+  const handleEdit = (school: School) => { setEditingSchool(school); setShowModal(true) }
+
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`Delete "${name}"?\n\nThis action cannot be undone.`)) return
+    setIsDeleting(id)
+    try {
+      const res = await apiClient.deleteSchool(String(id))
+      if (res.error) showToast('error', res.error)
+      else { showToast('success', `"${name}" deleted`); await fetchSchools() }
+    } catch { showToast('error', 'Failed to delete school') }
+    finally { setIsDeleting(null) }
+  }
+
+  const handleSave = async (data: any) => {
+    const res = editingSchool
+      ? await apiClient.updateSchool(String(editingSchool.id), data)
+      : await apiClient.createSchool(data)
+    if (res.error) { showToast('error', res.error); return }
+    showToast('success', editingSchool ? 'School updated' : 'School created')
+    setShowModal(false)
+    await fetchSchools()
+  }
 
   const fetchSchools = async () => {
     if (currentPage > 1) setIsTableLoading(true)
@@ -76,7 +105,7 @@ export default function SchoolsPage() {
             {isLoading ? 'Loading…' : `${totalCount.toLocaleString()} schools`}
           </p>
         </div>
-        <button className="btn-primary w-full sm:w-auto">
+        <button className="btn-primary w-full sm:w-auto" onClick={handleAdd}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -132,11 +161,22 @@ export default function SchoolsPage() {
                   ? <TableRowsSkeleton rows={itemsPerPage} columns={4} />
                   : schools.map(school => (
                   <tr key={school.id} className="table-row">
-                    <td className="table-cell">{school.school_code}</td>
+                    <td className="table-cell font-medium">{school.school_code}</td>
                     <td className="table-cell">{school.school_name}</td>
                     <td className="table-cell">{school.description || '-'}</td>
                     <td className="table-cell">
-                      <button className="btn-ghost text-xs px-2 py-1" disabled={isTableLoading}>Edit</button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="btn-ghost text-xs px-2 py-1"
+                          onClick={() => handleEdit(school)}
+                          disabled={isTableLoading || isDeleting !== null}
+                        >Edit</button>
+                        <button
+                          className="btn-danger text-xs px-2 py-1"
+                          onClick={() => handleDelete(school.id, school.school_name)}
+                          disabled={isTableLoading || isDeleting === school.id}
+                        >{isDeleting === school.id ? '…' : 'Delete'}</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -158,6 +198,12 @@ export default function SchoolsPage() {
           </div>
         )}
       </div>
+      <AddEditSchoolModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        school={editingSchool}
+        onSave={handleSave}
+      />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import apiClient from '@/lib/api'
 import { TableSkeleton, TableRowsSkeleton } from '@/components/LoadingSkeletons'
 import Pagination from '@/components/Pagination'
@@ -31,6 +31,7 @@ export default function ClassroomsPage() {
   const [isTableLoading, setIsTableLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedType, setSelectedType] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -134,6 +135,18 @@ export default function ClassroomsPage() {
     setShowForm(false)
   }
 
+  const ROOM_TYPE_LABELS: Record<string, string> = {
+    lecture_hall: 'Lecture Hall',
+    laboratory: 'Laboratory',
+    tutorial_room: 'Tutorial Room',
+    seminar_hall: 'Seminar Hall',
+  }
+
+  const filteredRooms = useMemo(() => {
+    if (!selectedType) return rooms
+    return rooms.filter(r => r.room_type === selectedType)
+  }, [rooms, selectedType])
+
 
 
   return (
@@ -202,19 +215,32 @@ export default function ClassroomsPage() {
 
       <div className="card">
         <div className="card-header">
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
-              </svg>
-            </span>
-            <input
-              type="text"
-              placeholder="Search by room code, number, type, or department…"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="input-primary pl-10 w-full"
-            />
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 111 11a6 6 0 0116 0z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                placeholder="Search by room code, number, type, or department…"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="input-primary pl-10 w-full"
+              />
+            </div>
+            <select
+              aria-label="Filter by room type"
+              className="input-primary w-full sm:w-44"
+              value={selectedType}
+              onChange={e => setSelectedType(e.target.value)}
+            >
+              <option value="">All Types</option>
+              {Object.entries(ROOM_TYPE_LABELS).map(([val, label]) => (
+                <option key={val} value={val}>{label}</option>
+              ))}
+            </select>
           </div>
         </div>
         {isLoading && <TableSkeleton rows={5} columns={7} />}
@@ -231,7 +257,7 @@ export default function ClassroomsPage() {
           </div>
         )}
 
-        {!isLoading && rooms.length > 0 && (
+        {!isLoading && filteredRooms.length > 0 && (
           <div className="overflow-x-auto">
             <table className="table">
             <thead className="table-header">
@@ -248,14 +274,14 @@ export default function ClassroomsPage() {
             <tbody>
               {isTableLoading
                 ? <TableRowsSkeleton rows={itemsPerPage} columns={7} />
-                : rooms.map(room => (
+                : filteredRooms.map(room => (
                 <tr key={room.room_id} className="table-row">
                   <td className="table-cell font-medium">{room.room_code}</td>
                   <td className="table-cell">{room.room_number}</td>
                   <td className="table-cell">{room.room_name || '-'}</td>
                   <td className="table-cell">{room.building_name || room.building?.building_name || '-'}</td>
                   <td className="table-cell">{room.seating_capacity}</td>
-                  <td className="table-cell"><span className="badge badge-neutral">{room.room_type}</span></td>
+                  <td className="table-cell"><span className="badge badge-neutral">{ROOM_TYPE_LABELS[room.room_type] || room.room_type}</span></td>
                   <td className="table-cell">
                     <div className="flex gap-2">
                       <button onClick={() => handleEdit(room)} className="btn-ghost text-xs px-2 py-1" disabled={isTableLoading}>Edit</button>

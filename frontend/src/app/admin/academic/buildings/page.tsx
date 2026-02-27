@@ -5,6 +5,7 @@ import apiClient from '@/lib/api'
 import { useToast } from '@/components/Toast'
 import { TableSkeleton, TableRowsSkeleton } from '@/components/LoadingSkeletons'
 import Pagination from '@/components/Pagination'
+import AddEditBuildingModal from './components/AddEditBuildingModal'
 
 interface Building {
   id: number
@@ -22,6 +23,10 @@ export default function BuildingsPage() {
   const [isTableLoading, setIsTableLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+
+  const [showModal, setShowModal] = useState(false)
+  const [editingBuilding, setEditingBuilding] = useState<Building | null>(null)
+  const [isDeleting, setIsDeleting] = useState<number | null>(null)
 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -41,6 +46,30 @@ export default function BuildingsPage() {
   useEffect(() => {
     fetchBuildings()
   }, [currentPage, itemsPerPage])
+
+  const handleAdd = () => { setEditingBuilding(null); setShowModal(true) }
+  const handleEdit = (b: Building) => { setEditingBuilding(b); setShowModal(true) }
+
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`Delete "${name}"?\n\nThis action cannot be undone.`)) return
+    setIsDeleting(id)
+    try {
+      const res = await apiClient.deleteBuilding(String(id))
+      if (res.error) showToast('error', res.error)
+      else { showToast('success', `"${name}" deleted`); await fetchBuildings() }
+    } catch { showToast('error', 'Failed to delete building') }
+    finally { setIsDeleting(null) }
+  }
+
+  const handleSave = async (data: any) => {
+    const res = editingBuilding
+      ? await apiClient.updateBuilding(String(editingBuilding.id), data)
+      : await apiClient.createBuilding(data)
+    if (res.error) { showToast('error', res.error); return }
+    showToast('success', editingBuilding ? 'Building updated' : 'Building created')
+    setShowModal(false)
+    await fetchBuildings()
+  }
 
   const fetchBuildings = async () => {
     if (currentPage > 1) setIsTableLoading(true)
@@ -77,7 +106,7 @@ export default function BuildingsPage() {
             {isLoading ? 'Loading…' : `${totalCount.toLocaleString()} buildings`}
           </p>
         </div>
-        <button className="btn-primary w-full sm:w-auto">
+        <button className="btn-primary w-full sm:w-auto" onClick={handleAdd}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
@@ -134,12 +163,23 @@ export default function BuildingsPage() {
                   ? <TableRowsSkeleton rows={itemsPerPage} columns={5} />
                   : buildings.map(building => (
                   <tr key={building.id} className="table-row">
-                    <td className="table-cell">{building.building_code}</td>
+                    <td className="table-cell font-medium">{building.building_code}</td>
                     <td className="table-cell">{building.building_name}</td>
                     <td className="table-cell">{building.address || '-'}</td>
                     <td className="table-cell">{building.total_floors || '-'}</td>
                     <td className="table-cell">
-                      <button className="btn-ghost text-xs px-2 py-1" disabled={isTableLoading}>Edit</button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="btn-ghost text-xs px-2 py-1"
+                          onClick={() => handleEdit(building)}
+                          disabled={isTableLoading || isDeleting !== null}
+                        >Edit</button>
+                        <button
+                          className="btn-danger text-xs px-2 py-1"
+                          onClick={() => handleDelete(building.id, building.building_name)}
+                          disabled={isTableLoading || isDeleting === building.id}
+                        >{isDeleting === building.id ? '…' : 'Delete'}</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -161,6 +201,12 @@ export default function BuildingsPage() {
           </div>
         )}
       </div>
+      <AddEditBuildingModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        building={editingBuilding}
+        onSave={handleSave}
+      />
     </div>
   )
 }

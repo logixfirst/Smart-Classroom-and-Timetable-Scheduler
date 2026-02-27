@@ -131,6 +131,7 @@ export default function AddEditDepartmentModal({ isOpen, onClose, department, on
               School <span className="text-gray-400 text-xs font-normal">(optional)</span>
             </label>
             <select
+              aria-label="School"
               value={formData.school}
               onChange={e => setFormData(p => ({ ...p, school: e.target.value }))}
               className="w-full px-3 py-2.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
