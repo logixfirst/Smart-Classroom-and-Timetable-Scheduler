@@ -40,8 +40,9 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_serializer_class(self):
-        """Use lightweight serializer for list view (excludes timetable_data)"""
-        if self.action == 'list':
+        """Use lightweight serializer for list/retrieve (excludes 5-50 MB timetable_data).
+        Only the internal generate/status/result actions need the full blob."""
+        if self.action in ('list', 'retrieve'):
             return GenerationJobListSerializer
         return GenerationJobSerializer
 
@@ -52,8 +53,8 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         # CRITICAL: Use select_related to avoid N+1 queries for org_name
         queryset = queryset.select_related('organization')
 
-        # CRITICAL: Defer timetable_data for list view (can be 5-50MB per job!)
-        if self.action == 'list':
+        # CRITICAL: Defer timetable_data for list and retrieve views (can be 5-50MB per job!)
+        if self.action in ('list', 'retrieve'):
             queryset = queryset.defer('timetable_data')
 
         # Filter by status if provided
@@ -74,12 +75,30 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
         return response
 
     def retrieve(self, request, *args, **kwargs):
-        """Retrieve single job; use a longer cache hint for completed jobs."""
-        response = super().retrieve(request, *args, **kwargs)
-        job = self.get_object()
-        ttl = 3600 if job.status in ('completed', 'failed', 'cancelled') else 10
-        response['Cache-Control'] = f'private, max-age={ttl}'
-        return response
+        """Retrieve single job; serve from Redis for completed/failed/cancelled jobs."""
+        pk = kwargs.get('pk') or self.kwargs.get('pk')
+        cache_key = f'generation_job_meta_{pk}'
+
+        cached = cache.get(cache_key)
+        if cached:
+            resp = Response(cached)
+            resp['Cache-Control'] = 'private, max-age=3600'
+            resp['X-Cache'] = 'HIT'
+            return resp
+
+        # get_object() is called once here and reused — avoids double DB hit
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+        # Only cache immutable terminal states
+        if instance.status in ('completed', 'failed', 'cancelled'):
+            cache.set(cache_key, data, 3600)
+            ttl = 3600
+        else:
+            ttl = 10
+        resp = Response(data)
+        resp['Cache-Control'] = f'private, max-age={ttl}'
+        return resp
 
     @action(detail=False, methods=["post"], url_path="generate")
     def generate_timetable(self, request):

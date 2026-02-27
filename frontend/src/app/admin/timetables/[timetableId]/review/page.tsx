@@ -200,6 +200,36 @@ function MetricBar({ label, value }: { label: string; value: number }) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// localStorage-backed variant entry cache
+// Timetable entries are immutable once generated, so we can cache them for
+// 30 minutes across navigations without risk of showing stale data.
+// ---------------------------------------------------------------------------
+const LS_ENTRY_TTL_MS = 30 * 60 * 1000 // 30 minutes
+
+function lsReadEntries(variantId: string): TimetableEntry[] | null {
+  try {
+    const raw = localStorage.getItem(`tt_entries_${variantId}`)
+    if (!raw) return null
+    const { ts, entries } = JSON.parse(raw) as { ts: number; entries: TimetableEntry[] }
+    if (Date.now() - ts > LS_ENTRY_TTL_MS) {
+      localStorage.removeItem(`tt_entries_${variantId}`)
+      return null
+    }
+    return entries
+  } catch {
+    return null
+  }
+}
+
+function lsWriteEntries(variantId: string, entries: TimetableEntry[]): void {
+  try {
+    localStorage.setItem(`tt_entries_${variantId}`, JSON.stringify({ ts: Date.now(), entries }))
+  } catch {
+    // localStorage quota exceeded or unavailable — silently ignore
+  }
+}
+
 export default function TimetableReviewPage() {
   const params = useParams()
   const router = useRouter()
@@ -259,21 +289,15 @@ export default function TimetableReviewPage() {
       setLoadingMeta(true)
       setError(null)
 
-      // ── Round 1: fire all three independent requests simultaneously ──────────
-      const [jobRes, workflowRes, variantsRes] = await Promise.all([
-        authenticatedFetch(`${API_BASE}/generation-jobs/${workflowId}/`, { credentials: 'include' }),
+      // ── Round 1: fire both independent requests simultaneously ──────────────
+      // NOTE: We intentionally skip GET /generation-jobs/{id}/ here.
+      // That endpoint returns the full GenerationJob including timetable_data
+      // (5-50 MB). The workflow endpoint returns job.status, which is all we
+      // need to decide whether to redirect to the status page.
+      const [workflowRes, variantsRes] = await Promise.all([
         authenticatedFetch(`${API_BASE}/timetable/workflows/${workflowId}/`, { credentials: 'include' }),
         authenticatedFetch(`${API_BASE}/timetable/variants/?job_id=${workflowId}`, { credentials: 'include' }),
       ])
-
-      // Re-route if job is still running
-      if (jobRes.ok) {
-        const jobData = await jobRes.json()
-        if (jobData.status === 'running' || jobData.status === 'queued') {
-          router.push(`/admin/timetables/status/${workflowId}`)
-          return
-        }
-      }
 
       if (!workflowRes.ok) {
         if (workflowRes.status === 401 || workflowRes.status === 403) {
@@ -287,6 +311,12 @@ export default function TimetableReviewPage() {
         workflowRes.json(),
         variantsRes.ok ? variantsRes.json() : Promise.resolve([]),
       ])
+
+      // Re-route if job is still running (status field is in the workflow response)
+      if (workflowData.status === 'running' || workflowData.status === 'queued') {
+        router.push(`/admin/timetables/status/${workflowId}`)
+        return
+      }
 
       setWorkflow(workflowData)
       setVariants(variantsData)
@@ -307,8 +337,10 @@ export default function TimetableReviewPage() {
       // ── Round 2: entries in background (non-blocking) ────────────────────
       setLoadingVariantId(variantToLoad.id)
       try {
-        const cached = entryCache.current.get(variantToLoad.id)
+        // Check in-memory cache first, then localStorage (survives navigation)
+        const cached = entryCache.current.get(variantToLoad.id) ?? lsReadEntries(variantToLoad.id)
         if (cached) {
+          entryCache.current.set(variantToLoad.id, cached) // re-warm in-memory cache
           setActiveVariant({ ...variantToLoad, timetable_entries: cached })
         } else {
           const entriesRes = await authenticatedFetch(
@@ -319,6 +351,7 @@ export default function TimetableReviewPage() {
             const entriesData = await entriesRes.json()
             const entries: TimetableEntry[] = entriesData.timetable_entries
             entryCache.current.set(variantToLoad.id, entries)
+            lsWriteEntries(variantToLoad.id, entries) // persist across navigations
             setActiveVariant(prev =>
               prev?.id === variantToLoad.id ? { ...prev, timetable_entries: entries } : prev
             )
@@ -440,10 +473,23 @@ export default function TimetableReviewPage() {
   }, [activeVariant?.timetable_entries])
 
   const loadVariantEntries = useCallback(async (variant: TimetableVariant) => {
-    // ── Instant paint from cache if available ───────────────────────────
-    const cached = entryCache.current.get(variant.id)
-    if (cached) {
-      setActiveVariant({ ...variant, timetable_entries: cached })
+    // ── Instant paint from in-memory cache ──────────────────────────────────
+    const memCached = entryCache.current.get(variant.id)
+    if (memCached) {
+      setActiveVariant({ ...variant, timetable_entries: memCached })
+      setActiveDay('all')
+      setDepartmentFilter('all')
+      setTimeout(() => {
+        document.getElementById('timetable-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 80)
+      return
+    }
+
+    // ── localStorage hit (survives navigation, 30-min TTL) ──────────────────
+    const lsCached = lsReadEntries(variant.id)
+    if (lsCached) {
+      entryCache.current.set(variant.id, lsCached) // re-warm in-memory cache
+      setActiveVariant({ ...variant, timetable_entries: lsCached })
       setActiveDay('all')
       setDepartmentFilter('all')
       setTimeout(() => {
@@ -472,6 +518,7 @@ export default function TimetableReviewPage() {
         const data = await response.json()
         const entries: TimetableEntry[] = data.timetable_entries
         entryCache.current.set(variant.id, entries) // store for future switches
+        lsWriteEntries(variant.id, entries)         // persist across navigations
         // Only update if this variant is still the active one
         setActiveVariant(prev =>
           prev?.id === variant.id ? { ...prev, timetable_entries: entries } : prev
