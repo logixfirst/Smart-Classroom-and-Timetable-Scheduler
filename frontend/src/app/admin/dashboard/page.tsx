@@ -248,7 +248,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Pending Approvals */
+        {/* Pending Approvals */}
         <div
           className="card clickable-card"
           onClick={() => router.push('/admin/approvals')}
