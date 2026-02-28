@@ -188,7 +188,7 @@ function QuickLink({
     <Link
       href={href}
       onClick={onClick}
-      className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
+      className="flex items-center gap-3 px-5 py-2.5 text-[14px] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
     >
       <span className="shrink-0 text-[#5f6368] dark:text-[#9aa0a6]">{icon}</span>
       <span className="flex-1">{label}</span>
@@ -414,43 +414,63 @@ export default function AppShell({ children }: DashboardLayoutProps) {
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 top-[calc(100%+8px)] w-[360px] rounded-3xl shadow-2xl bg-white dark:bg-[#202124] border border-[#e0e0e0] dark:border-[#3c4043] overflow-hidden z-[60]">
+              <div className="absolute right-0 top-[calc(100%+8px)] w-[360px] rounded-[28px] shadow-[0_8px_10px_1px_rgba(0,0,0,0.14),0_3px_14px_2px_rgba(0,0,0,0.12),0_5px_5px_-3px_rgba(0,0,0,0.2)] bg-white dark:bg-[#202124] border border-[#e0e0e0] dark:border-[#3c4043] overflow-hidden z-[60]">
 
-                {/* ── Top strip: close + role badge ── */}
-                <div className="flex items-center justify-between px-4 pt-3 pb-2">
-                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#E8F0FE] dark:bg-[#1C2B4A] text-[#1A73E8] dark:text-[#8AB4F8] uppercase tracking-wider select-none">
-                    {rolePill}
+                {/* ── Header bar: app domain + close ── */}
+                <div className="flex items-center justify-between px-5 h-11 border-b border-[#e0e0e0] dark:border-[#3c4043]">
+                  <span className="text-[12px] text-[#5f6368] dark:text-[#9aa0a6] select-none font-medium tracking-[0.01em]">
+                    cadence.erp
                   </span>
                   <button
                     onClick={() => setProfileOpen(false)}
                     aria-label="Close account menu"
-                    className="w-7 h-7 flex items-center justify-center rounded-full text-[#5f6368] dark:text-[#9aa0a6] hover:bg-[#f1f3f4] dark:hover:bg-[#3c4043] transition-colors"
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-[#5f6368] dark:text-[#9aa0a6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
                   >
-                    <X size={14} />
+                    <X size={16} />
                   </button>
                 </div>
 
-                {/* ── Avatar card ── */}
-                <div className="flex flex-col items-center px-4 pb-5 pt-1">
-                  <div className="relative mb-3">
-                    <Avatar name={displayName} size={72} />
+                {/* ── Avatar card — Google-exact layout ── */}
+                <div className="flex flex-col items-center px-6 pt-6 pb-5">
+                  {/* Avatar */}
+                  <div className="mb-3">
+                    <Avatar name={displayName} size={64} />
                   </div>
-                  <p className="text-[20px] font-normal text-[#202124] dark:text-[#e8eaed] leading-tight mb-1">
+
+                  {/* "Hi, Name!" */}
+                  <p className="text-[22px] font-normal text-[#202124] dark:text-[#e8eaed] leading-snug mb-0.5 text-center">
                     Hi, {user?.first_name || displayName.split(' ')[0]}!
                   </p>
-                  <p className="text-[13px] text-[#5f6368] dark:text-[#9aa0a6] mb-4">
+
+                  {/* Full display name */}
+                  <p className="text-[14px] text-[#202124] dark:text-[#e8eaed] mb-0.5 text-center font-normal">
                     {displayName}
                   </p>
 
-                  {/* Manage profile button — opens profile page */}
+                  {/* Email — shown prominently like Google */}
+                  <p className="text-[14px] text-[#5f6368] dark:text-[#9aa0a6] mb-5 text-center">
+                    {user?.email ?? ''}
+                  </p>
+
+                  {/* Manage profile pill */}
                   <Link
                     href={`/${role}/profile`}
                     onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-medium border border-[#dadce0] dark:border-[#5f6368] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f8f9fa] dark:hover:bg-[#303134] transition-colors"
+                    className="flex items-center gap-2 px-5 py-2 rounded-full text-[14px] font-medium border border-[#dadce0] dark:border-[#5f6368] text-[#1f1f1f] dark:text-[#e8eaed] hover:bg-[#f8f9fa] dark:hover:bg-[#303134] transition-colors"
                   >
-                    <UserIcon size={14} />
-                    Manage profile
+                    Manage your account
                   </Link>
+                </div>
+
+                <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
+
+                {/* ── Role badge ── */}
+                <div className="flex items-center gap-2 px-5 py-2.5">
+                  <ShieldCheck size={14} className="text-[#5f6368] dark:text-[#9aa0a6] shrink-0" />
+                  <span className="text-[12px] text-[#5f6368] dark:text-[#9aa0a6] flex-1">Signed in as</span>
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#E8F0FE] dark:bg-[#1C2B4A] text-[#1A73E8] dark:text-[#8AB4F8] uppercase tracking-wider">
+                    {rolePill}
+                  </span>
                 </div>
 
                 <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
@@ -488,11 +508,11 @@ export default function AppShell({ children }: DashboardLayoutProps) {
                   <QuickLink href={`/${role}/settings`} icon={<Settings size={16}/>} label="Settings" onClick={() => setProfileOpen(false)} />
                   <button
                     onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-5 py-2.5 text-[14px] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors text-left"
                   >
                     {mounted && resolvedTheme === 'dark'
-                      ? <><Sun size={16} className="shrink-0" /><span>Switch to Light mode</span></>
-                      : <><Moon size={16} className="shrink-0" /><span>Switch to Dark mode</span></>
+                      ? <><Sun size={16} className="shrink-0 text-[#5f6368] dark:text-[#9aa0a6]" /><span>Switch to Light mode</span></>
+                      : <><Moon size={16} className="shrink-0 text-[#5f6368] dark:text-[#9aa0a6]" /><span>Switch to Dark mode</span></>
                     }
                   </button>
                 </div>
@@ -500,15 +520,16 @@ export default function AppShell({ children }: DashboardLayoutProps) {
                 <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
 
                 {/* ── Sign out ── */}
-                <div className="p-3">
+                <div className="px-4 py-3">
                   <button
                     onClick={() => { setProfileOpen(false); setShowSignOut(true) }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-medium border border-[#dadce0] dark:border-[#5f6368] text-[#d93025] dark:text-[#f28b82] hover:bg-[#fce8e6] dark:hover:bg-[#3a2323] transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-full text-[14px] font-medium border border-[#dadce0] dark:border-[#5f6368] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
                   >
                     <LogOut size={15} />
                     Sign out
                   </button>
                 </div>
+
               </div>
             )}
           </div>

@@ -106,7 +106,8 @@ function ToastContainer({
   removeToast: (id: string) => void
 }) {
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
+    // Google Material 3 snackbar: top-right, 16px inset, 8px gap between stacked toasts
+    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 items-end w-[min(400px,calc(100vw-32px))]">
       {toasts.map(toast => (
         <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
       ))}
@@ -115,31 +116,64 @@ function ToastContainer({
 }
 
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
-  const icons = {
-    success: <CheckCircle className="w-5 h-5 text-green-600" />,
-    error: <AlertCircle className="w-5 h-5 text-red-600" />,
-    warning: <AlertTriangle className="w-5 h-5 text-yellow-600" />,
-    info: <Info className="w-5 h-5 text-blue-600" />,
+  // Google Material 3 «filled tonal» notification tokens
+  const config = {
+    success: {
+      icon: <CheckCircle className="w-5 h-5" />,
+      iconCls: 'text-[#0d652d]',
+      bar: 'bg-[#0d652d]',
+      bg: 'bg-white dark:bg-[#2d2d2d]',
+      border: 'border-[#e0e0e0] dark:border-[#3c4043]',
+    },
+    error: {
+      icon: <AlertCircle className="w-5 h-5" />,
+      iconCls: 'text-[#c5221f]',
+      bar: 'bg-[#c5221f]',
+      bg: 'bg-white dark:bg-[#2d2d2d]',
+      border: 'border-[#e0e0e0] dark:border-[#3c4043]',
+    },
+    warning: {
+      icon: <AlertTriangle className="w-5 h-5" />,
+      iconCls: 'text-[#b06000]',
+      bar: 'bg-[#b06000]',
+      bg: 'bg-white dark:bg-[#2d2d2d]',
+      border: 'border-[#e0e0e0] dark:border-[#3c4043]',
+    },
+    info: {
+      icon: <Info className="w-5 h-5" />,
+      iconCls: 'text-[#1a73e8]',
+      bar: 'bg-[#1a73e8]',
+      bg: 'bg-white dark:bg-[#2d2d2d]',
+      border: 'border-[#e0e0e0] dark:border-[#3c4043]',
+    },
   }
 
-  const bgColors = {
-    success: 'bg-green-50 border-green-200',
-    error: 'bg-red-50 border-red-200',
-    warning: 'bg-yellow-50 border-yellow-200',
-    info: 'bg-blue-50 border-blue-200',
-  }
+  const c = config[toast.type]
 
   return (
     <div
-      className={`flex items-start gap-3 p-4 rounded-lg border shadow-lg animate-slide-in ${bgColors[toast.type]}`}
+      className={`
+        relative flex items-center gap-3 w-full
+        pl-4 pr-3 py-3.5
+        rounded-[12px] border shadow-[0_1px_3px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.10)]
+        ${c.bg} ${c.border}
+        animate-[slideInRight_0.2s_ease-out]
+      `}
     >
-      <div className="flex-shrink-0 mt-0.5">{icons[toast.type]}</div>
-      <p className="flex-1 text-sm text-gray-800 font-medium">{toast.message}</p>
+      {/* Left colour bar */}
+      <span className={`absolute left-0 top-2 bottom-2 w-[3px] rounded-full ${c.bar}`} />
+      {/* Icon */}
+      <span className={`shrink-0 ml-2 ${c.iconCls}`}>{c.icon}</span>
+      {/* Message */}
+      <p className="flex-1 text-[14px] font-medium text-[#202124] dark:text-[#e8eaed] leading-snug">
+        {toast.message}
+      </p>
+      {/* Close */}
       <button
         type="button"
         onClick={onClose}
-        aria-label="Close notification"
-        className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+        aria-label="Dismiss notification"
+        className="shrink-0 p-1 rounded-full text-[#5f6368] dark:text-[#9aa0a6] hover:bg-[#f1f3f4] dark:hover:bg-[#3c4043] transition-colors"
       >
         <X className="w-4 h-4" />
       </button>

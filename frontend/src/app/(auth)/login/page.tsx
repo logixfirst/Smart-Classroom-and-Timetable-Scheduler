@@ -7,11 +7,88 @@ import { useAuth } from '@/context/AuthContext'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { loginSchema, type LoginFormData } from '@/lib/validations'
-import { FormField } from '@/components/FormFields'
 import { useToast } from '@/components/Toast'
-import { Divider } from '@/components/ui/Divider'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import { AuthRedirect } from '@/components/AuthRedirect'
+
+// ─── Inline eye icons (no extra file) ────────────────────────────────────────
+function EyeOpen() {
+  return (
+    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  )
+}
+
+function EyeOff() {
+  return (
+    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+    </svg>
+  )
+}
+
+// ─── Google Material outlined input ──────────────────────────────────────────
+function OutlinedInput({
+  id,
+  label,
+  type,
+  placeholder,
+  error,
+  suffix,
+  ...rest
+}: {
+  id: string
+  label: string
+  type: string
+  placeholder?: string
+  error?: string
+  suffix?: React.ReactNode
+} & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label
+        htmlFor={id}
+        className="text-[14px] font-medium text-[#444746] dark:text-[#bdc1c6]"
+      >
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type={type}
+          placeholder={placeholder ?? ''}
+          className={[
+            'w-full h-14 px-4 rounded-[4px] text-[16px] outline-none',
+            'bg-transparent',
+            'text-[#202124] dark:text-[#e8eaed]',
+            'placeholder:text-[#9aa0a6]',
+            'border transition-colors duration-150',
+            suffix ? 'pr-12' : '',
+            error
+              ? 'border-[#b3261e] dark:border-[#f2b8b5] focus:border-[#b3261e] dark:focus:border-[#f2b8b5] focus:ring-1 focus:ring-[#b3261e]'
+              : 'border-[#747775] dark:border-[#8e918f] focus:border-[#1a73e8] dark:focus:border-[#8ab4f8] focus:ring-1 focus:ring-[#1a73e8] dark:focus:ring-[#8ab4f8]',
+          ].join(' ')}
+          {...rest}
+        />
+        {suffix && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5f6368] dark:text-[#9aa0a6]">
+            {suffix}
+          </span>
+        )}
+      </div>
+      {error && (
+        <p className="text-[12px] text-[#b3261e] dark:text-[#f2b8b5] flex items-center gap-1">
+          <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -76,166 +153,95 @@ export default function LoginPage() {
   return (
     <>
       <AuthRedirect />
-      <div
-        className="min-h-screen flex flex-col items-center justify-center px-6 py-12 sm:p-6"
-        style={{ background: 'var(--color-bg-page)' }}
-      >
-      {/* Card — invisible on mobile, visible sm+ */}
-      <div
-        className="w-full"
-        style={{ maxWidth: '400px' }}
-      >
-        <div
-          className="w-full"
-          style={{
-            background: 'var(--color-bg-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-xl)',
-            boxShadow: 'var(--shadow-modal)',
-            padding: 'clamp(24px, 5vw, 40px)',
-          }}
-        >
-          {/* Logo + brand */}
-          <div className="flex flex-col items-center gap-3 mb-6">
-            {/* Logo mark — large, centered */}
+
+      {/* ── Page shell — Google #f0f4f9 background ── */}
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 bg-[#f0f4f9] dark:bg-[#111111]">
+
+        {/* ── Card — Google Material 3: white, 28px radius, hairline border ── */}
+        <div className="w-full max-w-[450px] bg-white dark:bg-[#1e1e1e] border border-[#dadce0] dark:border-[#3c4043] rounded-[28px] px-10 py-10 sm:px-12">
+
+          {/* ── Header ── */}
+          <div className="flex flex-col items-center gap-2 mb-8">
             <Image
               src="/logo2.png"
-              alt="Cadence logo"
-              width={72}
-              height={72}
+              alt="Cadence"
+              width={40}
+              height={40}
               priority
               quality={100}
-              style={{ objectFit: 'contain', borderRadius: '50%' }}
+              className="rounded-full object-contain"
             />
-            {/* Wordmark */}
-            <span
-              style={{
-                fontWeight: 700,
-                fontSize: '26px',
-                color: 'var(--color-text-primary)',
-                letterSpacing: '-0.03em',
-                fontFamily: "'Poppins', 'Inter', sans-serif",
-                lineHeight: 1,
-              }}
-            >
-              Cadence
-            </span>
-            <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', margin: 0 }}>
-              Timetable Optimization Platform
+            <h1 className="text-[24px] font-normal text-[#202124] dark:text-[#e8eaed] mt-1">
+              Sign in
+            </h1>
+            <p className="text-[14px] text-[#5f6368] dark:text-[#9aa0a6]">
+              to continue to Cadence
             </p>
           </div>
 
-          <Divider spacing="md" />
+          {/* ── Form ── */}
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
 
-          {/* Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" style={{ marginTop: '20px' }}>
-            <div>
-              <label
-                htmlFor="username"
-                style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '6px' }}
-              >
-                Username or Email <span style={{ color: 'var(--color-danger)' }}>*</span>
-              </label>
-              <FormField
-                name="username"
-                label=""
-                type="text"
-                placeholder="Enter username or email"
-                register={register}
-                error={errors.username}
-              />
-              {errors.username && (
-                <p style={{ fontSize: '12px', color: 'var(--color-danger)', marginTop: '4px' }}>
-                  {errors.username.message}
-                </p>
-              )}
-            </div>
+            <OutlinedInput
+              id="username"
+              label="Username or email"
+              type="text"
+              autoComplete="username"
+              placeholder=""
+              error={errors.username?.message}
+              {...register('username')}
+            />
 
-            <div>
-              <label
-                htmlFor="password"
-                style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: '6px' }}
-              >
-                Password <span style={{ color: 'var(--color-danger)' }}>*</span>
-              </label>
-              <div className="relative">
-                <FormField
-                  name="password"
-                  label=""
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
-                  register={register}
-                  error={errors.password}
-                />
+            <OutlinedInput
+              id="password"
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              placeholder=""
+              error={errors.password?.message}
+              suffix={
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
-                  style={{ background: 'none', border: 'none', padding: '4px', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+                  onClick={() => setShowPassword(v => !v)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="p-1 rounded-full hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
                 >
-                  {showPassword ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                      />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                      />
-                    </svg>
-                  )}
+                  {showPassword ? <EyeOff /> : <EyeOpen />}
                 </button>
-              </div>
-              {errors.password && (
-                <p style={{ fontSize: '12px', color: 'var(--color-danger)', marginTop: '4px' }}>
-                  {errors.password.message}
-                </p>
-              )}
+              }
+              {...register('password')}
+            />
+
+            {/* Forgot link — Google right-aligns it */}
+            <div className="flex justify-end -mt-2">
+              <a
+                href="#"
+                className="text-[14px] text-[#1a73e8] dark:text-[#8ab4f8] hover:underline"
+              >
+                Forgot password?
+              </a>
             </div>
 
+            {/* ── Sign-in button — spinner ONLY during loading ── */}
             <button
               type="submit"
-              className="btn-primary w-full"
-              style={{
-                height: 'clamp(40px, 5vw, 48px)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                marginTop: '8px',
-              }}
               disabled={isLoading}
+              className="w-full h-[48px] rounded-full bg-[#1a73e8] hover:bg-[#1765cc] active:bg-[#185abc] disabled:opacity-70 text-white text-[15px] font-medium flex items-center justify-center gap-2 transition-colors duration-150 mt-1"
             >
-              {isLoading && <GoogleSpinner size={18} />}
-              Sign In
+              {isLoading
+                ? <GoogleSpinner size={22} color="white" />
+                : 'Sign in'
+              }
             </button>
+
           </form>
         </div>
 
-        {/* Footer outside card */}
-        <p
-          className="text-center"
-          style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '24px' }}
-        >
+        {/* ── Footer ── */}
+        <p className="text-[12px] text-[#5f6368] dark:text-[#9aa0a6] mt-8">
           &copy; {new Date().getFullYear()} Cadence Platform
         </p>
       </div>
-    </div>
     </>
   )
 }
