@@ -13,6 +13,9 @@ interface RunningJob {
   status: string
   message: string
   time_remaining_seconds?: number | null
+  department?: string
+  academic_year?: string
+  semester?: number
 }
 
 // ── Status chip — semantic CSS-var colours, no hardcoded hex ─────────────────
@@ -110,8 +113,11 @@ export default function AdminTimetablesPage() {
           job_id: t.id,
           progress: 0,
           status: t.status,
-          message: t.status === 'pending' ? 'Starting…' : 'Processing…',
+          message: t.status === 'pending' ? 'Queued — waiting to start' : 'Generating schedule…',
           time_remaining_seconds: null,
+          department: t.department,
+          academic_year: t.academic_year,
+          semester: t.semester,
         })),
     [timetables]
   )
@@ -280,42 +286,69 @@ export default function AdminTimetablesPage() {
 
       {/* ── 3. Active-jobs banner ────────────────────────────────────────── */}
       {runningJobs.length > 0 && (
-        <div style={{
-          background: 'var(--color-info-subtle)', border: '1px solid var(--color-primary)',
-          borderRadius: 'var(--radius-lg)', padding: '14px 16px',
-        }}>
-          <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-info)' }}>
-              Generation in progress — {runningJobs.length} job{runningJobs.length > 1 ? 's' : ''} running
-            </span>
+        <div className="card" style={{ borderLeft: '3px solid var(--color-primary)' }}>
+          {/* Header */}
+          <div className="card-header" style={{ paddingBottom: 12, marginBottom: 16 }}>
+            <div className="flex items-center gap-2">
+              <span
+                className="animate-pulse"
+                style={{
+                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                  background: 'var(--color-primary)',
+                  boxShadow: '0 0 0 3px var(--color-primary-subtle)',
+                }}
+              />
+              <h3 className="card-title">
+                {runningJobs.length === 1 ? 'Generation in Progress' : `${runningJobs.length} Jobs Running`}
+              </h3>
+            </div>
+            <p className="card-description">
+              AI engine is building your timetable — typically takes 1–3 minutes
+            </p>
           </div>
+
+          {/* Job rows */}
           <div className="space-y-3">
             {runningJobs.map(job => (
-              <div key={job.job_id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
-                    {job.message}
-                    {job.time_remaining_seconds && job.time_remaining_seconds > 0 && (
-                      <span style={{ marginLeft: 8 }}>
-                        · {Math.floor(job.time_remaining_seconds / 60)}m {job.time_remaining_seconds % 60}s remaining
+              <div key={job.job_id} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 14px',
+                background: 'var(--color-bg-page)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Identity */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {job.department ?? 'All Departments'}
+                    </span>
+                    {job.academic_year && job.semester && (
+                      <span style={{
+                        fontSize: 11, color: 'var(--color-text-muted)',
+                        background: 'var(--color-bg-surface-2)',
+                        padding: '1px 7px', borderRadius: 4,
+                        flexShrink: 0, fontWeight: 500,
+                      }}>
+                        {job.academic_year} · Sem {job.semester}
                       </span>
                     )}
                   </div>
+                  {/* Status text */}
+                  <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '0 0 8px' }}>
+                    {job.message}
+                  </p>
+                  {/* Indeterminate shimmer — honest: we don\'t have real % from list API */}
                   <div style={{ height: 4, background: 'var(--color-bg-surface-3)', borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', width: `${job.progress || 0}%`,
-                      background: 'var(--color-primary)', borderRadius: 2,
-                      transition: 'width 600ms ease',
-                      minWidth: job.progress > 0 ? 0 : '6%',
-                    }} />
+                    <div className="animate-shimmer" style={{ height: '100%', borderRadius: 2 }} />
                   </div>
                 </div>
                 <button
                   onClick={() => router.push(`/admin/timetables/status/${job.job_id}`)}
-                  className="btn-secondary"
-                  style={{ fontSize: 12, height: 28, padding: '0 10px', flexShrink: 0 }}
+                  className="btn-primary"
+                  style={{ fontSize: 12, height: 32, padding: '0 14px', flexShrink: 0 }}
                 >
-                  View
+                  View Progress
                 </button>
               </div>
             ))}
