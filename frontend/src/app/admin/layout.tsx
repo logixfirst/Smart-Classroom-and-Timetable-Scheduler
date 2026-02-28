@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import DashboardLayout from '@/components/dashboard-layout'
+import AppShell from '@/components/shell/AppShell'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -40,5 +40,5 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return null
   }
 
-  return <DashboardLayout>{children}</DashboardLayout>
+  return <AppShell>{children}</AppShell>
 }

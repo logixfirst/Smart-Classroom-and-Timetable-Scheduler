@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import DashboardLayout from '@/components/dashboard-layout'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -128,21 +127,18 @@ export default function StudentTimetable() {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <GoogleSpinner size={32} className="mx-auto mb-4" />
             <p className="text-gray-600 dark:text-gray-400">Loading schedule...</p>
           </div>
         </div>
-      </DashboardLayout>
     )
   }
 
   if (error) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="text-red-600 dark:text-red-400 mb-4">⚠️</div>
             <p className="text-gray-800 dark:text-gray-200 font-medium mb-2">Failed to load timetable</p>
@@ -150,20 +146,18 @@ export default function StudentTimetable() {
             <button onClick={fetchSchedule} className="btn-primary">Retry</button>
           </div>
         </div>
-      </DashboardLayout>
     )
   }
 
   return (
-    <DashboardLayout>
-      <div className="space-responsive">
+    <div className="space-responsive">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-800 dark:text-gray-200 truncate">
+            <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
               My Timetable
             </h2>
-            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-xs sm:text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
               View your weekly schedule
             </p>
           </div>
@@ -273,6 +267,5 @@ export default function StudentTimetable() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   )
 }

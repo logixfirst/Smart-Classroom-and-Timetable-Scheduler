@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
+import AppShell from '@/components/shell/AppShell'
 
 export default function FacultyLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -31,5 +32,5 @@ export default function FacultyLayout({ children }: { children: React.ReactNode 
     return null
   }
 
-  return <>{children}</>
+  return <AppShell>{children}</AppShell>
 }

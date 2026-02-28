@@ -213,8 +213,8 @@ export default function AdminUsersPage() {
       {/* ── Page Header ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Admin Users</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Admin Users</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
             {isLoading ? 'Loading…' : `${totalCount.toLocaleString()} admin accounts`}
           </p>
         </div>

@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import DashboardLayout from '@/components/dashboard-layout'
 import TimetableGrid from '@/components/shared/TimetableGrid'
 import apiClient from '@/lib/api'
 
@@ -213,8 +212,7 @@ export default function FacultyDashboard() {
   // REMOVED: closeAttendanceModal - attendance feature removed
 
   return (
-    <DashboardLayout role="faculty">
-      <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6">
         {/* Assigned Subjects */}
         <div className="card">
           <div className="card-header">
@@ -362,6 +360,5 @@ export default function FacultyDashboard() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   )
 }

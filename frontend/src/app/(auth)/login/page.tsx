@@ -11,6 +11,7 @@ import { FormField } from '@/components/FormFields'
 import { useToast } from '@/components/Toast'
 import { Divider } from '@/components/ui/Divider'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
+import { AuthRedirect } from '@/components/AuthRedirect'
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -73,10 +74,12 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-6 py-12 sm:p-6"
-      style={{ background: 'var(--color-bg-page)' }}
-    >
+    <>
+      <AuthRedirect />
+      <div
+        className="min-h-screen flex flex-col items-center justify-center px-6 py-12 sm:p-6"
+        style={{ background: 'var(--color-bg-page)' }}
+      >
       {/* Card — invisible on mobile, visible sm+ */}
       <div
         className="w-full"
@@ -233,5 +236,6 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+    </>
   )
 }

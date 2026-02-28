@@ -1,14 +1,13 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import {
-  Menu,
   Search,
   Mic,
-  Settings,
   Bell,
   LogOut,
   Sun,
@@ -24,10 +23,11 @@ import {
   FileText,
   Calendar,
   SlidersHorizontal,
+  ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface NavItem {
   label: string
@@ -44,10 +44,11 @@ interface DashboardLayoutProps {
 
 const ADMIN_NAV: NavItem[] = [
   { label: 'Dashboard',          href: '/admin/dashboard',        icon: LayoutDashboard },
-  { label: 'Timetables',         href: '/admin/timetables',       icon: CalendarDays },
-  { label: 'Academic Structure', href: '/admin/academic/schools', icon: BookOpen },
+  { label: 'Admins',             href: '/admin/admins',           icon: ShieldCheck },
   { label: 'Faculty',            href: '/admin/faculty',          icon: Users },
   { label: 'Students',           href: '/admin/students',         icon: GraduationCap },
+  { label: 'Academic',           href: '/admin/academic/schools', icon: BookOpen },
+  { label: 'Timetables',         href: '/admin/timetables',       icon: CalendarDays },
   { label: 'Approvals',          href: '/admin/approvals',        icon: CheckCircle2, badge: true },
   { label: 'Logs',               href: '/admin/logs',             icon: FileText },
 ]
@@ -64,7 +65,7 @@ const STUDENT_NAV: NavItem[] = [
 ]
 
 const NAV_MAP: Record<string, NavItem[]> = {
-  admin: ADMIN_NAV,
+  admin:   ADMIN_NAV,
   faculty: FACULTY_NAV,
   student: STUDENT_NAV,
 }
@@ -103,12 +104,7 @@ function Avatar({ name, size = 32 }: { name: string; size?: number }) {
   return (
     <span
       className="inline-flex items-center justify-center rounded-full font-semibold text-white select-none shrink-0"
-      style={{
-        width: size,
-        height: size,
-        fontSize: size * 0.375,
-        background: seedHsl(name),
-      }}
+      style={{ width: size, height: size, fontSize: size * 0.375, background: seedHsl(name) }}
     >
       {initials}
     </span>
@@ -141,10 +137,10 @@ function NavItemRow({
       className={[
         'relative flex items-center gap-3 rounded-[24px] h-10 my-0.5',
         'transition-colors duration-150 select-none',
-        collapsed ? 'justify-center w-10 mx-auto px-0' : 'px-4 mx-2',
+        collapsed ? 'justify-center w-10 mx-4 px-0' : 'px-4 mx-2',
         active
-          ? 'bg-[#c2e7ff] dark:bg-[#004a77] font-semibold text-[#001d35] dark:text-white'
-          : 'text-[#444746] dark:text-[#bdc1c6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134]',
+          ? 'bg-[#E8F0FE] dark:bg-[#1C2B4A] font-semibold text-[#1A73E8] dark:text-[#8AB4F8]'
+          : 'text-[#444746] dark:text-[#bdc1c6] hover:bg-[#EEF3FD] dark:hover:bg-[#1a2640]',
       ].join(' ')}
     >
       <span className="relative shrink-0">
@@ -153,6 +149,7 @@ function NavItemRow({
           <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-[#202124]" />
         )}
       </span>
+      {/* Visible label — hidden when rail is collapsed */}
       <span
         className={[
           'text-sm whitespace-nowrap transition-all duration-200',
@@ -161,33 +158,43 @@ function NavItemRow({
       >
         {item.label}
       </span>
+      {/* Screen-reader label always present so collapsed rail is accessible */}
+      {collapsed && <span className="sr-only">{item.label}</span>}
     </Link>
   )
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ─── AppShell ─────────────────────────────────────────────────────────────────
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+export default function AppShell({ children }: DashboardLayoutProps) {
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
-  const pathname  = usePathname()
-  const router    = useRouter()
+  const pathname = usePathname()
+  const router   = useRouter()
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [sidebarOpen,  setSidebarOpen]  = useState(true)    // desktop expanded
-  const [mobileOpen,   setMobileOpen]   = useState(false)   // mobile drawer
-  const [profileOpen,  setProfileOpen]  = useState(false)   // avatar dropdown
-  const [showSignOut,  setShowSignOut]  = useState(false)   // confirm dialog
-  const [searchOpen,   setSearchOpen]   = useState(false)   // mobile search overlay
-  const [pendingApprovals]              = useState(0)        // extend with SWR if needed
+  const [sidebarOpen,  setSidebarOpen]  = useState(true)   // desktop expanded
+  const [mobileOpen,   setMobileOpen]   = useState(false)  // mobile drawer
+  const [profileOpen,  setProfileOpen]  = useState(false)  // avatar dropdown
+  const [showSignOut,  setShowSignOut]  = useState(false)  // confirm dialog
+  const [searchOpen,   setSearchOpen]   = useState(false)  // mobile search overlay
+  const [pendingApprovals]              = useState(0)       // extend with SWR if needed
   const [mounted,      setMounted]      = useState(false)
 
   const profileRef = useRef<HTMLDivElement>(null)
   const searchRef  = useRef<HTMLInputElement>(null)
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const role      = (user?.role ?? 'student') as 'admin' | 'faculty' | 'student'
-  const navItems  = NAV_MAP[role] ?? STUDENT_NAV
+  // Prefer the role from the auth context; fall back to pathname so the correct
+  // nav is shown even while the user API call is still in-flight or fails.
+  const role: 'admin' | 'faculty' | 'student' = (() => {
+    if (user?.role === 'admin' || user?.role === 'faculty' || user?.role === 'student')
+      return user.role
+    if (pathname.startsWith('/admin'))   return 'admin'
+    if (pathname.startsWith('/faculty')) return 'faculty'
+    return 'student'
+  })()
+  const navItems   = NAV_MAP[role] ?? ADMIN_NAV
   const { full: displayName } = resolveUser(
     user ?? { username: 'User', email: '', first_name: '', last_name: '' }
   )
@@ -243,8 +250,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     router.push('/login')
   }
 
-  // ── Content area left margin transitions with sidebar width ───────────────
-  // SSR-safe: render SSR-default (expanded) then update after mount.
+  // ── Content area left margin — SSR-safe ─────────────────────────────────
   const contentMarginCls = mounted
     ? [
         'transition-[margin-left] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
@@ -263,25 +269,40 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       ══════════════════════════════════════════════════════════ */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center h-14 md:h-16 px-2 md:px-4 gap-1 bg-white dark:bg-[#202124] border-b border-[#e0e0e0] dark:border-[#3c4043]">
 
-        {/* Left: hamburger + wordmark */}
+        {/* Left: hamburger + logo + wordmark */}
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={handleHamburger}
             aria-label="Toggle sidebar"
             className="w-10 h-10 flex items-center justify-center rounded-full text-[#444746] dark:text-[#bdc1c6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
           >
-            <Menu size={20} />
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+              <line x1="3" y1="5"  x2="17" y2="5"/>
+              <line x1="3" y1="10" x2="17" y2="10"/>
+              <line x1="3" y1="15" x2="17" y2="15"/>
+            </svg>
           </button>
 
-          <Link
-            href={`/${role}/dashboard`}
-            className="flex items-center gap-1 px-1 select-none"
-          >
-            <span className="font-bold text-sm leading-none tracking-tight">
-              <span className="text-[#4285F4]">S</span>
-              <span className="text-[#EA4335]">I</span>
-              <span className="text-[#FBBC04]">H</span>
-              <span className="text-[#34A853]">28</span>
+          <Link href={`/${role}/dashboard`} className="flex items-center gap-2 px-1 select-none">
+            <Image
+              src="/logo2.png"
+              alt="Cadence"
+              width={32}
+              height={32}
+              className="rounded-full object-contain"
+              style={{ mixBlendMode: 'multiply', flexShrink: 0 }}
+            />
+            <span
+              className="hidden sm:inline"
+              style={{
+                fontSize: '17px',
+                fontWeight: 600,
+                color: 'var(--color-text-primary, #202124)',
+                whiteSpace: 'nowrap',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Cadence
             </span>
           </Link>
         </div>
@@ -313,7 +334,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </div>
 
-        {/* Right: search-icon (mobile) + settings + bell + avatar */}
+        {/* Right: mobile search + bell + avatar */}
         <div className="flex items-center gap-0.5 ml-auto shrink-0">
 
           {/* Mobile search icon */}
@@ -323,14 +344,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             className="md:hidden w-10 h-10 flex items-center justify-center rounded-full text-[#444746] dark:text-[#bdc1c6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
           >
             <Search size={20} />
-          </button>
-
-          {/* Settings */}
-          <button
-            aria-label="Settings"
-            className="w-10 h-10 flex items-center justify-center rounded-full text-[#444746] dark:text-[#bdc1c6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
-          >
-            <Settings size={20} />
           </button>
 
           {/* Bell */}
@@ -354,11 +367,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <Avatar name={displayName} size={32} />
             </button>
 
-            {/* Dropdown */}
             {profileOpen && (
               <div className="absolute right-0 top-[calc(100%+8px)] w-72 rounded-2xl shadow-xl bg-white dark:bg-[#292a2d] border border-[#e0e0e0] dark:border-[#3c4043] overflow-hidden z-[60]">
 
-                {/* User info header */}
+                {/* User info */}
                 <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#e0e0e0] dark:border-[#3c4043]">
                   <Avatar name={displayName} size={40} />
                   <div className="min-w-0">
@@ -427,7 +439,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       )}
 
       {/* ══════════════════════════════════════════════════════════
-          MOBILE BACKDROP (behind open drawer)
+          MOBILE BACKDROP
       ══════════════════════════════════════════════════════════ */}
       {mobileOpen && (
         <div
@@ -445,13 +457,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           'fixed left-0 top-0 h-full z-[45] flex flex-col',
           'bg-white dark:bg-[#202124]',
           'border-r border-[#e0e0e0] dark:border-[#3c4043]',
-          // Below header on desktop/tablet; full-height drawer on mobile
           'pt-14 md:pt-16',
-          // Mobile: off-canvas (translateX) / Desktop: width transition
           'transition-[width,transform] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
-          // Mobile open/closed
           mobileOpen ? 'translate-x-0 w-[256px]' : '-translate-x-full w-[256px] md:translate-x-0',
-          // Desktop width: depends on sidebarOpen; mobile open overrides to 256px
           !mobileOpen && (sidebarOpen ? 'md:w-[256px]' : 'md:w-[72px]'),
         ].filter(Boolean).join(' ')}
       >
@@ -472,27 +480,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           })}
         </nav>
 
-        {/* Role badge at bottom */}
-        <div
-          className={[
-            'shrink-0 py-4 flex',
-            collapsed ? 'justify-center px-0' : 'px-4',
-          ].join(' ')}
-        >
-          {collapsed ? (
-            <span
-              title={rolePill}
-              className="w-8 h-8 rounded-full bg-[#e8f0fe] dark:bg-[#1a3a5c] text-[#1a73e8] dark:text-[#8ab4f8] flex items-center justify-center"
-            >
-              <UserIcon size={14} />
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#e8f0fe] dark:bg-[#1a3a5c] text-[#1a73e8] dark:text-[#8ab4f8] text-xs font-semibold select-none">
-              <UserIcon size={12} />
-              {rolePill}
-            </span>
-          )}
-        </div>
+
       </aside>
 
       {/* ══════════════════════════════════════════════════════════
@@ -515,14 +503,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       ══════════════════════════════════════════════════════════ */}
       {showSignOut && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setShowSignOut(false)}
             aria-hidden="true"
           />
-
-          {/* Dialog card */}
           <div className="relative w-full max-w-sm bg-white dark:bg-[#292a2d] rounded-2xl shadow-2xl border border-[#e0e0e0] dark:border-[#3c4043] p-6 flex flex-col gap-4">
             <div className="flex items-start gap-3">
               <span className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0 mt-0.5">
@@ -533,11 +518,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   Sign out?
                 </h2>
                 <p className="text-sm text-[#5f6368] dark:text-[#9aa0a6] mt-1">
-                  Are you sure you want to sign out of SIH28?
+                  Are you sure you want to sign out of Cadence?
                 </p>
               </div>
             </div>
-
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setShowSignOut(false)}

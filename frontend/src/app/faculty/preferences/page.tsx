@@ -1,9 +1,7 @@
-import DashboardLayout from '@/components/dashboard-layout'
 
 export default function PreferencesPage() {
   return (
-    <DashboardLayout role="faculty">
-      <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-gray-200">
             Teaching Preferences
@@ -166,6 +164,5 @@ export default function PreferencesPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   )
 }

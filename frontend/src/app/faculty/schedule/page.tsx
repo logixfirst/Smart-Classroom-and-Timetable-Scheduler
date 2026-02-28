@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
-import DashboardLayout from '@/components/dashboard-layout'
 
 export default function FacultySchedule() {
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
@@ -48,27 +47,24 @@ export default function FacultySchedule() {
 
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <GoogleSpinner size={48} className="mx-auto mb-4" />
             <p className="text-gray-600 dark:text-gray-400">Loading schedule...</p>
           </div>
         </div>
-      </DashboardLayout>
     )
   }
 
   return (
-    <DashboardLayout role="faculty">
-      <div className="space-responsive">
+    <div className="space-responsive">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 dark:text-gray-200 truncate">
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
               My Schedule
             </h1>
-            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-xs sm:text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
               {faculty
                 ? `${faculty.faculty_name} • ${faculty.department}`
                 : 'View your weekly teaching schedule'}
@@ -235,6 +231,5 @@ export default function FacultySchedule() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   )
 }

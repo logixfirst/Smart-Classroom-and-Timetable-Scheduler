@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
-import DashboardLayout from '@/components/dashboard-layout'
 import apiClient from '@/lib/api'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
@@ -182,8 +181,7 @@ export default function StudentDashboard() {
   }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6">
         {/* Welcome Section */}
         <div className="card">
           <div className="flex flex-col gap-4 sm:gap-6">
@@ -893,6 +891,5 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   )
 }
