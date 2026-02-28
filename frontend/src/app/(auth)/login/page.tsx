@@ -102,7 +102,7 @@ export default function LoginPage() {
               height={72}
               priority
               quality={100}
-              style={{ objectFit: 'contain' }}
+              style={{ objectFit: 'contain', borderRadius: '50%' }}
             />
             {/* Wordmark */}
             <span

@@ -171,7 +171,7 @@ export default function Sidebar({
             width={32}
             height={32}
             quality={100}
-            style={{ flexShrink: 0, objectFit: 'contain' }}
+            style={{ flexShrink: 0, objectFit: 'contain', borderRadius: '50%' }}
           />
 
           {/* Wordmark — hidden only when collapsed on desktop; always shown in mobile drawer */}
