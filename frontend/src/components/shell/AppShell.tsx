@@ -269,15 +269,8 @@ export default function AppShell({ children }: DashboardLayoutProps) {
       ══════════════════════════════════════════════════════════ */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center h-14 md:h-16 px-2 md:px-4 gap-1 bg-[#f6f8fc] dark:bg-[#111111]">
 
-        {/* Left: hamburger + logo + wordmark — width tracks sidebar so search starts at sidebar edge */}
-        <div
-          className={[
-            'flex items-center gap-1 shrink-0 transition-[width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
-            mounted
-              ? (sidebarOpen ? 'md:w-[256px]' : 'md:w-[72px]')
-              : 'md:w-[256px]',
-          ].join(' ')}
-        >
+        {/* Left: hamburger + logo + wordmark — fixed natural width, never shifts search bar */}
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={handleHamburger}
             aria-label="Toggle sidebar"
@@ -342,8 +335,8 @@ export default function AppShell({ children }: DashboardLayoutProps) {
           </div>
         </div>
 
-        {/* Right: mobile search + bell + avatar */}
-        <div className="flex items-center gap-0.5 ml-auto shrink-0">
+        {/* Right: mobile search + Generate Timetable CTA + bell + avatar */}
+        <div className="flex items-center gap-2 ml-auto shrink-0">
 
           {/* Mobile search icon */}
           <button
@@ -359,14 +352,14 @@ export default function AppShell({ children }: DashboardLayoutProps) {
             <Link
               href="/admin/timetables/new"
               aria-label="Generate new timetable"
-              className="flex items-center gap-1.5 h-9 px-3.5 rounded-[20px] text-sm font-medium shrink-0 transition-colors bg-[#1A73E8] hover:bg-[#1765CC] active:bg-[#185ABC] text-white"
+              className="flex items-center gap-1.5 h-9 px-4 rounded-[20px] text-sm font-medium shrink-0 transition-colors bg-[#1A73E8] hover:bg-[#1765CC] active:bg-[#185ABC] text-white"
             >
               <Plus size={15} strokeWidth={2.2} />
               <span className="hidden sm:inline">Generate Timetable</span>
             </Link>
           )}
 
-          {/* Bell */}
+          {/* Bell — 4px gap from CTA */}
           <button
             aria-label="Notifications"
             className="relative w-10 h-10 flex items-center justify-center rounded-full text-[#444746] dark:text-[#bdc1c6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
@@ -377,14 +370,14 @@ export default function AppShell({ children }: DashboardLayoutProps) {
             )}
           </button>
 
-          {/* Avatar + dropdown */}
-          <div className="relative ml-1" ref={profileRef}>
+          {/* Avatar + dropdown — 2px gap from bell */}
+          <div className="relative ml-0.5" ref={profileRef}>
             <button
               onClick={() => setProfileOpen((v) => !v)}
               aria-label="Account menu"
               className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a73e8] focus-visible:ring-offset-1"
             >
-              <Avatar name={displayName} size={32} />
+              <Avatar name={displayName} size={36} />
             </button>
 
             {profileOpen && (

@@ -93,8 +93,9 @@ const CSS_KEYFRAMES = `
   );
   animation: shimmer 1.8s linear infinite;
 }
-/* Dot-grid page background — fills AppShell content pane, no scroll override */
+/* Dot-grid page background — bleeds through AppShell padding to fill entire rounded pane */
 .page-bg {
+  margin: -12px;           /* cancels AppShell p-3 (mobile) */
   min-height: calc(100vh - 4.5rem);
   background: var(--color-bg-page);
   background-image: radial-gradient(circle, #CBD5E1 1px, transparent 1px);
@@ -102,9 +103,12 @@ const CSS_KEYFRAMES = `
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: 28px 16px;
   position: relative;
-  border-radius: inherit;
+  border-radius: inherit;  /* keeps the rounded-2xl corners from <main> */
+}
+@media (min-width: 768px) {
+  .page-bg { margin: -24px; }  /* cancels AppShell md:p-6 */
 }
 /* Shared modal card */
 .modal-card { box-shadow: 0 4px 24px rgba(15,23,42,0.06); padding: 28px 36px; z-index: 1; }
