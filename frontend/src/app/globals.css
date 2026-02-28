@@ -327,6 +327,54 @@
   .btn-success:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
   .btn-success:disabled { opacity: 0.4; cursor: not-allowed; }
 
+  /* ── Table-row action buttons (Google Material 3 — Tonal style) ─────────── */
+  /* Edit — primary tonal: subtle blue bg, primary-blue text, pill shape       */
+  .btn-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 30px;
+    padding: 0 14px;
+    background-color: var(--color-primary-subtle);
+    color: var(--color-primary);
+    border: none;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 120ms, opacity 150ms;
+  }
+  .btn-edit:hover  { filter: brightness(0.93); }
+  .btn-edit:active { filter: brightness(0.86); }
+  .btn-edit:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
+  .btn-edit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Delete — danger tonal: subtle red bg, danger text, pill shape             */
+  .btn-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 30px;
+    padding: 0 14px;
+    background-color: var(--color-danger-subtle);
+    color: var(--color-danger-text);
+    border: none;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 120ms, opacity 150ms;
+  }
+  .btn-delete:hover  { filter: brightness(0.93); }
+  .btn-delete:active { filter: brightness(0.86); }
+  .btn-delete:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
+  .btn-delete:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Destructive / full-fill danger button (dialogs, confirmations) ──────── */
   .btn-danger {
     display: inline-flex;
     align-items: center;
@@ -336,15 +384,16 @@
     padding: 0 16px;
     background-color: var(--color-danger);
     color: var(--color-text-inverse);
-    border: 1px solid transparent;
-    border-radius: var(--radius-md);
+    border: none;
+    border-radius: 20px;
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     white-space: nowrap;
-    transition: background-color 100ms, opacity 150ms;
+    transition: background-color 120ms, opacity 150ms;
   }
-  .btn-danger:hover { filter: brightness(0.9); }
+  .btn-danger:hover  { filter: brightness(0.9); }
+  .btn-danger:active { filter: brightness(0.82); }
   .btn-danger:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
   .btn-danger:disabled { opacity: 0.4; cursor: not-allowed; }
 

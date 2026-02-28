@@ -283,8 +283,8 @@ export default function StudentsPage() {
                       <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{student.course?.course_name}</div>
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <button onClick={() => handleEditStudent(student)} className="btn-ghost text-xs px-2 py-1">Edit</button>
-                      <button onClick={() => handleDeleteStudent(student.id, student.name)} className="btn-danger text-xs px-2 py-1" disabled={isDeleting === student.id}>
+                      <button onClick={() => handleEditStudent(student)} className="btn-edit">Edit</button>
+                      <button onClick={() => handleDeleteStudent(student.id, student.name)} className="btn-delete" disabled={isDeleting === student.id}>
                         {isDeleting === student.id ? 'Deleting…' : 'Delete'}
                       </button>
                     </div>
@@ -341,13 +341,13 @@ export default function StudentsPage() {
                         <div className="flex gap-1">
                           <button
                             onClick={() => handleEditStudent(student)}
-                            className="btn-ghost text-xs px-2 py-1"
+                            className="btn-edit"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDeleteStudent(student.id, student.name)}
-                            className="btn-danger text-xs px-2 py-1"
+                            className="btn-delete"
                             disabled={isDeleting === student.id}
                           >
                             {isDeleting === student.id ? 'Deleting…' : 'Delete'}

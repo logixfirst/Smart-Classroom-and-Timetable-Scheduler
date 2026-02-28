@@ -192,12 +192,12 @@ export default function ProgramsPage() {
                     <td className="table-cell">
                       <div className="flex items-center gap-2">
                         <button
-                          className="btn-ghost text-xs px-2 py-1"
+                          className="btn-edit"
                           onClick={() => handleEdit(program)}
                           disabled={isTableLoading || isDeleting !== null}
                         >Edit</button>
                         <button
-                          className="btn-danger text-xs px-2 py-1"
+                          className="btn-delete"
                           onClick={() => handleDelete(program.id, program.program_name)}
                           disabled={isTableLoading || isDeleting === program.id}
                         >{isDeleting === program.id ? '…' : 'Delete'}</button>

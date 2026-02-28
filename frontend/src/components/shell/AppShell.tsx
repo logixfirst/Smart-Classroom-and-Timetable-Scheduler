@@ -102,7 +102,7 @@ function Avatar({ name, size = 32 }: { name: string; size?: number }) {
   return (
     <span
       className="inline-flex items-center justify-center rounded-full font-semibold text-white select-none shrink-0"
-      style={{ width: size, height: size, fontSize: size * 0.375, background: seedHsl(name) }}
+      style={{ width: size, height: size, fontSize: size * 0.44, background: seedHsl(name) }}
     >
       {initials}
     </span>
@@ -168,7 +168,7 @@ function NavItemRow({
 
 export default function AppShell({ children }: DashboardLayoutProps) {
   const { user, logout } = useAuth()
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, resolvedTheme } = useTheme()
   const pathname = usePathname()
   const router   = useRouter()
 
@@ -307,9 +307,9 @@ export default function AppShell({ children }: DashboardLayoutProps) {
           </Link>
         </div>
 
-        {/* Search bar — starts exactly at sidebar edge, high-contrast idle state */}
-        <div className="hidden md:flex flex-1 px-2">
-          <div className="relative w-full max-w-[584px]">
+        {/* Search bar — absolutely centred in the header, unaffected by sidebar */}
+        <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 w-full max-w-[584px] px-2">
+          <div className="relative w-full">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#5f6368] dark:text-[#9aa0a6]">
               <Search size={18} />
             </span>
@@ -381,46 +381,73 @@ export default function AppShell({ children }: DashboardLayoutProps) {
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 top-[calc(100%+8px)] w-72 rounded-2xl shadow-xl bg-white dark:bg-[#292a2d] border border-[#e0e0e0] dark:border-[#3c4043] overflow-hidden z-[60]">
+              <div className="absolute right-0 top-[calc(100%+8px)] w-[340px] rounded-3xl shadow-2xl bg-[#f6f8fc] dark:bg-[#111111] border border-[#e0e0e0] dark:border-[#3c4043] overflow-hidden z-[60]">
 
-                {/* User info */}
-                <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#e0e0e0] dark:border-[#3c4043]">
-                  <Avatar name={displayName} size={40} />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[#202124] dark:text-[#e8eaed] truncate">
-                      {displayName}
-                    </p>
-                    <p className="text-xs text-[#5f6368] dark:text-[#9aa0a6] truncate">
-                      {user?.email ?? ''}
-                    </p>
-                  </div>
+                {/* Header: email + close button */}
+                <div className="flex items-right justify-between px-4 pt-3.5 pb-2.5">
+                  <button
+                    onClick={() => setProfileOpen(false)}
+                    className="w-7 h-7 shrink-0 ml-2 flex items-center justify-center rounded-full text-[#5f6368] dark:text-[#9aa0a6] hover:bg-[#f1f3f4] dark:hover:bg-[#3c4043] transition-colors">
+                    <X size={14} />
+                  </button>
                 </div>
 
-                {/* Actions */}
-                <div className="py-1">
-                  <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors text-left">
-                    <UserIcon size={16} />
-                    Profile Settings
+                {/* Large avatar + greeting */}
+                <div className="flex flex-col items-center px-4 pb-5 pt-1">
+                  <div className="relative mb-3">
+                    <Avatar name={displayName} size={72} />
+                    <span aria-label="Change profile photo" className="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full flex items-center justify-center bg-white dark:bg-[#3c4043] border border-[#e0e0e0] dark:border-[#5f6368] shadow-sm">
+                      <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-[#5f6368] dark:text-[#9aa0a6]">
+                        <path fillRule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586l-1-1H7.586l-1 1H4zm8 4a2 2 0 11-4 0 2 2 0 014 0z" clipRule="evenodd" />
+                      </svg>
+                    </span>
+                  </div>
+                  <p className="text-[20px] font-normal text-[#202124] dark:text-[#e8eaed] mb-0.5">
+                    Hi, {user?.first_name || displayName.split(' ')[0]}!
+                  </p>
+                  <p className="text-[13px] text-[#5f6368] dark:text-[#9aa0a6] mb-4">
+                    {user?.email ?? ''}
+                  </p>
+                </div>
+
+                <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
+
+                {/* Two-column action row */}
+                <div className="grid grid-cols-2 gap-2 p-3">
+                  <button className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-[13px] font-medium border border-[#e0e0e0] dark:border-[#3c4043] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#3c4043] transition-colors">
+                    <UserIcon size={15} />
+                    Profile
                   </button>
                   <button
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors text-left"
+                    onClick={() => { setProfileOpen(false); setShowSignOut(true) }}
+                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-[13px] font-medium border border-[#e0e0e0] dark:border-[#3c4043] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#3c4043] transition-colors"
                   >
-                    {mounted && theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                    {mounted && theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                    <LogOut size={15} />
+                    Sign out
                   </button>
                 </div>
 
                 <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
 
+                {/* More section */}
                 <div className="py-1">
+                  <p className="px-4 pt-2.5 pb-1 text-[11px] font-semibold text-[#5f6368] dark:text-[#9aa0a6] uppercase tracking-wider">
+                    More from Cadence
+                  </p>
                   <button
-                    onClick={() => { setProfileOpen(false); setShowSignOut(true) }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors text-left"
+                    onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors text-left"
                   >
-                    <LogOut size={16} />
-                    Sign out
+                    {mounted && resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                    {mounted && resolvedTheme === 'dark' ? 'Switch to Light mode' : 'Switch to Dark mode'}
                   </button>
+                  <div className="flex items-center gap-3 px-4 py-2 pb-3">
+                    <ShieldCheck size={16} className="text-[#5f6368] dark:text-[#9aa0a6] shrink-0" />
+                    <span className="text-sm text-[#5f6368] dark:text-[#9aa0a6]">Signed in as</span>
+                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#E8F0FE] dark:bg-[#1C2B4A] text-[#1A73E8] dark:text-[#8AB4F8]">
+                      {rolePill}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}

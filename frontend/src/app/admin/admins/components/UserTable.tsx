@@ -33,8 +33,8 @@ export default function UserTable({ users }: UserTableProps) {
                 <span className="text-xs text-gray-500 dark:text-gray-400">{user.department || 'N/A'}</span>
               </div>
               <div className="flex gap-1">
-                <button className="btn-ghost text-xs px-2 py-1">Edit</button>
-                <button className="btn-ghost text-xs px-2 py-1 text-red-600 dark:text-red-400">
+                <button className="btn-edit">Edit</button>
+                <button className="btn-delete">
                   Delete
                 </button>
               </div>
@@ -75,10 +75,10 @@ export default function UserTable({ users }: UserTableProps) {
                 </td>
                 <td className="table-cell">
                   <div className="flex gap-1 sm:gap-2">
-                    <button className="btn-ghost text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2">
+                    <button className="btn-edit">
                       Edit
                     </button>
-                    <button className="btn-ghost text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2 text-red-600 dark:text-red-400">
+                    <button className="btn-delete">
                       Del
                     </button>
                   </div>

@@ -189,12 +189,12 @@ export default function DepartmentsPage() {
                     <td className="table-cell">
                       <div className="flex items-center gap-2">
                         <button
-                          className="btn-ghost text-xs px-2 py-1"
+                          className="btn-edit"
                           onClick={() => handleEdit(dept)}
                           disabled={isTableLoading || isDeleting !== null}
                         >Edit</button>
                         <button
-                          className="btn-danger text-xs px-2 py-1"
+                          className="btn-delete"
                           onClick={() => handleDelete(dept.id, dept.dept_name)}
                           disabled={isTableLoading || isDeleting === dept.id}
                         >{isDeleting === dept.id ? '…' : 'Delete'}</button>

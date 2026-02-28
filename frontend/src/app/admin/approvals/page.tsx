@@ -237,7 +237,7 @@ export default function AdminApprovals() {
                 <div className="flex gap-1">
                   <button
                     onClick={() => handleReject(approval.id)}
-                    className="btn-danger text-xs px-2 py-1"
+                    className="btn-delete"
                   >
                     Reject
                   </button>
@@ -294,7 +294,7 @@ export default function AdminApprovals() {
                       <div className="flex gap-1 sm:gap-2">
                         <button
                           onClick={() => handleReject(approval.id)}
-                          className="btn-danger text-xs px-2 py-1"
+                          className="btn-delete"
                         >
                           Reject
                         </button>

@@ -284,8 +284,8 @@ export default function ClassroomsPage() {
                   <td className="table-cell"><span className="badge badge-neutral">{ROOM_TYPE_LABELS[room.room_type] || room.room_type}</span></td>
                   <td className="table-cell">
                     <div className="flex gap-2">
-                      <button onClick={() => handleEdit(room)} className="btn-ghost text-xs px-2 py-1" disabled={isTableLoading}>Edit</button>
-                      <button onClick={() => handleDelete(room.room_id)} className="btn-danger text-xs px-2 py-1" disabled={isTableLoading}>Delete</button>
+                      <button onClick={() => handleEdit(room)} className="btn-edit" disabled={isTableLoading}>Edit</button>
+                      <button onClick={() => handleDelete(room.room_id)} className="btn-delete" disabled={isTableLoading}>Delete</button>
                     </div>
                   </td>
                 </tr>

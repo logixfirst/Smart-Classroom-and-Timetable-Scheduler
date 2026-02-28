@@ -53,11 +53,9 @@ import { useProgress, useSmoothProgress, useSmoothedETA } from '@/hooks/useProgr
 import { fetchGenerationJobStatus } from '@/lib/api/timetable'
 import type { GenerationJob } from '@/types/timetable'
 import { useEffect, useRef, useState, ReactNode } from 'react'
-import { DM_Serif_Display, DM_Sans, JetBrains_Mono } from 'next/font/google'
+import { JetBrains_Mono } from 'next/font/google'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 
-const dmSerifDisplay = DM_Serif_Display({ subsets: ['latin'], weight: '400' })
-const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'] })
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '700'] })
 
 // ─── CSS Keyframes + Static Utility Classes ──────────────────────────────────
@@ -93,11 +91,25 @@ const CSS_KEYFRAMES = `
   );
   animation: shimmer 1.8s linear infinite;
 }
-/* Dot-grid page background — bleeds through AppShell padding to fill entire rounded pane */
+@keyframes orbDrift1 {
+  0%, 100% { transform: translate(0px,   0px)   scale(1);    }
+  33%       { transform: translate(40px, -30px)  scale(1.05); }
+  66%       { transform: translate(-20px, 25px)  scale(0.97); }
+}
+@keyframes orbDrift2 {
+  0%, 100% { transform: translate(0px,   0px)   scale(1);    }
+  40%       { transform: translate(-35px, 20px)  scale(1.04); }
+  70%       { transform: translate(25px, -30px)  scale(0.96); }
+}
+@keyframes orbDrift3 {
+  0%, 100% { transform: translate(0px,  0px)   scale(1);    }
+  50%       { transform: translate(15px, 35px)  scale(1.06); }
+}
+/* Dot-grid + animated orb background */
 .page-bg {
-  margin: -12px;           /* cancels AppShell p-3 (mobile) */
+  margin: -12px;
   min-height: calc(100vh - 4.5rem);
-  background: var(--color-bg-page);
+  background-color: var(--color-bg-page);
   background-image: radial-gradient(circle, #CBD5E1 1px, transparent 1px);
   background-size: 24px 24px;
   display: flex;
@@ -105,10 +117,46 @@ const CSS_KEYFRAMES = `
   justify-content: center;
   padding: 28px 16px;
   position: relative;
-  border-radius: inherit;  /* keeps the rounded-2xl corners from <main> */
+  overflow: hidden;
+  border-radius: inherit;
+}
+.dark .page-bg {
+  background-image: radial-gradient(circle, #2C3040 1px, transparent 1px);
 }
 @media (min-width: 768px) {
-  .page-bg { margin: -24px; }  /* cancels AppShell md:p-6 */
+  .page-bg { margin: -24px; }
+}
+/* Orb 1 — blue, top-left */
+.page-bg::before {
+  content: '';
+  position: absolute;
+  width: 520px; height: 520px;
+  top: -160px; left: -120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(26,115,232,0.22) 0%, transparent 70%);
+  filter: blur(32px);
+  animation: orbDrift1 12s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+.dark .page-bg::before {
+  background: radial-gradient(circle, rgba(138,180,248,0.14) 0%, transparent 70%);
+}
+/* Orb 2 — indigo, bottom-right */
+.page-bg::after {
+  content: '';
+  position: absolute;
+  width: 480px; height: 480px;
+  bottom: -140px; right: -100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%);
+  filter: blur(36px);
+  animation: orbDrift2 15s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+.dark .page-bg::after {
+  background: radial-gradient(circle, rgba(139,92,246,0.13) 0%, transparent 70%);
 }
 /* Shared modal card */
 .modal-card { box-shadow: 0 4px 24px rgba(15,23,42,0.06); padding: 28px 36px; z-index: 1; }
@@ -116,6 +164,7 @@ const CSS_KEYFRAMES = `
 .modal-card--in1 { animation: fadeUp 400ms ease-out 100ms both; }
 /* Top gradient overlay */
 .top-gradient { background: linear-gradient(to bottom, rgba(248,250,255,0.95), transparent); z-index: 0; }
+.dark .top-gradient { background: linear-gradient(to bottom, rgba(28,30,33,0.95), transparent); }
 /* SVG icon sizes */
 .stage-icon { width: 14px; height: 14px; }
 .small-icon { width: 12px; height: 12px; }
@@ -123,8 +172,9 @@ const CSS_KEYFRAMES = `
 .center-fade { text-align: center; animation: fadeUp 400ms ease-out 100ms both; }
 /* Checkmark SVG path draw-on animation */
 .check-path { stroke-dasharray: 44; stroke-dashoffset: 44; animation: drawCheck 600ms ease-in-out forwards; }
-/* Success bar (always 100% deep blue) */
+/* Success bar */
 .complete-track { height: 14px; background-color: hsl(120,80%,94%); }
+.dark .complete-track { background-color: hsl(120,35%,14%); }
 .complete-fill  { height: 100%; border-radius: 9999px; background-color: hsl(120,88%,48%); }
 /* Dynamic progress bar — driven by CSS custom properties */
 .progress-track { height: 14px; background-color: var(--track-color, #E2E8F0); }
@@ -421,7 +471,7 @@ export default function TimetableStatusPage() {
   // ── Connection error ─────────────────────────────────────────────────────────
   if (error && reconnectAttempt > 5) {
     return (
-      <div className={`page-bg ${dmSans.className}`}>
+      <div className="page-bg">
         <div className="max-w-[680px] w-full rounded-2xl text-center modal-card modal-card--in" style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)' }}>
           <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] font-medium mb-6 -ml-1 transition-colors" style={{ color: 'var(--color-text-secondary)' }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -432,23 +482,15 @@ export default function TimetableStatusPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h2 className={`${dmSerifDisplay.className} text-[24px] mb-3`} style={{ color: 'var(--color-text-primary)' }}>
+          <h2 className="text-[22px] font-bold mb-3" style={{ color: 'var(--color-text-primary)' }}>
             Connection Lost
           </h2>
           <p className="text-[15px] mb-8 max-w-xs mx-auto" style={{ color: 'var(--color-text-secondary)' }}>{error}</p>
           <div className="flex gap-3 justify-center">
-            <button
-              onClick={() => window.location.reload()}
-              className="px-6 py-2.5 text-white font-semibold rounded-xl text-sm transition-colors"
-              style={{ background: 'var(--color-primary)' }}
-            >
+            <button onClick={() => window.location.reload()} className="btn-primary">
               Try Again
             </button>
-            <button
-              onClick={() => router.push('/admin/timetables')}
-              className="px-6 py-2.5 font-semibold rounded-xl text-sm transition-colors"
-              style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
-            >
+            <button onClick={() => router.push('/admin/timetables')} className="btn-secondary">
               Back to Timetables
             </button>
           </div>
@@ -461,7 +503,7 @@ export default function TimetableStatusPage() {
   // ── Connecting / loading ─────────────────────────────────────────────────────
   if (!progress) {
     return (
-      <div className={`page-bg ${dmSans.className}`}>
+      <div className="page-bg">
         <div className="center-fade">
           <GoogleSpinner size={48} className="mx-auto mb-6" />
           <p className="font-semibold text-[17px] mb-1" style={{ color: 'var(--color-text-primary)' }}>
@@ -479,7 +521,7 @@ export default function TimetableStatusPage() {
   // ── Success ──────────────────────────────────────────────────────────────────
   if (progress.status === 'completed') {
     return (
-      <div className={`page-bg ${dmSans.className}`}>
+      <div className="page-bg">
         <div className="max-w-[680px] w-full rounded-2xl text-center modal-card modal-card--in" style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)' }}>
           <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] font-medium mb-4 -ml-1 transition-colors" style={{ color: 'var(--color-text-secondary)' }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -494,7 +536,7 @@ export default function TimetableStatusPage() {
               className="check-path"
             />
           </svg>
-          <h2 className={`${dmSerifDisplay.className} text-[28px] mb-3`} style={{ color: 'var(--color-text-primary)' }}>
+          <h2 className="text-[26px] font-bold mb-3" style={{ color: 'var(--color-text-primary)' }}>
             Timetable Ready
           </h2>
           <p className="text-[15px] mb-8" style={{ color: 'var(--color-text-secondary)' }}>
@@ -507,8 +549,7 @@ export default function TimetableStatusPage() {
           </div>
           <button
             onClick={() => router.push(`/admin/timetables/${jobId}/review`)}
-            className="px-8 py-3 text-white font-semibold rounded-xl text-sm transition-colors"
-            style={{ background: 'var(--color-primary)' }}
+            className="btn-primary"
           >
             View Timetables
           </button>
@@ -524,7 +565,7 @@ export default function TimetableStatusPage() {
       ? String(progress.metadata.error)
       : 'Something went wrong while building the timetable. Please try again.'
     return (
-      <div className={`page-bg ${dmSans.className}`}>
+      <div className="page-bg">
         <div className="max-w-[680px] w-full rounded-2xl text-center modal-card modal-card--in" style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)' }}>
           <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] font-medium mb-6 -ml-1 transition-colors" style={{ color: 'var(--color-text-secondary)' }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -535,23 +576,15 @@ export default function TimetableStatusPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h2 className={`${dmSerifDisplay.className} text-[28px] mb-3`} style={{ color: 'var(--color-text-primary)' }}>
+          <h2 className="text-[26px] font-bold mb-3" style={{ color: 'var(--color-text-primary)' }}>
             Generation Failed
           </h2>
           <p className="text-[15px] mb-8 max-w-sm mx-auto" style={{ color: 'var(--color-text-secondary)' }}>{errorMsg}</p>
           <div className="flex gap-3 justify-center">
-            <button
-              onClick={() => router.push('/admin/timetables/new')}
-              className="px-6 py-2.5 text-white font-semibold rounded-xl text-sm transition-colors"
-              style={{ background: 'var(--color-primary)' }}
-            >
+            <button onClick={() => router.push('/admin/timetables/new')} className="btn-primary">
               Try Again
             </button>
-            <button
-              onClick={() => router.push('/admin/timetables')}
-              className="px-6 py-2.5 font-semibold rounded-xl text-sm transition-colors"
-              style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
-            >
+            <button onClick={() => router.push('/admin/timetables')} className="btn-secondary">
               Back to Timetables
             </button>
           </div>
@@ -564,9 +597,9 @@ export default function TimetableStatusPage() {
   // ── Cancelled ────────────────────────────────────────────────────────────────
   if (progress.status === 'cancelled') {
     return (
-      <div className={`page-bg ${dmSans.className}`}>
-        <div className="max-w-[680px] w-full bg-white border border-[#E2E8F0] rounded-2xl text-center modal-card modal-card--in">
-          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F172A] font-medium mb-6 -ml-1 transition-colors">
+      <div className="page-bg">
+        <div className="max-w-[680px] w-full rounded-2xl text-center modal-card modal-card--in" style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)' }}>
+          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] font-medium mb-6 -ml-1 transition-colors" style={{ color: 'var(--color-text-secondary)' }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Back to Timetables
           </button>
@@ -575,15 +608,11 @@ export default function TimetableStatusPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
             </svg>
           </div>
-          <h2 className={`${dmSerifDisplay.className} text-[28px] mb-3`} style={{ color: 'var(--color-text-primary)' }}>
+          <h2 className="text-[26px] font-bold mb-3" style={{ color: 'var(--color-text-primary)' }}>
             Generation Cancelled
           </h2>
           <p className="text-[15px] mb-8" style={{ color: 'var(--color-text-secondary)' }}>The timetable generation was stopped.</p>
-          <button
-            onClick={() => router.push('/admin/timetables')}
-            className="px-8 py-3 text-white font-semibold rounded-xl text-sm transition-colors"
-            style={{ background: 'var(--color-primary)' }}
-          >
+          <button onClick={() => router.push('/admin/timetables')} className="btn-primary">
             Back to Timetables
           </button>
         </div>
@@ -603,7 +632,7 @@ export default function TimetableStatusPage() {
     : 'Timetable Generation in Progress'
 
   return (
-    <div ref={containerRef} className={`page-bg ${dmSans.className}`}>
+    <div ref={containerRef} className="page-bg">
 
       {/* Top gradient fade — absolute so it stays within the AppShell content pane */}
       <div className="absolute top-0 left-0 right-0 h-32 pointer-events-none top-gradient" />
@@ -623,7 +652,7 @@ export default function TimetableStatusPage() {
         </p>
 
         {/* Heading — DM Sans (parent font), bold */}
-        <h1 className={`text-[26px] font-bold mb-1 fu-200`} style={{ color: 'var(--color-text-primary)' }}>
+          <h1 className="text-[24px] font-bold mb-1 fu-200" style={{ color: 'var(--color-text-primary)' }}>
           Building Your Timetable
         </h1>
 
@@ -720,8 +749,7 @@ export default function TimetableStatusPage() {
           {!showCancelConfirm ? (
             <button
               onClick={() => setShowCancelConfirm(true)}
-              className="text-[13px] font-medium border px-4 py-2 rounded-xl transition-colors"
-              style={{ color: 'var(--color-danger-text)', borderColor: 'var(--color-danger)' }}
+              className="btn-delete"
             >
               Cancel Generation
             </button>
@@ -731,15 +759,13 @@ export default function TimetableStatusPage() {
               <button
                 onClick={handleCancel}
                 disabled={isCancelling}
-                className="text-[13px] font-semibold text-white disabled:opacity-50 px-4 py-2 rounded-xl transition-colors"
-                style={{ background: 'var(--color-danger)' }}
+                className="btn-danger disabled:opacity-50"
               >
                 {isCancelling ? 'Stopping...' : 'Yes, stop'}
               </button>
               <button
                 onClick={() => setShowCancelConfirm(false)}
-                className="text-[13px] font-medium px-3 py-2 rounded-xl transition-colors"
-                style={{ color: 'var(--color-text-secondary)' }}
+                className="btn-ghost"
               >
                 Keep going
               </button>

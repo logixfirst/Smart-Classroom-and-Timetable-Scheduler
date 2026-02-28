@@ -319,14 +319,14 @@ export default function FacultyManagePage() {
                   <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                     <button
                       onClick={() => handleEditFaculty(member)}
-                      className="btn-ghost text-xs px-2 py-1"
+                      className="btn-edit"
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => handleDeleteFaculty(member.id, `${member.first_name} ${member.last_name}`)}
                       disabled={isDeleting === member.id}
-                      className="btn-danger text-xs px-2 py-1"
+                      className="btn-delete"
                     >
                       {isDeleting === member.id ? 'Deleting...' : 'Delete'}
                     </button>
@@ -395,7 +395,7 @@ export default function FacultyManagePage() {
                           <div className="flex gap-2">
                             <button
                               onClick={() => handleEditFaculty(member)}
-                              className="btn-ghost text-xs px-2 py-1"
+                              className="btn-edit"
                             >
                               Edit
                             </button>
@@ -405,7 +405,7 @@ export default function FacultyManagePage() {
                                 handleDeleteFaculty(member.id, `${member.first_name} ${member.last_name}`)
                               }
                               disabled={isDeleting === member.id}
-                              className="btn-danger text-xs px-2 py-1"
+                              className="btn-delete"
                             >
                               {isDeleting === member.id ? 'Deleting...' : 'Delete'}
                             </button>

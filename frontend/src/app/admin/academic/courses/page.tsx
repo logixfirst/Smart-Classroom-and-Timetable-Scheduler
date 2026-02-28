@@ -358,8 +358,8 @@ export default function SubjectsPage() {
                   <td className="table-cell">{course.credits}</td>
                   <td className="table-cell">
                     <div className="flex gap-2">
-                      <button onClick={() => handleEdit(course)} className="btn-ghost text-xs px-2 py-1" disabled={isTableLoading}>Edit</button>
-                      <button onClick={() => handleDelete(course.course_id)} className="btn-danger text-xs px-2 py-1" disabled={isTableLoading}>Delete</button>
+                      <button onClick={() => handleEdit(course)} className="btn-edit" disabled={isTableLoading}>Edit</button>
+                      <button onClick={() => handleDelete(course.course_id)} className="btn-delete" disabled={isTableLoading}>Delete</button>
                     </div>
                   </td>
                 </tr>

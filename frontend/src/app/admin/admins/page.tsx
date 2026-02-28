@@ -308,8 +308,8 @@ export default function AdminUsersPage() {
                     <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{user.department || 'No department'}</div>
                   </div>
                   <div className="flex gap-1 shrink-0">
-                    <button onClick={() => handleEditUser(user)} className="btn-ghost text-xs px-2 py-1">Edit</button>
-                    <button onClick={() => handleDeleteUser(user.id)} className="btn-danger text-xs px-2 py-1">Delete</button>
+                    <button onClick={() => handleEditUser(user)} className="btn-edit">Edit</button>
+                    <button onClick={() => handleDeleteUser(user.id)} className="btn-delete">Delete</button>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-2.5">
@@ -366,10 +366,10 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="table-cell">
                       <div className="flex gap-1">
-                        <button onClick={() => handleEditUser(user)} className="btn-ghost text-xs px-2 py-1">
+                        <button onClick={() => handleEditUser(user)} className="btn-edit">
                           Edit
                         </button>
-                        <button onClick={() => handleDeleteUser(user.id)} className="btn-danger text-xs px-2 py-1">
+                        <button onClick={() => handleDeleteUser(user.id)} className="btn-delete">
                           Delete
                         </button>
                       </div>
