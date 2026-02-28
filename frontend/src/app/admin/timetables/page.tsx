@@ -286,7 +286,7 @@ export default function AdminTimetablesPage() {
 
       {/* ── 3. Active-jobs banner ────────────────────────────────────────── */}
       {runningJobs.length > 0 && (
-        <div className="card" style={{ borderLeft: '3px solid var(--color-primary)' }}>
+        <div className="card" style={{ borderLeft: '3px solid var(--color-success)' }}>
           {/* Header */}
           <div className="card-header" style={{ paddingBottom: 12, marginBottom: 16 }}>
             <div className="flex items-center gap-2">
@@ -294,8 +294,8 @@ export default function AdminTimetablesPage() {
                 className="animate-pulse"
                 style={{
                   width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                  background: 'var(--color-primary)',
-                  boxShadow: '0 0 0 3px var(--color-primary-subtle)',
+                  background: 'var(--color-success)',
+                  boxShadow: '0 0 0 3px var(--color-success-subtle)',
                 }}
               />
               <h3 className="card-title">
@@ -338,8 +338,8 @@ export default function AdminTimetablesPage() {
                   <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '0 0 8px' }}>
                     {job.message}
                   </p>
-                  {/* Indeterminate shimmer — honest: we don\'t have real % from list API */}
-                  <div style={{ height: 4, background: 'var(--color-bg-surface-3)', borderRadius: 2, overflow: 'hidden' }}>
+                  {/* Indeterminate shimmer — no track, just the sweep */}
+                  <div style={{ height: 4, borderRadius: 2, overflow: 'hidden' }}>
                     <div className="animate-shimmer" style={{ height: '100%', borderRadius: 2 }} />
                   </div>
                 </div>
