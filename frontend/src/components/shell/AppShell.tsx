@@ -25,6 +25,11 @@ import {
   Calendar,
   SlidersHorizontal,
   ShieldCheck,
+  Settings,
+  BarChart3,
+  Clock,
+  BookMarked,
+  ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
@@ -160,6 +165,34 @@ function NavItemRow({
       </span>
       {/* Screen-reader label always present so collapsed rail is accessible */}
       {collapsed && <span className="sr-only">{item.label}</span>}
+    </Link>
+  )
+}
+
+// ─── QuickLink (profile dropdown row) ────────────────────────────────────────
+
+function QuickLink({
+  href,
+  icon,
+  label,
+  onClick,
+  badge,
+}: {
+  href: string
+  icon: React.ReactNode
+  label: string
+  onClick?: () => void
+  badge?: boolean
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      className="flex items-center gap-3 px-4 py-2.5 text-sm text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
+    >
+      <span className="shrink-0 text-[#5f6368] dark:text-[#9aa0a6]">{icon}</span>
+      <span className="flex-1">{label}</span>
+      {badge && <span className="w-2 h-2 rounded-full bg-red-500" />}
     </Link>
   )
 }
@@ -381,73 +414,100 @@ export default function AppShell({ children }: DashboardLayoutProps) {
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 top-[calc(100%+8px)] w-[340px] rounded-3xl shadow-2xl bg-[#f6f8fc] dark:bg-[#111111] border border-[#e0e0e0] dark:border-[#3c4043] overflow-hidden z-[60]">
+              <div className="absolute right-0 top-[calc(100%+8px)] w-[360px] rounded-3xl shadow-2xl bg-white dark:bg-[#202124] border border-[#e0e0e0] dark:border-[#3c4043] overflow-hidden z-[60]">
 
-                {/* Header: email + close button */}
-                <div className="flex items-right justify-between px-4 pt-3.5 pb-2.5">
+                {/* ── Top strip: close + role badge ── */}
+                <div className="flex items-center justify-between px-4 pt-3 pb-2">
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#E8F0FE] dark:bg-[#1C2B4A] text-[#1A73E8] dark:text-[#8AB4F8] uppercase tracking-wider select-none">
+                    {rolePill}
+                  </span>
                   <button
                     onClick={() => setProfileOpen(false)}
-                    className="w-7 h-7 shrink-0 ml-2 flex items-center justify-center rounded-full text-[#5f6368] dark:text-[#9aa0a6] hover:bg-[#f1f3f4] dark:hover:bg-[#3c4043] transition-colors">
+                    aria-label="Close account menu"
+                    className="w-7 h-7 flex items-center justify-center rounded-full text-[#5f6368] dark:text-[#9aa0a6] hover:bg-[#f1f3f4] dark:hover:bg-[#3c4043] transition-colors"
+                  >
                     <X size={14} />
                   </button>
                 </div>
 
-                {/* Large avatar + greeting */}
+                {/* ── Avatar card ── */}
                 <div className="flex flex-col items-center px-4 pb-5 pt-1">
                   <div className="relative mb-3">
                     <Avatar name={displayName} size={72} />
-                    <span aria-label="Change profile photo" className="absolute -bottom-0.5 -right-0.5 w-[22px] h-[22px] rounded-full flex items-center justify-center bg-white dark:bg-[#3c4043] border border-[#e0e0e0] dark:border-[#5f6368] shadow-sm">
-                      <svg viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-[#5f6368] dark:text-[#9aa0a6]">
-                        <path fillRule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586l-1-1H7.586l-1 1H4zm8 4a2 2 0 11-4 0 2 2 0 014 0z" clipRule="evenodd" />
-                      </svg>
-                    </span>
                   </div>
-                  <p className="text-[20px] font-normal text-[#202124] dark:text-[#e8eaed] mb-0.5">
+                  <p className="text-[20px] font-normal text-[#202124] dark:text-[#e8eaed] leading-tight mb-1">
                     Hi, {user?.first_name || displayName.split(' ')[0]}!
                   </p>
                   <p className="text-[13px] text-[#5f6368] dark:text-[#9aa0a6] mb-4">
-                    {user?.email ?? ''}
+                    {displayName}
                   </p>
-                </div>
 
-                <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
-
-                {/* Two-column action row */}
-                <div className="grid grid-cols-2 gap-2 p-3">
-                  <button className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-[13px] font-medium border border-[#e0e0e0] dark:border-[#3c4043] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#3c4043] transition-colors">
-                    <UserIcon size={15} />
-                    Profile
-                  </button>
-                  <button
-                    onClick={() => { setProfileOpen(false); setShowSignOut(true) }}
-                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-2xl text-[13px] font-medium border border-[#e0e0e0] dark:border-[#3c4043] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#3c4043] transition-colors"
+                  {/* Manage profile button — opens profile page */}
+                  <Link
+                    href={`/${role}/profile`}
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-medium border border-[#dadce0] dark:border-[#5f6368] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f8f9fa] dark:hover:bg-[#303134] transition-colors"
                   >
-                    <LogOut size={15} />
-                    Sign out
-                  </button>
+                    <UserIcon size={14} />
+                    Manage profile
+                  </Link>
                 </div>
 
                 <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
 
-                {/* More section */}
+                {/* ── Role-aware quick actions ── */}
                 <div className="py-1">
-                  <p className="px-4 pt-2.5 pb-1 text-[11px] font-semibold text-[#5f6368] dark:text-[#9aa0a6] uppercase tracking-wider">
-                    More from Cadence
-                  </p>
+                  {role === 'admin' && (
+                    <>
+                      <QuickLink href="/admin/timetables/new" icon={<CalendarDays size={16}/>} label="Generate Timetable" onClick={() => setProfileOpen(false)} />
+                      <QuickLink href="/admin/approvals" icon={<CheckCircle2 size={16}/>} label="Pending Approvals" onClick={() => setProfileOpen(false)} badge={pendingApprovals > 0} />
+                      <QuickLink href="/admin/timetables" icon={<ClipboardList size={16}/>} label="All Timetables" onClick={() => setProfileOpen(false)} />
+                      <QuickLink href="/admin/academic/schools" icon={<BookOpen size={16}/>} label="Academic Setup" onClick={() => setProfileOpen(false)} />
+                      <QuickLink href="/admin/logs" icon={<BarChart3 size={16}/>} label="System Logs" onClick={() => setProfileOpen(false)} />
+                    </>
+                  )}
+                  {role === 'faculty' && (
+                    <>
+                      <QuickLink href="/faculty/schedule" icon={<Clock size={16}/>} label="My Schedule" onClick={() => setProfileOpen(false)} />
+                      <QuickLink href="/faculty/preferences" icon={<SlidersHorizontal size={16}/>} label="Teaching Preferences" onClick={() => setProfileOpen(false)} />
+                      <QuickLink href="/faculty/timetable" icon={<CalendarDays size={16}/>} label="View Timetable" onClick={() => setProfileOpen(false)} />
+                    </>
+                  )}
+                  {role === 'student' && (
+                    <>
+                      <QuickLink href="/student/timetable" icon={<CalendarDays size={16}/>} label="My Timetable" onClick={() => setProfileOpen(false)} />
+                      <QuickLink href="/student/schedule" icon={<BookMarked size={16}/>} label="Weekly Schedule" onClick={() => setProfileOpen(false)} />
+                    </>
+                  )}
+                </div>
+
+                <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
+
+                {/* ── Settings & theme ── */}
+                <div className="py-1">
+                  <QuickLink href={`/${role}/settings`} icon={<Settings size={16}/>} label="Settings" onClick={() => setProfileOpen(false)} />
                   <button
                     onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors text-left"
                   >
-                    {mounted && resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-                    {mounted && resolvedTheme === 'dark' ? 'Switch to Light mode' : 'Switch to Dark mode'}
+                    {mounted && resolvedTheme === 'dark'
+                      ? <><Sun size={16} className="shrink-0" /><span>Switch to Light mode</span></>
+                      : <><Moon size={16} className="shrink-0" /><span>Switch to Dark mode</span></>
+                    }
                   </button>
-                  <div className="flex items-center gap-3 px-4 py-2 pb-3">
-                    <ShieldCheck size={16} className="text-[#5f6368] dark:text-[#9aa0a6] shrink-0" />
-                    <span className="text-sm text-[#5f6368] dark:text-[#9aa0a6]">Signed in as</span>
-                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#E8F0FE] dark:bg-[#1C2B4A] text-[#1A73E8] dark:text-[#8AB4F8]">
-                      {rolePill}
-                    </span>
-                  </div>
+                </div>
+
+                <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
+
+                {/* ── Sign out ── */}
+                <div className="p-3">
+                  <button
+                    onClick={() => { setProfileOpen(false); setShowSignOut(true) }}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-[13px] font-medium border border-[#dadce0] dark:border-[#5f6368] text-[#d93025] dark:text-[#f28b82] hover:bg-[#fce8e6] dark:hover:bg-[#3a2323] transition-colors"
+                  >
+                    <LogOut size={15} />
+                    Sign out
+                  </button>
                 </div>
               </div>
             )}
