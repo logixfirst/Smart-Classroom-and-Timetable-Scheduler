@@ -30,6 +30,8 @@ import {
   Clock,
   BookMarked,
   ClipboardList,
+  Globe,
+  HelpCircle,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
@@ -188,7 +190,7 @@ function QuickLink({
     <Link
       href={href}
       onClick={onClick}
-      className="flex items-center gap-3 px-5 py-2.5 text-[14px] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
+      className="flex items-center gap-3 px-5 py-2.5 text-[14px] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#e8eef7] dark:hover:bg-[#303134] transition-colors"
     >
       <span className="shrink-0 text-[#5f6368] dark:text-[#9aa0a6]">{icon}</span>
       <span className="flex-1">{label}</span>
@@ -414,122 +416,113 @@ export default function AppShell({ children }: DashboardLayoutProps) {
             </button>
 
             {profileOpen && (
-              <div className="absolute right-0 top-[calc(100%+8px)] w-[360px] rounded-[28px] shadow-[0_8px_10px_1px_rgba(0,0,0,0.14),0_3px_14px_2px_rgba(0,0,0,0.12),0_5px_5px_-3px_rgba(0,0,0,0.2)] bg-white dark:bg-[#202124] border border-[#e0e0e0] dark:border-[#3c4043] overflow-hidden z-[60]">
+              /* Outer panel — light: soft blue-grey #e8edf5 | dark: Google panel #202124 */
+              <div className="absolute right-0 top-[calc(100%+8px)] w-[360px] rounded-[28px] shadow-[0_8px_24px_rgba(0,0,0,0.18)] bg-[#e8edf5] dark:bg-[#202124] border border-[#cdd3de] dark:border-[#3c4043] overflow-hidden z-[60]">
 
-                {/* ── Header bar: app domain + close ── */}
-                <div className="flex items-center justify-between px-5 h-11 border-b border-[#e0e0e0] dark:border-[#3c4043]">
-                  <span className="text-[12px] text-[#5f6368] dark:text-[#9aa0a6] select-none font-medium tracking-[0.01em]">
-                    cadence.erp
+                {/* ── Row 1: centered email + X ── */}
+                <div className="relative flex items-center justify-center h-12 px-12">
+                  <span className="text-[16px] font-normal text-[#1f1f1f] dark:text-[#e8eaed] truncate select-none">
+                    {user?.email ?? ''}
                   </span>
                   <button
                     onClick={() => setProfileOpen(false)}
-                    aria-label="Close account menu"
-                    className="w-8 h-8 flex items-center justify-center rounded-full text-[#5f6368] dark:text-[#9aa0a6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
+                    aria-label="Close"
+                    className="absolute right-3 w-8 h-8 flex items-center justify-center rounded-full text-[#5f6368] dark:text-[#9aa0a6] hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
                   >
                     <X size={16} />
                   </button>
                 </div>
 
-                {/* ── Avatar card — Google-exact layout ── */}
+                {/* ── Row 2: centered avatar + Hi + full name ── */}
                 <div className="flex flex-col items-center px-6 pt-6 pb-5">
-                  {/* Avatar */}
-                  <div className="mb-3">
-                    <Avatar name={displayName} size={64} />
-                  </div>
-
-                  {/* "Hi, Name!" */}
-                  <p className="text-[22px] font-normal text-[#202124] dark:text-[#e8eaed] leading-snug mb-0.5 text-center">
+                  <Avatar name={displayName} size={72} />
+                  <p className="mt-4 text-[22px] font-normal text-[#202124] dark:text-[#e8eaed] leading-snug">
                     Hi, {user?.first_name || displayName.split(' ')[0]}!
                   </p>
-
-                  {/* Full display name */}
-                  <p className="text-[14px] text-[#202124] dark:text-[#e8eaed] mb-0.5 text-center font-normal">
+                  <p className="mt-0.5 mb-5 text-[14px] text-[#5f6368] dark:text-[#9aa0a6]">
                     {displayName}
                   </p>
 
-                  {/* Email — shown prominently like Google */}
-                  <p className="text-[14px] text-[#5f6368] dark:text-[#9aa0a6] mb-5 text-center">
-                    {user?.email ?? ''}
+                  {/* Profile | Sign out — single pill container with thin divider, Google style */}
+                  <div className="flex w-full rounded-full border border-[#c5ccd8] dark:border-[#5f6368] bg-white dark:bg-[#2d2f31] overflow-hidden">
+                    <Link
+                      href={`/${role}/profile`}
+                      onClick={() => setProfileOpen(false)}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 text-[14px] font-medium text-[#1f1f1f] dark:text-[#e8eaed] hover:bg-[#f1f3f4] dark:hover:bg-[#3c4043] transition-colors"
+                    >
+                      <UserIcon size={15} className="shrink-0" />
+                      Profile
+                    </Link>
+                    <div className="w-px my-2 bg-[#c5ccd8] dark:bg-[#5f6368]" />
+                    <button
+                      onClick={() => { setProfileOpen(false); setShowSignOut(true) }}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 text-[14px] font-medium text-[#1f1f1f] dark:text-[#e8eaed] hover:bg-[#f1f3f4] dark:hover:bg-[#3c4043] transition-colors"
+                    >
+                      <LogOut size={15} className="shrink-0" />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+
+                {/* ── Cards section ── */}
+                <div className="px-3 pb-3 flex flex-col gap-2">
+
+                  {/* Logged in as role */}
+                  <div className="bg-white dark:bg-[#2d2f31] rounded-[20px] px-4 py-3 flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-[#5f6368] dark:text-[#9aa0a6] shrink-0" />
+                    <span className="text-[13px] text-[#5f6368] dark:text-[#9aa0a6] flex-1">Logged in as</span>
+                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#E8F0FE] dark:bg-[#1C2B4A] text-[#1A73E8] dark:text-[#8AB4F8] uppercase tracking-wider">
+                      {rolePill}
+                    </span>
+                  </div>
+
+                  {/* Settings + Theme */}
+                  <div className="bg-white dark:bg-[#2d2f31] rounded-[20px] overflow-hidden">
+                    <Link
+                      href={`/${role}/settings`}
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3.5 text-[14px] text-[#1f1f1f] dark:text-[#e8eaed] hover:bg-[#d8dde9] dark:hover:bg-[#3c4043] transition-colors"
+                    >
+                      <Settings size={18} className="text-[#5f6368] dark:text-[#9aa0a6] shrink-0" />
+                      <span className="flex-1">Settings</span>
+                    </Link>
+                    <div className="h-px mx-4 bg-[#dde2eb] dark:bg-[#3c4043]" />
+                    <button
+                      onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+                      className="w-full flex items-center gap-3 px-4 py-3.5 text-[14px] text-[#1f1f1f] dark:text-[#e8eaed] hover:bg-[#d8dde9] dark:hover:bg-[#3c4043] transition-colors text-left"
+                    >
+                      {mounted && resolvedTheme === 'dark'
+                        ? <Sun  size={18} className="text-[#5f6368] dark:text-[#9aa0a6] shrink-0" />
+                        : <Moon size={18} className="text-[#5f6368] dark:text-[#9aa0a6] shrink-0" />
+                      }
+                      <span className="flex-1">
+                        {mounted && resolvedTheme === 'dark' ? 'Light mode' : 'Dark mode'}
+                      </span>
+                      <span className="text-[12px] text-[#5f6368] dark:text-[#9aa0a6]">Off</span>
+                    </button>
+                  </div>
+
+                  {/* Language | Help */}
+                  <div className="bg-white dark:bg-[#2d2f31] rounded-[20px] overflow-hidden flex">
+                    <button className="flex-1 flex items-center gap-2 px-4 py-3.5 text-[14px] text-[#1f1f1f] dark:text-[#e8eaed] hover:bg-[#d8dde9] dark:hover:bg-[#3c4043] transition-colors">
+                      <Globe      size={17} className="text-[#5f6368] dark:text-[#9aa0a6] shrink-0" />
+                      <span>Language</span>
+                    </button>
+                    <div className="w-px my-3 bg-[#dde2eb] dark:bg-[#3c4043]" />
+                    <button className="flex-1 flex items-center gap-2 px-4 py-3.5 text-[14px] text-[#1f1f1f] dark:text-[#e8eaed] hover:bg-[#d8dde9] dark:hover:bg-[#3c4043] transition-colors">
+                      <HelpCircle size={17} className="text-[#5f6368] dark:text-[#9aa0a6] shrink-0" />
+                      <span>Help</span>
+                    </button>
+                  </div>
+
+                  {/* Footer */}
+                  <p className="text-center text-[12px] text-[#5f6368] dark:text-[#9aa0a6] pt-1 pb-1">
+                    <a href="/privacy" className="hover:underline">Privacy Policy</a>
+                    <span className="mx-1.5">&bull;</span>
+                    <a href="/terms" className="hover:underline">Terms of Service</a>
                   </p>
 
-                  {/* Manage profile pill */}
-                  <Link
-                    href={`/${role}/profile`}
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-2 px-5 py-2 rounded-full text-[14px] font-medium border border-[#dadce0] dark:border-[#5f6368] text-[#1f1f1f] dark:text-[#e8eaed] hover:bg-[#f8f9fa] dark:hover:bg-[#303134] transition-colors"
-                  >
-                    Manage your account
-                  </Link>
                 </div>
-
-                <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
-
-                {/* ── Role badge ── */}
-                <div className="flex items-center gap-2 px-5 py-2.5">
-                  <ShieldCheck size={14} className="text-[#5f6368] dark:text-[#9aa0a6] shrink-0" />
-                  <span className="text-[12px] text-[#5f6368] dark:text-[#9aa0a6] flex-1">Signed in as</span>
-                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#E8F0FE] dark:bg-[#1C2B4A] text-[#1A73E8] dark:text-[#8AB4F8] uppercase tracking-wider">
-                    {rolePill}
-                  </span>
-                </div>
-
-                <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
-
-                {/* ── Role-aware quick actions ── */}
-                <div className="py-1">
-                  {role === 'admin' && (
-                    <>
-                      <QuickLink href="/admin/timetables/new" icon={<CalendarDays size={16}/>} label="Generate Timetable" onClick={() => setProfileOpen(false)} />
-                      <QuickLink href="/admin/approvals" icon={<CheckCircle2 size={16}/>} label="Pending Approvals" onClick={() => setProfileOpen(false)} badge={pendingApprovals > 0} />
-                      <QuickLink href="/admin/timetables" icon={<ClipboardList size={16}/>} label="All Timetables" onClick={() => setProfileOpen(false)} />
-                      <QuickLink href="/admin/academic/schools" icon={<BookOpen size={16}/>} label="Academic Setup" onClick={() => setProfileOpen(false)} />
-                      <QuickLink href="/admin/logs" icon={<BarChart3 size={16}/>} label="System Logs" onClick={() => setProfileOpen(false)} />
-                    </>
-                  )}
-                  {role === 'faculty' && (
-                    <>
-                      <QuickLink href="/faculty/schedule" icon={<Clock size={16}/>} label="My Schedule" onClick={() => setProfileOpen(false)} />
-                      <QuickLink href="/faculty/preferences" icon={<SlidersHorizontal size={16}/>} label="Teaching Preferences" onClick={() => setProfileOpen(false)} />
-                      <QuickLink href="/faculty/timetable" icon={<CalendarDays size={16}/>} label="View Timetable" onClick={() => setProfileOpen(false)} />
-                    </>
-                  )}
-                  {role === 'student' && (
-                    <>
-                      <QuickLink href="/student/timetable" icon={<CalendarDays size={16}/>} label="My Timetable" onClick={() => setProfileOpen(false)} />
-                      <QuickLink href="/student/schedule" icon={<BookMarked size={16}/>} label="Weekly Schedule" onClick={() => setProfileOpen(false)} />
-                    </>
-                  )}
-                </div>
-
-                <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
-
-                {/* ── Settings & theme ── */}
-                <div className="py-1">
-                  <QuickLink href={`/${role}/settings`} icon={<Settings size={16}/>} label="Settings" onClick={() => setProfileOpen(false)} />
-                  <button
-                    onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-                    className="w-full flex items-center gap-3 px-5 py-2.5 text-[14px] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors text-left"
-                  >
-                    {mounted && resolvedTheme === 'dark'
-                      ? <><Sun size={16} className="shrink-0 text-[#5f6368] dark:text-[#9aa0a6]" /><span>Switch to Light mode</span></>
-                      : <><Moon size={16} className="shrink-0 text-[#5f6368] dark:text-[#9aa0a6]" /><span>Switch to Dark mode</span></>
-                    }
-                  </button>
-                </div>
-
-                <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
-
-                {/* ── Sign out ── */}
-                <div className="px-4 py-3">
-                  <button
-                    onClick={() => { setProfileOpen(false); setShowSignOut(true) }}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-full text-[14px] font-medium border border-[#dadce0] dark:border-[#5f6368] text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
-                  >
-                    <LogOut size={15} />
-                    Sign out
-                  </button>
-                </div>
-
               </div>
             )}
           </div>
