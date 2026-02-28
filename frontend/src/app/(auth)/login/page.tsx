@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, forwardRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
@@ -30,22 +30,20 @@ function EyeOff() {
 }
 
 // ─── Google Material outlined input ──────────────────────────────────────────
-function OutlinedInput({
-  id,
-  label,
-  type,
-  placeholder,
-  error,
-  suffix,
-  ...rest
-}: {
+// Must be a forwardRef component so react-hook-form's `register` ref reaches
+// the underlying <input> DOM node — without this, RHF can't read field values,
+// causing "required" errors on every submit and the form never firing onSubmit.
+type OutlinedInputProps = {
   id: string
   label: string
   type: string
   placeholder?: string
   error?: string
   suffix?: React.ReactNode
-} & React.InputHTMLAttributes<HTMLInputElement>) {
+} & React.InputHTMLAttributes<HTMLInputElement>
+
+const OutlinedInput = forwardRef<HTMLInputElement, OutlinedInputProps>(
+  function OutlinedInput({ id, label, type, placeholder, error, suffix, ...rest }, ref) {
   return (
     <div className="flex flex-col gap-1.5">
       <label
@@ -56,6 +54,7 @@ function OutlinedInput({
       </label>
       <div className="relative">
         <input
+          ref={ref}
           id={id}
           type={type}
           placeholder={placeholder ?? ''}
@@ -72,17 +71,15 @@ function OutlinedInput({
           ].join(' ')}
           {...rest}
           onAnimationStart={(e) => {
-            // Chromium fires a CSS 'animationstart' event named 'onAutoFillStart'
-            // when it autofills a field. Dispatch synthetic input + change events
-            // so react-hook-form reads the autofilled value before submit.
-            const name = (e.animationName ?? '') as string
-            if (name.toLowerCase().includes('autofill')) {
+            // Chromium fires a CSS animationstart named 'onAutoFillStart' when
+            // autofilling. Dispatch synthetic events so RHF reads the value.
+            const animName = (e.animationName ?? '') as string
+            if (animName.toLowerCase().includes('autofill')) {
               const target = e.currentTarget
               target.dispatchEvent(new Event('input',  { bubbles: true }))
               target.dispatchEvent(new Event('change', { bubbles: true }))
             }
-            // Forward to any onAnimationStart passed via {...rest}
-            ;(rest as React.InputHTMLAttributes<HTMLInputElement>).onAnimationStart?.(e)
+            rest.onAnimationStart?.(e)
           }}
         />
         {suffix && (
@@ -101,7 +98,7 @@ function OutlinedInput({
       )}
     </div>
   )
-}
+})
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
