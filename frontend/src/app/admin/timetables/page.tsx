@@ -81,24 +81,28 @@ function RunningJobRow({ job, onNavigate }: { job: RunningJob; onNavigate: () =>
           </span>
         </div>
 
-        {/* Progress bar — blue fill + shimmer over it (status page pattern); shimmer-only while connecting */}
+        {/* Progress bar — blue fill + white shine beam, exact status-page pattern */}
         <div style={{ position: 'relative', height: 4, background: 'var(--color-bg-surface-3)', borderRadius: 2, overflow: 'hidden' }}>
-          {hasProgress ? (
-            <>
-              {/* Blue fill */}
-              <div style={{
-                position: 'absolute', top: 0, left: 0, height: '100%',
-                width: `${pct}%`, background: 'var(--color-primary)',
-                borderRadius: 2, transition: 'width 600ms ease',
-              }} />
-              {/* Shimmer clipped to fill width — sweeps only over the blue bar */}
-              <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${pct}%`, overflow: 'hidden', borderRadius: 2 }}>
-                <div className="animate-shimmer" style={{ position: 'absolute', inset: 0 }} />
-              </div>
-            </>
-          ) : (
-            <div className="animate-shimmer" style={{ height: '100%', borderRadius: 2 }} />
-          )}
+          {/* Blue fill — always visible, min 8% so it shows from the moment the job appears */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, height: '100%',
+            width: `${Math.max(pct, 8)}%`,
+            background: 'var(--color-primary)', borderRadius: 2,
+            transition: 'width 600ms ease',
+            animation: 'progress-fill-breathe 2s ease-in-out infinite',
+          }} />
+          {/* White shine beam clipped to fill width */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, height: '100%',
+            width: `${Math.max(pct, 8)}%`,
+            overflow: 'hidden', borderRadius: 2,
+          }}>
+            <span style={{
+              position: 'absolute', inset: 0, width: '50%',
+              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%)',
+              animation: 'progress-shine 1.8s linear infinite',
+            }} />
+          </div>
         </div>
       </div>
 
