@@ -71,6 +71,19 @@ function OutlinedInput({
               : 'border-[#747775] dark:border-[#8e918f] focus:border-[#1a73e8] dark:focus:border-[#8ab4f8] focus:ring-1 focus:ring-[#1a73e8] dark:focus:ring-[#8ab4f8]',
           ].join(' ')}
           {...rest}
+          onAnimationStart={(e) => {
+            // Chromium fires a CSS 'animationstart' event named 'onAutoFillStart'
+            // when it autofills a field. Dispatch synthetic input + change events
+            // so react-hook-form reads the autofilled value before submit.
+            const name = (e.animationName ?? '') as string
+            if (name.toLowerCase().includes('autofill')) {
+              const target = e.currentTarget
+              target.dispatchEvent(new Event('input',  { bubbles: true }))
+              target.dispatchEvent(new Event('change', { bubbles: true }))
+            }
+            // Forward to any onAnimationStart passed via {...rest}
+            ;(rest as React.InputHTMLAttributes<HTMLInputElement>).onAnimationStart?.(e)
+          }}
         />
         {suffix && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5f6368] dark:text-[#9aa0a6]">
@@ -103,47 +116,28 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    // onChange: validate as user types so autofilled values are checked
+    // before the first submit attempt — prevents false "required" errors.
+    mode: 'onChange',
   })
+
+  const ROLE_DASHBOARD: Record<string, string> = {
+    admin:     '/admin/dashboard',
+    org_admin: '/admin/dashboard',
+    faculty:   '/faculty/dashboard',
+    student:   '/student/dashboard',
+  }
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true)
-
     try {
       await login(data.username, data.password)
       showToast('success', 'Login successful! Redirecting...')
-
-      // Get user data from localStorage to check role
-      const userData = localStorage.getItem('user')
-      if (userData) {
-        const user = JSON.parse(userData)
-
-        // Redirect based on user role (case-insensitive)
-        const role = user.role.toLowerCase()
-        switch (role) {
-          case 'admin':
-          case 'org_admin':
-            router.push('/admin/dashboard')
-            break
-          case 'student':
-            router.push('/student/dashboard')
-            break
-          case 'faculty':
-            router.push('/faculty/dashboard')
-            break
-          default:
-            router.push('/admin/dashboard') // Default to admin for now
-        }
-      } else {
-        // Fallback to username-based redirect if role not available
-        if (data.username.includes('admin')) {
-          router.push('/admin/dashboard')
-        } else if (data.username.includes('student')) {
-          router.push('/student/dashboard')
-        } else {
-          router.push('/faculty/dashboard')
-        }
-      }
-    } catch (err) {
+      // login() persists the user to localStorage; read role immediately.
+      const raw = localStorage.getItem('user')
+      const role = raw ? (JSON.parse(raw).role?.toLowerCase() ?? '') : ''
+      router.push(ROLE_DASHBOARD[role] ?? '/admin/dashboard')
+    } catch {
       showToast('error', 'Login failed. Please check your credentials and try again.')
     } finally {
       setIsLoading(false)

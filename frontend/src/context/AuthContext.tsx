@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
 import { User } from '@/types'
 import apiClient from '@/lib/api'
 
@@ -18,10 +18,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Prevents React 18 StrictMode from firing the auth probe twice.
+  // StrictMode mounts → unmounts → remounts in dev; the ref persists across
+  // remounts so the second invocation is a no-op and no duplicate request
+  // hits the backend.
+  const authChecked = useRef(false)
 
   useEffect(() => {
-    // 🔐 On mount, try to get current user from backend (cookie auth)
-    // No need to check localStorage - cookies are sent automatically
+    if (authChecked.current) return
+    authChecked.current = true
+
     const checkAuth = async () => {
       try {
         const response = await apiClient.getCurrentUser()
@@ -29,7 +35,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(response.data)
         }
       } catch {
-        // Not authenticated or error
         setUser(null)
       } finally {
         setIsLoading(false)
