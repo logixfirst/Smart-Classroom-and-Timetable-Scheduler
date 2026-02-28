@@ -170,10 +170,35 @@ class GenerationService:
             self.redis.delete(f"start_time:job:{job_id}")
     
     async def _handle_error(self, job_id: str, error: Exception):
-        """Handle job error"""
+        """Handle job error — fallback DB write in case _compensate in saga.py failed."""
         if self.redis:
             self.redis.delete(f"cancel:job:{job_id}")
             self.redis.delete(f"start_time:job:{job_id}")
+        # Fallback: ensure the Django DB row is marked failed so the API never
+        # returns 'running' for this job on subsequent polls (which would cause
+        # an infinite SSE-reconnect loop in the frontend).
+        try:
+            import os, psycopg2
+            from datetime import datetime, timezone
+            db_url = os.getenv('DATABASE_URL', 'postgresql://postgres:postgres@localhost:5432/sih28')
+            db_conn = psycopg2.connect(db_url, connect_timeout=5)
+            db_conn.autocommit = False
+            with db_conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE generation_jobs
+                    SET status = 'failed',
+                        error_message = %s,
+                        updated_at = %s
+                    WHERE id = %s AND status NOT IN ('completed', 'cancelled', 'approved')
+                    """,
+                    (str(error)[:500], datetime.now(timezone.utc), job_id)
+                )
+            db_conn.commit()
+            db_conn.close()
+            logger.info(f"[JOB {job_id}] Fallback: marked as failed in DB (_handle_error)")
+        except Exception as db_err:
+            logger.warning(f"[JOB {job_id}] Fallback DB write failed: {db_err}")
     
     async def _cleanup(self, job_id: str):
         """Cleanup resources after generation"""

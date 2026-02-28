@@ -21,15 +21,15 @@ print(f"Found {count} stuck jobs")
 if count > 0:
     # Clear them
     stuck_jobs.update(status="failed", error_message="Manually cleared - stuck job")
-    print(f"✅ Cleared {count} stuck jobs")
+    print(f" Cleared {count} stuck jobs")
 else:
-    print("✅ No stuck jobs found")
+    print(" No stuck jobs found")
 
 # Also clear Redis cache
 try:
     from django.core.cache import cache
 
     cache.clear()
-    print("✅ Cleared Redis cache")
+    print(" Cleared Redis cache")
 except Exception as e:
-    print(f"⚠️ Could not clear cache: {e}")
+    print(f" Could not clear cache: {e}")

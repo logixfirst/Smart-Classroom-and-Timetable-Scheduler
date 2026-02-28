@@ -271,8 +271,21 @@ export default function AdminTimetablesPage() {
       setTotalCount(data.count || 0)
 
       const listItems = transformJobs(jobs)
-      // Clear terminated IDs now that the updated statuses are in the list.
-      setTerminatedJobIds(new Set())
+      // Prune terminatedJobIds: only remove IDs that the API now confirms are
+      // no longer running/pending. IDs where the DB is stuck at 'running' stay
+      // in the set so the running banner never re-shows a job the SSE already
+      // reported as failed/cancelled — preventing the infinite reconnect loop.
+      setTerminatedJobIds(prev => {
+        if (prev.size === 0) return prev
+        const next = new Set(prev)
+        listItems.forEach((t: TimetableListItem) => {
+          const s = t.status as string
+          if (s !== 'running' && s !== 'pending') {
+            next.delete(t.id)
+          }
+        })
+        return next
+      })
       setTimetables(listItems)
 
       // Background-prefetch variants for the 3 most-recent completed/failed jobs.
