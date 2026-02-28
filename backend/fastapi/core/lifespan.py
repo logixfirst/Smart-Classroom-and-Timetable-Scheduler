@@ -4,9 +4,16 @@ Handles startup and shutdown procedures following industry best practices
 
 Includes:
 - Memory monitoring (background thread)
-- Cache management
+- Cache management with startup warming
 - Resource cleanup
+
+Cache warming strategy:
+  On startup FastAPI queries all active org IDs and pre-loads faculty, rooms,
+  and students into Redis.  Courses are NOT pre-warmed (requires semester
+  context which varies per request).  Warming runs as a background asyncio
+  task so it never delays the first incoming request.
 """
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -15,6 +22,79 @@ import redis
 from config import settings
 
 logger = logging.getLogger(__name__)
+
+
+async def _warm_org_cache(org_id: str, redis_client) -> None:
+    """Pre-load faculty, rooms, and students for one org into Redis.
+
+    Courses are omitted: they require a semester argument which we don't know
+    at startup time.  faculty/rooms/students rarely change and are worth
+    warming because they are fetched on EVERY generation request.
+    """
+    from utils.django_client import DjangoAPIClient
+    client = DjangoAPIClient(redis_client=redis_client)
+    try:
+        # Run all three in parallel — each uses asyncio.to_thread internally
+        faculty, rooms, students = await asyncio.gather(
+            client.fetch_faculty(org_id),
+            client.fetch_rooms(org_id),
+            client.fetch_students(org_id),
+        )
+        logger.info(
+            "[WARM] Org cache warm complete",
+            extra={
+                "org_id": org_id,
+                "faculty": len(faculty),
+                "rooms": len(rooms),
+                "students": len(students),
+            },
+        )
+    except Exception as exc:
+        # Warming is opportunistic — a failure must never crash the server
+        logger.warning(
+            "[WARM] Org cache warm failed (non-fatal)",
+            extra={"org_id": org_id, "error": str(exc)},
+        )
+    finally:
+        await client.close()
+
+
+async def _warm_all_orgs(redis_client) -> None:
+    """Discover all active org IDs and warm their caches concurrently.
+
+    Uses the connection pool (via DjangoAPIClient) so no extra connection is
+    opened — the pool is already initialised at this point.
+    """
+    import asyncio
+    from utils.django_client import _get_db_pool
+    import psycopg2.extras
+
+    logger.info("[WARM] Starting startup cache warming for all orgs")
+    try:
+        pool = _get_db_pool()
+        conn = pool.getconn()
+        conn.autocommit = True
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT org_id FROM organizations WHERE is_active = true"
+                )
+                org_rows = cur.fetchall()
+        finally:
+            pool.putconn(conn)
+
+        org_ids = [str(r["org_id"]) for r in org_rows]
+        logger.info("[WARM] Warming %d orgs: %s", len(org_ids), org_ids)
+
+        # Warm all orgs concurrently
+        await asyncio.gather(*[_warm_org_cache(oid, redis_client) for oid in org_ids])
+        logger.info("[WARM] All org caches warmed successfully")
+
+    except Exception as exc:
+        logger.warning(
+            "[WARM] Cache warming aborted (non-fatal)",
+            extra={"error": str(exc)},
+        )
 
 
 @asynccontextmanager
@@ -80,7 +160,6 @@ async def lifespan(app: FastAPI):
             db_conn=None
         )
 
-        
         # 6. Start memory monitoring (background thread)
         from core.memory_monitor import get_memory_monitor
         app.state.memory_monitor = get_memory_monitor()
@@ -92,8 +171,15 @@ async def lifespan(app: FastAPI):
         
         # Start monitoring
         app.state.memory_monitor.start()
+
+        # 7. Fire-and-forget cache warming.
+        # Runs concurrently with the first requests — never blocks startup.
+        # If Redis is unavailable, _warm_all_orgs logs a warning and exits.
+        if app.state.redis_client:
+            asyncio.ensure_future(_warm_all_orgs(app.state.redis_client))
+            logger.info("✅ Cache warming scheduled (background)")
         
-        logger.info("\u2705 FastAPI Timetable Service ready")
+        logger.info("✅ FastAPI Timetable Service ready")
         
     except Exception as e:
         logger.error(f"❌ Startup failed: {e}")

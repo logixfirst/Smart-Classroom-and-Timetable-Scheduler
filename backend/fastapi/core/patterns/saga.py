@@ -342,41 +342,57 @@ class TimetableGenerationSaga:
     
     async def _load_data(self, job_id: str, request_data: dict, tracker=None) -> Dict:
         """
-        Load data from Django backend via database connection
-        PRODUCTION: Direct database access for performance
+        Load data from Django backend via database connection.
+
+        All five fetch_* calls run truly in parallel via asyncio.gather:
+        - Each method uses asyncio.to_thread so psycopg2 blocking I/O does NOT
+          stall the event loop.
+        - Each thread borrows its own connection from the module-level pool.
+
+        The DjangoAPIClient.close() call is in a finally block to guarantee the
+        primary borrowed connection is returned to the pool even on exceptions.
         """
         from utils.django_client import DjangoAPIClient
-        
+
+        org_id = request_data.get('organization_id')
+        semester = request_data.get('semester', 1)
+        time_config = request_data.get('time_config')
+
+        logger.info(
+            "[SAGA] Loading data",
+            extra={"job_id": job_id, "org_id": org_id, "semester": semester},
+        )
+
+        django_client = DjangoAPIClient(redis_client=self.redis_client)
         try:
-            # Use Redis client passed to saga instance
-            django_client = DjangoAPIClient(redis_client=self.redis_client)
-            
-            org_id = request_data.get('organization_id')
-            semester = request_data.get('semester', 1)
-            time_config = request_data.get('time_config')
-            
-            logger.info(f"[SAGA] Loading data for org={org_id}, semester={semester}")
-            
-            # Resolve org name to UUID if needed
+            # Resolve org name → UUID (sync, uses primary connection, fast)
             org_id = django_client.resolve_org_id(org_id)
-            
-            # Fetch all data in parallel for performance
+
+            # Fetch all data in parallel.
+            # Each fetch_* method uses asyncio.to_thread internally, so these
+            # coroutines truly run concurrently on the thread pool.
+            # Wall-clock time = max(individual fetch times), not their sum.
             import asyncio
-            courses_task = django_client.fetch_courses(org_id, semester)
-            faculty_task = django_client.fetch_faculty(org_id)
-            rooms_task = django_client.fetch_rooms(org_id)
-            time_slots_task = django_client.fetch_time_slots(org_id, time_config)
-            students_task = django_client.fetch_students(org_id)
-            
             courses, faculty, rooms, time_slots, students = await asyncio.gather(
-                courses_task, faculty_task, rooms_task, time_slots_task, students_task
+                django_client.fetch_courses(org_id, semester),
+                django_client.fetch_faculty(org_id),
+                django_client.fetch_rooms(org_id),
+                django_client.fetch_time_slots(org_id, time_config),
+                django_client.fetch_students(org_id),
             )
-            
-            logger.info(f"[SAGA] Data loaded: {len(courses)} courses, {len(faculty)} faculty, "
-                       f"{len(rooms)} rooms, {len(time_slots)} time slots, {len(students)} students")
-            
-            await django_client.close()
-            
+
+            logger.info(
+                "[SAGA] Data loaded",
+                extra={
+                    "job_id": job_id,
+                    "courses": len(courses),
+                    "faculty": len(faculty),
+                    "rooms": len(rooms),
+                    "time_slots": len(time_slots),
+                    "students": len(students),
+                },
+            )
+
             return {
                 'courses': courses,
                 'rooms': rooms,
@@ -384,14 +400,21 @@ class TimetableGenerationSaga:
                 'faculty': faculty,
                 'students': students,
                 'organization_id': org_id,
-                'semester': semester
+                'semester': semester,
             }
-            
-        except Exception as e:
-            logger.error(f"[SAGA] Data loading failed: {e}")
+
+        except Exception as exc:
+            logger.error(
+                "[SAGA] Data loading failed",
+                extra={"job_id": job_id, "error": str(exc)},
+            )
             import traceback
             logger.error(traceback.format_exc())
             raise
+        finally:
+            # Always return the borrowed connection to the pool,
+            # even if an exception occurred above.
+            await django_client.close()
     
     async def _stage1_clustering(self, job_id: str, data: Dict, token: CancellationToken, tracker=None) -> List[List]:
         """
