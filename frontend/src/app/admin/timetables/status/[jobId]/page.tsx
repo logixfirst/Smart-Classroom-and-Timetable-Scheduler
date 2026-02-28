@@ -93,10 +93,9 @@ const CSS_KEYFRAMES = `
   );
   animation: shimmer 1.8s linear infinite;
 }
-/* Dot-grid page background — locked to viewport, no scroll */
+/* Dot-grid page background — fills AppShell content pane, no scroll override */
 .page-bg {
-  height: 100vh;
-  overflow: hidden;
+  min-height: calc(100vh - 4.5rem);
   background: var(--color-bg-page);
   background-image: radial-gradient(circle, #CBD5E1 1px, transparent 1px);
   background-size: 24px 24px;
@@ -105,6 +104,7 @@ const CSS_KEYFRAMES = `
   justify-content: center;
   padding: 16px;
   position: relative;
+  border-radius: inherit;
 }
 /* Shared modal card */
 .modal-card { box-shadow: 0 4px 24px rgba(15,23,42,0.06); padding: 28px 36px; z-index: 1; }
@@ -601,8 +601,8 @@ export default function TimetableStatusPage() {
   return (
     <div ref={containerRef} className={`page-bg ${dmSans.className}`}>
 
-      {/* Top gradient fade */}
-      <div className="fixed top-0 left-0 right-0 h-32 pointer-events-none top-gradient" />
+      {/* Top gradient fade — absolute so it stays within the AppShell content pane */}
+      <div className="absolute top-0 left-0 right-0 h-32 pointer-events-none top-gradient" />
 
       {/* Main card */}
       <div className="relative max-w-[680px] w-full rounded-2xl modal-card modal-card--in1" style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)' }}>

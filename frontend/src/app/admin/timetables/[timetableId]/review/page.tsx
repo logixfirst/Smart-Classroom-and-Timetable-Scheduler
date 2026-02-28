@@ -810,18 +810,16 @@ export default function TimetableReviewPage() {
   // Entries for the grid load in the background and show an inline skeleton.
   if (loadingMeta) {
     return (
-      <div className="flex items-center justify-center min-h-screen" style={{ background: 'var(--color-bg-page)' }}>
-        <div className="text-center space-y-4">
-          <GoogleSpinner size={64} className="mx-auto" />
-          <p className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Loading timetable variants…</p>
-        </div>
+      <div className="flex flex-col items-center justify-center gap-4" style={{ minHeight: '60vh' }}>
+        <GoogleSpinner size={56} className="mx-auto" />
+        <p className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Loading timetable variants…</p>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen" style={{ background: 'var(--color-bg-page)' }}>
+      <div className="flex items-center justify-center" style={{ minHeight: '60vh' }}>
         <div className="text-center space-y-4 max-w-sm mx-auto px-4">
           <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: 'var(--color-danger-subtle)' }}>
             <svg className="w-8 h-8" style={{ color: 'var(--color-danger-text)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">

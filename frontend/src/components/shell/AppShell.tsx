@@ -12,6 +12,7 @@ import {
   LogOut,
   Sun,
   Moon,
+  Plus,
   User as UserIcon,
   X,
   LayoutDashboard,
@@ -34,6 +35,7 @@ interface NavItem {
   href: string
   icon: React.ElementType
   badge?: boolean
+  activeBase?: string   // match any sub-path when href is a deep link
 }
 
 interface DashboardLayoutProps {
@@ -47,7 +49,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Admins',             href: '/admin/admins',           icon: ShieldCheck },
   { label: 'Faculty',            href: '/admin/faculty',          icon: Users },
   { label: 'Students',           href: '/admin/students',         icon: GraduationCap },
-  { label: 'Academic',           href: '/admin/academic/schools', icon: BookOpen },
+  { label: 'Academic',           href: '/admin/academic/schools', icon: BookOpen,      activeBase: '/admin/academic' },
   { label: 'Timetables',         href: '/admin/timetables',       icon: CalendarDays },
   { label: 'Approvals',          href: '/admin/approvals',        icon: CheckCircle2, badge: true },
   { label: 'Logs',               href: '/admin/logs',             icon: FileText },
@@ -88,12 +90,8 @@ function resolveUser(u: {
 }) {
   const full =
     [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.username
-  const initials = full
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
+  // Google-style: single letter — first char of first_name, fallback to username
+  const initials = (u.first_name?.[0] ?? u.username[0]).toUpperCase()
   return { full, initials }
 }
 
@@ -135,9 +133,11 @@ function NavItemRow({
       onClick={onClick}
       title={collapsed ? item.label : undefined}
       className={[
-        'relative flex items-center gap-3 rounded-[24px] h-10 my-0.5',
+        'relative flex items-center h-10 my-0.5',
         'transition-colors duration-150 select-none',
-        collapsed ? 'justify-center w-10 mx-4 px-0' : 'px-4 mx-2',
+        collapsed
+          ? 'justify-center gap-0 w-10 rounded-full mx-auto'
+          : 'gap-3 px-4 mx-2 rounded-[24px]',
         active
           ? 'bg-[#E8F0FE] dark:bg-[#1C2B4A] font-semibold text-[#1A73E8] dark:text-[#8AB4F8]'
           : 'text-[#444746] dark:text-[#bdc1c6] hover:bg-[#EEF3FD] dark:hover:bg-[#1a2640]',
@@ -262,15 +262,22 @@ export default function AppShell({ children }: DashboardLayoutProps) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#f8f9fa] dark:bg-[#111111] font-sans">
+    <div className="min-h-screen bg-[#f6f8fc] dark:bg-[#111111] font-sans">
 
       {/* ══════════════════════════════════════════════════════════
           HEADER  (fixed, full-width, z-50)
       ══════════════════════════════════════════════════════════ */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center h-14 md:h-16 px-2 md:px-4 gap-1 bg-white dark:bg-[#202124] border-b border-[#e0e0e0] dark:border-[#3c4043]">
+      <header className="fixed top-0 left-0 right-0 z-50 flex items-center h-14 md:h-16 px-2 md:px-4 gap-1 bg-[#f6f8fc] dark:bg-[#111111]">
 
-        {/* Left: hamburger + logo + wordmark */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Left: hamburger + logo + wordmark — width tracks sidebar so search starts at sidebar edge */}
+        <div
+          className={[
+            'flex items-center gap-1 shrink-0 transition-[width] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
+            mounted
+              ? (sidebarOpen ? 'md:w-[256px]' : 'md:w-[72px]')
+              : 'md:w-[256px]',
+          ].join(' ')}
+        >
           <button
             onClick={handleHamburger}
             aria-label="Toggle sidebar"
@@ -307,9 +314,9 @@ export default function AppShell({ children }: DashboardLayoutProps) {
           </Link>
         </div>
 
-        {/* Centre: pill search bar — hidden on mobile */}
-        <div className="hidden md:flex flex-1 justify-center px-4">
-          <div className="relative w-full max-w-[720px]">
+        {/* Search bar — starts exactly at sidebar edge, high-contrast idle state */}
+        <div className="hidden md:flex flex-1 px-2">
+          <div className="relative w-full max-w-[584px]">
             <span className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#5f6368] dark:text-[#9aa0a6]">
               <Search size={18} />
             </span>
@@ -318,11 +325,12 @@ export default function AppShell({ children }: DashboardLayoutProps) {
               placeholder="Search timetables, faculty, rooms…"
               className={[
                 'w-full h-11 pl-[3rem] pr-12 rounded-[24px] text-sm outline-none',
-                'bg-[#f1f3f4] dark:bg-[#303134]',
-                'text-[#202124] dark:text-[#e8eaed]',
-                'placeholder:text-[#9aa0a6]',
-                'border border-transparent',
+                'bg-[#e8eaed] dark:bg-[#303134]',
+                'hover:bg-[#dadce0] dark:hover:bg-[#3c4043]',
                 'focus:bg-white dark:focus:bg-[#202124]',
+                'text-[#202124] dark:text-[#e8eaed]',
+                'placeholder:text-[#80868b]',
+                'border border-transparent',
                 'focus:border-[#dfe1e5] dark:focus:border-[#5f6368]',
                 'focus:shadow-[0_1px_6px_rgba(32,33,36,0.28)]',
                 'transition-[background-color,box-shadow,border-color] duration-150',
@@ -345,6 +353,18 @@ export default function AppShell({ children }: DashboardLayoutProps) {
           >
             <Search size={20} />
           </button>
+
+          {/* Generate Timetable — primary CTA, admin only */}
+          {role === 'admin' && (
+            <Link
+              href="/admin/timetables/new"
+              aria-label="Generate new timetable"
+              className="flex items-center gap-1.5 h-9 px-3.5 rounded-[20px] text-sm font-medium shrink-0 transition-colors bg-[#1A73E8] hover:bg-[#1765CC] active:bg-[#185ABC] text-white"
+            >
+              <Plus size={15} strokeWidth={2.2} />
+              <span className="hidden sm:inline">Generate Timetable</span>
+            </Link>
+          )}
 
           {/* Bell */}
           <button
@@ -455,8 +475,7 @@ export default function AppShell({ children }: DashboardLayoutProps) {
       <aside
         className={[
           'fixed left-0 top-0 h-full z-[45] flex flex-col',
-          'bg-white dark:bg-[#202124]',
-          'border-r border-[#e0e0e0] dark:border-[#3c4043]',
+          'bg-[#f6f8fc] dark:bg-[#111111]',
           'pt-14 md:pt-16',
           'transition-[width,transform] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
           mobileOpen ? 'translate-x-0 w-[256px]' : '-translate-x-full w-[256px] md:translate-x-0',
@@ -466,7 +485,8 @@ export default function AppShell({ children }: DashboardLayoutProps) {
         {/* Nav items */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2">
           {navItems.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(item.href + '/')
+            const base   = item.activeBase ?? item.href
+            const active = pathname === item.href || pathname.startsWith(base + '/')
             return (
               <NavItemRow
                 key={item.href}
@@ -490,7 +510,10 @@ export default function AppShell({ children }: DashboardLayoutProps) {
         className={[
           contentMarginCls,
           'mt-14 md:mt-16',
-          'min-h-[calc(100vh-56px)] md:min-h-[calc(100vh-64px)]',
+          'mx-2 md:mx-3 mb-2 md:mb-3',
+          'min-h-[calc(100vh-58px)] md:min-h-[calc(100vh-68px)]',
+          'rounded-2xl',
+          'bg-white dark:bg-[#1e1e1e]',
           'p-3 md:p-6',
           '[&>*]:rounded-2xl',
         ].join(' ')}

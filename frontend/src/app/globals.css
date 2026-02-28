@@ -28,7 +28,8 @@
 
   /* Brand / Action */
   --color-primary:        #1A73E8;
-  --color-primary-hover:  #1557B0;
+  --color-primary-hover:  #1765CC;
+  --color-primary-active: #185ABC;
   --color-primary-subtle: #E8F0FE;
 
   /* Status */
@@ -108,6 +109,7 @@
 
   --color-primary:        #8AB4F8;
   --color-primary-hover:  #AECBFA;
+  --color-primary-active: #7AABF5;
   --color-primary-subtle: #1C2B4A;
 
   --color-success:        #81C995;
@@ -269,16 +271,17 @@
     padding: 0 16px;
     background-color: var(--color-primary);
     color: var(--color-text-inverse);
-    border: 1px solid transparent;
-    border-radius: var(--radius-md);
+    border: none;
+    border-radius: 20px;
     font-size: 14px;
     font-weight: 500;
     letter-spacing: 0.01em;
     cursor: pointer;
     white-space: nowrap;
-    transition: background-color 100ms, border-color 100ms, opacity 150ms;
+    transition: background-color 100ms, opacity 150ms;
   }
-  .btn-primary:hover { background-color: var(--color-primary-hover); }
+  .btn-primary:hover  { background-color: var(--color-primary-hover); }
+  .btn-primary:active { background-color: var(--color-primary-active); }
   .btn-primary:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
