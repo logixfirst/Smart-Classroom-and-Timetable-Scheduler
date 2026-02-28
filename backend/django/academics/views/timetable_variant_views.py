@@ -125,10 +125,10 @@ class TimetableVariantViewSet(viewsets.ViewSet):
         except GenerationJob.DoesNotExist:
             return Response({"error": "Not found"}, status=status.HTTP_404_NOT_FOUND)
 
+        all_variants = [v for v in (job.variants_meta or []) if v is not None]
         result = [
-            self._build_variant_summary(job, idx, v)
-            for idx, v in enumerate(job.variants_meta or [])
-            if v is not None
+            self._build_variant_summary(job, idx, v, all_variants=all_variants)
+            for idx, v in enumerate(all_variants)
         ]
         cache.set(cache_key, result, 3600)
         response = Response(result)
@@ -173,6 +173,114 @@ class TimetableVariantViewSet(viewsets.ViewSet):
     def select(self, request, pk=None):
         """Mark a variant as selected."""
         return Response({"success": True, "variant_id": str(pk)})
+
+    @action(detail=False, methods=["get"], url_path="compare")
+    def compare(self, request):
+        """
+        Side-by-side diff of two variants for a given department scope.
+
+        Query params:
+          job_id          — required
+          a               — variant id  (e.g. "{job_id}-variant-1")
+          b               — variant id  (e.g. "{job_id}-variant-2")
+          department_id   — optional; "all" or a dept UUID
+
+        Returns:
+          shared_slots    — entries present and identical in both A and B
+          only_in_a       — entries in A not matched in B
+          only_in_b       — entries in B not matched in A
+          conflicts_a     — entries in A that have has_conflict=True
+          conflicts_b     — entries in B that have has_conflict=True
+          summary         — { identical, diff_a, diff_b, conflicts_a, conflicts_b }
+        """
+        job_id = request.query_params.get("job_id")
+        var_a_id = request.query_params.get("a")
+        var_b_id = request.query_params.get("b")
+        dept_id = request.query_params.get("department_id", "all")
+
+        if not job_id or not var_a_id or not var_b_id:
+            return Response(
+                {"error": "job_id, a, and b params required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        cache_key = (
+            f"variant_compare_{var_a_id}_{var_b_id}_{dept_id}"
+        )
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
+        raw_a = self._fetch_variant_entries(job_id, var_a_id)
+        raw_b = self._fetch_variant_entries(job_id, var_b_id)
+
+        if raw_a is None or raw_b is None:
+            return Response(
+                {"error": "One or both variants not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        entries_a = self._convert_timetable_entries(raw_a)
+        entries_b = self._convert_timetable_entries(raw_b)
+
+        if dept_id != "all":
+            entries_a = [e for e in entries_a if e.get("department_id") == dept_id]
+            entries_b = [e for e in entries_b if e.get("department_id") == dept_id]
+
+        result = self._diff_entries(entries_a, entries_b)
+        cache.set(cache_key, result, 300)
+        return Response(result)
+
+    # ------------------------------------------------------------------
+    # Diff helper
+    # ------------------------------------------------------------------
+
+    def _entry_key(self, entry: dict) -> str:
+        """Canonical identity key for deduplication in diff."""
+        return "|".join([
+            str(entry.get("day", "")),
+            str(entry.get("time_slot", "")),
+            str(entry.get("subject_code", "")),
+            str(entry.get("faculty_id", "")),
+            str(entry.get("room_number", "")),
+            str(entry.get("batch_name", "")),
+        ])
+
+    def _diff_entries(self, entries_a: list, entries_b: list) -> dict:
+        """
+        Compute symmetric diff between two variant entry lists.
+
+        Entry identity: (day, time_slot, subject_code, faculty_id, room_number, batch_name)
+        If the key exists in both → shared (identical).
+        If only in A → only_in_a.
+        If only in B → only_in_b.
+        """
+        map_a = {self._entry_key(e): e for e in entries_a}
+        map_b = {self._entry_key(e): e for e in entries_b}
+
+        keys_a = set(map_a)
+        keys_b = set(map_b)
+
+        shared = [map_a[k] for k in (keys_a & keys_b)]
+        only_in_a = [map_a[k] for k in (keys_a - keys_b)]
+        only_in_b = [map_b[k] for k in (keys_b - keys_a)]
+        conflicts_a = [e for e in entries_a if e.get("has_conflict")]
+        conflicts_b = [e for e in entries_b if e.get("has_conflict")]
+
+        return {
+            "shared_slots": shared,
+            "only_in_a": only_in_a,
+            "only_in_b": only_in_b,
+            "conflicts_a": conflicts_a,
+            "conflicts_b": conflicts_b,
+            "summary": {
+                "identical": len(shared),
+                "diff_a": len(only_in_a),
+                "diff_b": len(only_in_b),
+                "conflicts_a": len(conflicts_a),
+                "conflicts_b": len(conflicts_b),
+            },
+        }
 
     # ------------------------------------------------------------------
     # Private helpers
@@ -229,10 +337,110 @@ class TimetableVariantViewSet(viewsets.ViewSet):
                 return v.get("timetable_entries", [])
         return []
 
-    def _build_variant_summary(self, job, idx: int, v: dict) -> dict:
-        """Build the lightweight summary dict for one variant (no entries)."""
+    # ------------------------------------------------------------------
+    # Scoring helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _compute_score_faculty_load(qm: dict) -> int:
+        """
+        Derive faculty-load score (0-100) from quality_metrics.
+
+        Looks for workload_balance / faculty_satisfaction first, then
+        falls back to inverting a raw avg-load metric.
+        Higher = faculty less overloaded = better.
+        """
+        raw = (
+            qm.get("workload_balance_score")
+            or qm.get("faculty_satisfaction")
+            or qm.get("workload_balance")
+        )
+        if raw is not None:
+            return min(100, max(0, int(round(float(raw)))))
+        # Inverse of overload_ratio if available
+        overload = qm.get("overload_ratio") or qm.get("faculty_overload_rate")
+        if overload is not None:
+            return min(100, max(0, int(round(100 - float(overload) * 100))))
+        return 70  # neutral default when data absent
+
+    @staticmethod
+    def _compute_score_student_gaps(qm: dict) -> int:
+        """
+        Derive student-gap score (0-100) from quality_metrics.
+
+        Fewer gaps → higher score. Looks for compactness / schedule_density.
+        """
+        raw = (
+            qm.get("compactness_score")
+            or qm.get("schedule_density")
+            or qm.get("student_gap_score")
+        )
+        if raw is not None:
+            return min(100, max(0, int(round(float(raw)))))
+        gap_rate = qm.get("avg_gap_hours_per_day") or qm.get("gap_rate")
+        if gap_rate is not None:
+            return min(100, max(0, int(round(100 - float(gap_rate) * 20))))
+        return 70  # neutral default
+
+    @staticmethod
+    def _derive_optimization_label(
+        score_faculty: int,
+        score_room: int,
+        score_student: int,
+    ) -> str:
+        """
+        Choose a human-readable label based on which dimension scores highest.
+        """
+        scores = {
+            "Faculty Optimized": score_faculty,
+            "Room Optimized": score_room,
+            "Student Experience": score_student,
+        }
+        return max(scores, key=lambda k: scores[k])
+
+    def _build_variant_summary(
+        self, job, idx: int, v: dict, all_variants: list | None = None
+    ) -> dict:
+        """
+        Build the lightweight summary dict for one variant (no entries).
+
+        Extended fields vs. old version:
+          score_faculty_load     — faculty workload balance (0-100)
+          score_room_utilization — room utilisation (0-100)
+          score_student_gaps     — schedule compactness (0-100)
+          conflict_count         — hard conflicts (int)
+          soft_violation_count   — soft violations (int)
+          optimization_label     — "Faculty Optimized" etc.
+          is_recommended         — True on the variant with highest overall_score
+        """
         qm = v.get("quality_metrics", {}) or {}
         sta = v.get("statistics", {}) or {}
+
+        score_overall = int(round(float(
+            qm.get("overall_score", v.get("score", 0)) or 0
+        )))
+        score_room = int(round(float(
+            qm.get("room_utilization_score", v.get("room_utilization", 0)) or 0
+        )))
+        score_faculty = self._compute_score_faculty_load(qm)
+        score_student = self._compute_score_student_gaps(qm)
+        conflict_count = int(qm.get("total_conflicts", v.get("conflicts", 0)) or 0)
+        soft_violations = int(qm.get("soft_violation_count", v.get("soft_violations", 0)) or 0)
+
+        # is_recommended: True when this variant has the highest overall_score
+        # across all variants in the same job. Pass `all_variants` to enable.
+        is_recommended = False
+        if all_variants:
+            best_score = max(
+                (
+                    float((av.get("quality_metrics") or {}).get("overall_score") or
+                          av.get("score", 0) or 0)
+                    for av in all_variants if av
+                ),
+                default=0,
+            )
+            is_recommended = (score_overall >= best_score and best_score > 0)
+
         return {
             "id": f"{job.id}-variant-{idx + 1}",
             "job_id": str(job.id),
@@ -241,12 +449,19 @@ class TimetableVariantViewSet(viewsets.ViewSet):
             "timetable_entries": [],  # populated on-demand via /entries/
             "statistics": {
                 "total_classes": sta.get("total_classes", v.get("entry_count", 0)),
-                "total_conflicts": qm.get("total_conflicts", v.get("conflicts", 0)),
+                "total_conflicts": conflict_count,
             },
             "quality_metrics": {
-                "overall_score": qm.get("overall_score", v.get("score", 0)),
-                "total_conflicts": qm.get("total_conflicts", v.get("conflicts", 0)),
-                "room_utilization_score": qm.get("room_utilization_score", v.get("room_utilization", 0)),
+                "overall_score": score_overall,
+                "total_conflicts": conflict_count,
+                "room_utilization_score": score_room,
+                "score_faculty_load": score_faculty,
+                "score_student_gaps": score_student,
+                "soft_violation_count": soft_violations,
+                "optimization_label": self._derive_optimization_label(
+                    score_faculty, score_room, score_student
+                ),
+                "is_recommended": is_recommended,
             },
             "generated_at": job.created_at.isoformat(),
         }
@@ -276,5 +491,11 @@ class TimetableVariantViewSet(viewsets.ViewSet):
                 "room_number": e.get("room_code", e.get("room_number", "")),
                 "batch_name": e.get("batch_name", ""),
                 "department_id": e.get("department_id", ""),
+                "year": e.get("year", e.get("student_year", None)),
+                "section": e.get("section", e.get("section_name", "")),
+                "has_conflict": bool(e.get("has_conflict", e.get("conflict", False))),
+                "conflict_description": e.get("conflict_description", e.get("conflict_reason", "")),
+                "enrolled_count": e.get("enrolled_count", e.get("enrollment_count", 0)),
+                "room_capacity": e.get("room_capacity", e.get("capacity", 0)),
             })
         return result

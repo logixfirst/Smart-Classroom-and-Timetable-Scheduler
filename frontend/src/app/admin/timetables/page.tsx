@@ -538,12 +538,14 @@ export default function AdminTimetablesPage() {
                           .map(t => {
                             const isRunning = runningJobs.some(j => j.job_id === t.id)
                             const href = isRunning ? `/admin/timetables/status/${t.id}` : `/admin/timetables/${t.id}/review`
+                            const showCompare = !isRunning && (t.status as string) === 'completed'
                             return (
-                              <Link key={t.id} href={href} style={{
+                              <div key={t.id} onClick={() => router.push(href)} style={{
                                 display: 'block', padding: '14px 16px',
                                 background: 'var(--color-bg-page)', border: '1px solid var(--color-border)',
-                                borderRadius: 'var(--radius-md)', textDecoration: 'none',
+                                borderRadius: 'var(--radius-md)',
                                 transition: 'border-color 120ms, background 120ms',
+                                cursor: 'pointer',
                               }}
                                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-primary)'; (e.currentTarget as HTMLElement).style.background = 'var(--color-primary-subtle)' }}
                                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)'; (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-page)' }}
@@ -577,7 +579,37 @@ export default function AdminTimetablesPage() {
                                     </span>
                                   </div>
                                 </div>
-                              </Link>
+                                {showCompare && (
+                                  <div
+                                    onClick={e => e.stopPropagation()}
+                                    style={{ marginTop: 10, borderTop: '1px solid var(--color-border)', paddingTop: 10 }}
+                                  >
+                                    <Link
+                                      href={`/admin/timetables/compare/${t.id}`}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                                        padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600,
+                                        color: 'var(--color-primary)',
+                                        background: 'var(--color-primary-subtle)',
+                                        border: '1px solid var(--color-primary)',
+                                        textDecoration: 'none',
+                                        transition: 'opacity 120ms',
+                                        width: '100%',
+                                      }}
+                                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = '0.8' }}
+                                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = '1' }}
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="21" y1="10" x2="3" y2="10" />
+                                        <line x1="21" y1="6" x2="3" y2="6" />
+                                        <line x1="21" y1="14" x2="3" y2="14" />
+                                        <line x1="21" y1="18" x2="3" y2="18" />
+                                      </svg>
+                                      Compare Variants
+                                    </Link>
+                                  </div>
+                                )}
+                              </div>
                             )
                           })}
                       </div>
@@ -588,13 +620,16 @@ export default function AdminTimetablesPage() {
                           .map(t => {
                             const isRunning = runningJobs.some(j => j.job_id === t.id)
                             const href = isRunning ? `/admin/timetables/status/${t.id}` : `/admin/timetables/${t.id}/review`
+                            const showCompare = !isRunning && (t.status as string) === 'completed'
                             return (
-                              <Link key={t.id} href={href} style={{
+                              <div key={t.id} style={{
                                 display: 'flex', alignItems: 'center', gap: 12,
-                                padding: '10px 4px', textDecoration: 'none',
+                                padding: '10px 4px',
                                 borderBottom: '1px solid var(--color-border)',
                                 transition: 'background 100ms',
+                                cursor: 'pointer',
                               }}
+                                onClick={() => router.push(href)}
                                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-primary-subtle)' }}
                                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
                               >
@@ -614,7 +649,20 @@ export default function AdminTimetablesPage() {
                                   {t.conflicts} conflict{t.conflicts !== 1 ? 's' : ''}
                                 </span>
                                 <span style={{ fontSize: 12, color: 'var(--color-text-muted)', flexShrink: 0 }}>{t.lastUpdated}</span>
-                              </Link>
+                                {showCompare && (
+                                  <Link
+                                    href={`/admin/timetables/compare/${t.id}`}
+                                    onClick={e => e.stopPropagation()}
+                                    style={{
+                                      flexShrink: 0, fontSize: 12, fontWeight: 600,
+                                      color: 'var(--color-primary)',
+                                      textDecoration: 'none', whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    Compare →
+                                  </Link>
+                                )}
+                              </div>
                             )
                           })}
                       </div>

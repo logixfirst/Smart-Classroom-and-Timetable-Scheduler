@@ -241,3 +241,69 @@ async def cancel_generation(
     except Exception as e:
         logger.error(f"[CANCEL] Error cancelling job {job_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/timetables/{job_id}/department/{dept_id}")
+async def get_department_timetable(
+    job_id: str,
+    dept_id: str,
+    redis=Depends(get_redis_client),
+):
+    """
+    Return the timetable filtered to a single department's perspective.
+
+    Reads the persisted solution from Redis, then applies build_department_view()
+    to return only entries whose course belongs to dept_id.
+
+    Args:
+        job_id:  Generation job identifier
+        dept_id: Department UUID to filter to
+
+    Returns:
+        List of timetable entries for the specified department.
+    """
+    import json
+
+    result_key = f"result:job:{job_id}"
+    raw = redis.get(result_key)
+    if not raw:
+        raise HTTPException(status_code=404, detail="Job result not found or expired")
+
+    try:
+        result_data = json.loads(raw) if isinstance(raw, (str, bytes)) else raw
+    except (json.JSONDecodeError, TypeError) as exc:
+        logger.error(f"[DEPT-VIEW] Failed to parse result for job {job_id}: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to parse stored result")
+
+    # Reconstruct solution dict from stored timetable entries
+    entries = result_data.get("timetable", [])
+    if not entries:
+        return {"job_id": job_id, "dept_id": dept_id, "entries": []}
+
+    # Filter to dept_id entries directly from persisted entries
+    # (build_department_view requires Course objects; here we filter stored dicts)
+    dept_entries = [
+        e for e in entries
+        if e.get("department_id") == dept_id
+        # Courses serialized without department_id fall through to course_id match
+        or _extract_dept_from_course_id(e.get("course_id", ""), result_data) == dept_id
+    ]
+
+    return {
+        "job_id": job_id,
+        "dept_id": dept_id,
+        "entries": dept_entries,
+        "total": len(dept_entries),
+    }
+
+
+def _extract_dept_from_course_id(course_id: str, result_data: dict) -> str:
+    """
+    Attempt to resolve department_id for a course from the stored metadata.
+    Returns empty string if not resolvable (safe — entry will be excluded).
+    """
+    for entry in result_data.get("timetable", []):
+        if entry.get("course_id") == course_id:
+            return entry.get("department_id", "")
+    return ""
+

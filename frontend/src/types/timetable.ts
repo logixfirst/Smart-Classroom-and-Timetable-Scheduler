@@ -287,3 +287,73 @@ export interface ApprovalResponse {
   status: string
   message: string
 }
+
+// ============================================
+// VARIANT SCORE CARD  (new — Google-style)
+// ============================================
+
+export interface VariantScoreCard {
+  overall_score: number              // 0-100
+  score_faculty_load: number         // 0-100  (higher = less overloaded)
+  score_room_utilization: number     // 0-100
+  score_student_gaps: number         // 0-100  (higher = fewer gaps)
+  total_conflicts: number            // hard conflicts
+  soft_violation_count: number       // soft constraint violations
+  optimization_label: string         // "Faculty Optimized" | "Room Optimized" | "Student Experience"
+  is_recommended: boolean            // true on variant with highest overall_score
+}
+
+/** A single schedulable entry with full metadata for the comparison grid */
+export interface TimetableSlotDetailed {
+  day: number                        // 0=Mon … 5=Sat
+  time_slot: string                  // "09:00-10:00"
+  subject_code: string
+  subject_name: string
+  faculty_id: string
+  faculty_name: string
+  room_number: string
+  batch_name: string
+  department_id: string
+  year: number | null                // 1-4 or null for cross-dept
+  section: string
+  has_conflict: boolean
+  conflict_description: string
+  enrolled_count: number
+  room_capacity: number
+}
+
+/** Result of the server-side diff between two variants */
+export interface ComparisonResult {
+  shared_slots: TimetableSlotDetailed[]
+  only_in_a: TimetableSlotDetailed[]
+  only_in_b: TimetableSlotDetailed[]
+  conflicts_a: TimetableSlotDetailed[]
+  conflicts_b: TimetableSlotDetailed[]
+  summary: {
+    identical: number
+    diff_a: number
+    diff_b: number
+    conflicts_a: number
+    conflicts_b: number
+  }
+}
+
+/** Enriched variant as returned by /api/timetable/variants/?job_id=X */
+export interface VariantSummary {
+  id: string                         // "{job_id}-variant-{n}"
+  job_id: string
+  variant_number: number
+  organization_id: string
+  timetable_entries: TimetableSlotDetailed[]   // empty; populated via /entries/
+  statistics: { total_classes: number; total_conflicts: number }
+  quality_metrics: VariantScoreCard
+  generated_at: string
+}
+
+/** Department option for the dropdown / tree */
+export interface DepartmentOption {
+  id: string
+  name: string
+  code: string
+  total_entries?: number
+}

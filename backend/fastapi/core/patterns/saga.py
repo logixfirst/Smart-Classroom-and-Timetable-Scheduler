@@ -238,7 +238,7 @@ class TimetableGenerationSaga:
                 logger.info("[SAGA] Step 3/5: CP-SAT solving...")
                 if tracker:
                     tracker.start_stage('cpsat_solving', total_items=len(clusters))
-                initial_solution = await self._stage2_cpsat(job_id, data, clusters, token, tracker)
+                initial_solution = await self._stage2_partitioned_solve(job_id, data, clusters, token, tracker)
                 self.stage_completed['cpsat'] = True
                 if tracker:
                     tracker.complete_stage()
@@ -373,12 +373,13 @@ class TimetableGenerationSaga:
             # coroutines truly run concurrently on the thread pool.
             # Wall-clock time = max(individual fetch times), not their sum.
             import asyncio
-            courses, faculty, rooms, time_slots, students = await asyncio.gather(
+            courses, faculty, rooms, time_slots, students, enrollments = await asyncio.gather(
                 django_client.fetch_courses(org_id, semester),
                 django_client.fetch_faculty(org_id),
                 django_client.fetch_rooms(org_id),
                 django_client.fetch_time_slots(org_id, time_config),
                 django_client.fetch_students(org_id),
+                django_client.fetch_enrollments(org_id, semester),
             )
 
             logger.info(
@@ -390,6 +391,7 @@ class TimetableGenerationSaga:
                     "rooms": len(rooms),
                     "time_slots": len(time_slots),
                     "students": len(students),
+                    "enrollments": len(enrollments),
                 },
             )
 
@@ -399,6 +401,7 @@ class TimetableGenerationSaga:
                 'time_slots': time_slots,
                 'faculty': faculty,
                 'students': students,
+                'enrollments': enrollments,
                 'organization_id': org_id,
                 'semester': semester,
             }
@@ -443,9 +446,172 @@ class TimetableGenerationSaga:
             chunk_size = 10
             return [courses[i:i+chunk_size] for i in range(0, len(courses), chunk_size)]
     
-    async def _stage2_cpsat(self, job_id: str, data: Dict, clusters: List[List], token: CancellationToken, tracker=None) -> Dict:
+    @staticmethod
+    def _push_phase_progress(
+        redis_client, job_id: str, phase: str, pct: int, meta: dict
+    ) -> None:
         """
-        Stage 2: CP-SAT solving with cancellation between clusters
+        Best-effort Redis progress push for partition-solve phase milestones.
+        Maps 0-100 pct into the 55%-72% overall window (clustering→GA).
+        Non-fatal: if Redis is unavailable, the progress bar skips this tick.
+        """
+        if not redis_client:
+            return
+        try:
+            import json
+            import time as _t
+            key = f"progress:job:{job_id}"
+            raw = redis_client.get(key)
+            existing = json.loads(raw) if raw else {}
+            mapped = 55.0 + (pct / 100.0) * 17.0
+            if mapped > existing.get("overall_progress", 0.0):
+                existing.update({
+                    "stage": "cpsat_solving",
+                    "stage_progress": float(pct),
+                    "overall_progress": round(mapped, 2),
+                    "last_updated": int(_t.time()),
+                    "metadata": {"phase": phase, **meta},
+                })
+                redis_client.setex(key, 7200, json.dumps(existing))
+        except Exception as exc:
+            logger.warning(
+                "[SAGA] Phase progress push failed (non-fatal)",
+                extra={"phase": phase, "error": str(exc)},
+            )
+
+    async def _run_dept_phase(
+        self,
+        job_id: str,
+        data: Dict,
+        dept_buckets: Dict,
+        registry,
+        token: CancellationToken,
+    ) -> List:
+        """Phase 2: solve each department's courses using CommittedAwareSolver."""
+        from engine.cpsat.dept_solver import solve_department_timetable
+
+        dept_results = []
+        n_depts = len(dept_buckets)
+        for i, (dept_id, dept_courses) in enumerate(dept_buckets.items()):
+            token.check_or_raise(f"dept_phase_{dept_id}")
+            result = solve_department_timetable(
+                dept_id=dept_id,
+                courses=dept_courses,
+                rooms=data["rooms"],
+                faculty=data["faculty"],
+                time_slots=data["time_slots"],
+                committed_registry=registry,
+                job_id=job_id,
+                redis_client=self.redis_client,
+            )
+            registry.commit_solution(result.solution, dept_courses)
+            dept_results.append(result)
+            pct = 10 + int((i + 1) / max(n_depts, 1) * 58)
+            self._push_phase_progress(
+                self.redis_client, job_id, "dept_solving", pct, registry.report_stats()
+            )
+            logger.info(
+                "[SAGA] Dept phase progress",
+                extra={"job_id": job_id, "dept_id": dept_id, "dept_n": i + 1, "of": n_depts},
+            )
+        return dept_results
+
+    async def _stage2_partitioned_solve(
+        self,
+        job_id: str,
+        data: Dict,
+        clusters: List[List],
+        token: CancellationToken,
+        tracker=None,
+    ) -> Dict:
+        """
+        4-phase partitioned solver replacing monolithic _stage2_cpsat_legacy.
+
+        Phase 1: CoursePartitioner  → dept_buckets + shared_pool
+        Phase 2: DeptSolvers (seq)  → commits each dept to CommittedResourceRegistry
+        Phase 3: CrossDeptSolver    → uses fully populated registry
+        Phase 4: TimetableMerger    → final solution (same format as legacy output)
+
+        Falls back to _stage2_cpsat_legacy on any unexpected exception so no
+        regression is possible for existing deployments.
+        """
+        from engine.cpsat.committed_registry import CommittedResourceRegistry
+        from engine.cpsat.cross_dept_solver import solve_cross_dept_timetable
+        from engine.cpsat.timetable_merger import merge_timetables
+        from core.services.course_partitioner import CoursePartitioner
+
+        courses = data.get("courses", [])
+        if not courses:
+            logger.warning(
+                "[SAGA] No courses — empty solution",
+                extra={"job_id": job_id},
+            )
+            return {}
+
+        try:
+            registry = CommittedResourceRegistry()
+            partition = CoursePartitioner().partition(courses)
+            self._push_phase_progress(
+                self.redis_client, job_id, "phase_1_partition", 5, partition.stats
+            )
+            logger.info(
+                "[SAGA] Partition complete",
+                extra={"job_id": job_id, **partition.stats},
+            )
+
+            # --- Phase 2: dept solvers (sequential) ---
+            token.check_or_raise("before_dept_phase")
+            dept_results = await self._run_dept_phase(
+                job_id, data, partition.dept_buckets, registry, token
+            )
+            self._push_phase_progress(
+                self.redis_client, job_id, "phase_2_complete", 68, registry.report_stats()
+            )
+
+            # --- Phase 3: cross-dept solver ---
+            token.check_or_raise("before_cross_dept")
+            cross_solution = solve_cross_dept_timetable(
+                shared_pool=partition.shared_pool,
+                rooms=data["rooms"],
+                faculty=data["faculty"],
+                time_slots=data["time_slots"],
+                committed_registry=registry,
+                job_id=job_id,
+                redis_client=self.redis_client,
+            )
+            registry.commit_solution(cross_solution, partition.shared_pool)
+            self._push_phase_progress(
+                self.redis_client, job_id, "phase_3_cross_dept", 90, registry.report_stats()
+            )
+
+            # --- Phase 4: merge ---
+            merged = merge_timetables(dept_results, cross_solution, courses)
+            self.job_data["registry"] = registry
+            self._push_phase_progress(
+                self.redis_client, job_id, "phase_4_merged", 100,
+                {"assignments": len(merged)},
+            )
+            logger.info(
+                "[SAGA] Partitioned solve complete",
+                extra={"job_id": job_id, "assignments": len(merged)},
+            )
+            return merged
+
+        except CancellationError:
+            raise  # propagate to saga.execute() cancellation handler
+        except Exception as exc:
+            logger.error(
+                "[SAGA] Partitioned solve failed — falling back to legacy CP-SAT",
+                extra={"job_id": job_id, "error": str(exc)},
+            )
+            import traceback
+            logger.error(traceback.format_exc())
+            return await self._stage2_cpsat_legacy(job_id, data, clusters, token, tracker)
+
+    async def _stage2_cpsat_legacy(self, job_id: str, data: Dict, clusters: List[List], token: CancellationToken, tracker=None) -> Dict:
+        """
+        Stage 2 (legacy): monolithic CP-SAT solving with cancellation between clusters.
+        Kept as fallback — called by _stage2_partitioned_solve on exception.
         ✅ DESIGN FREEZE: Deterministic, provably correct
         """
         from engine.cpsat.solver import AdaptiveCPSATSolver
