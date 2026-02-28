@@ -12,6 +12,19 @@ interface ApiResponse<T> {
   status: number;
 }
 
+/**
+ * Extends the standard RequestInit with internal flags that are consumed by
+ * ApiClient.request() and must never be forwarded to fetch().
+ */
+interface InternalRequestOptions extends RequestInit {
+  /**
+   * When true, suppresses the automatic redirect to /login on 401.
+   * Use this for silent auth-probes (e.g. getCurrentUser on mount) where
+   * an unauthenticated response is expected and handled by the caller.
+   */
+  noRedirectOn401?: boolean;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -31,14 +44,15 @@ class ApiClient {
    * 🔐 CRITICAL: credentials: 'include' sends HttpOnly cookies with every request
    * This is required for secure JWT authentication
    */
-  async request<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
+  async request<T>(endpoint: string, options?: InternalRequestOptions): Promise<ApiResponse<T>> {
+    const { noRedirectOn401 = false, ...fetchOptions } = options ?? {};
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        ...options,
+        ...fetchOptions,
         credentials: 'include',  // 🔐 CRITICAL: Send cookies with request
         headers: {
           ...this.getHeaders(),
-          ...options?.headers,
+          ...fetchOptions?.headers,
         },
       });
 
@@ -46,15 +60,19 @@ class ApiClient {
       if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh')) {
         const refreshed = await this.refreshToken();
         if (refreshed) {
-          // Retry original request after refresh
+          // Retry original request after refresh (preserve original options).
           return this.request<T>(endpoint, options);
         }
-        // Refresh failed — redirect to login.
+        // Refresh failed — redirect to login only when:
+        //   1. This is not a silent auth-probe (noRedirectOn401 is false), AND
+        //   2. We are not already on an auth page (guard against redirect loops).
         // NOTE: useRouter() is a React hook and MUST NOT be called outside a
-        // component or custom hook. Use window.location for imperative redirects
-        // from non-React contexts such as this class method.
-        // Guard against redirect loops: only redirect if not already on an auth page.
-        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        // component. Use window.location for imperative redirects from class methods.
+        if (
+          !noRedirectOn401 &&
+          typeof window !== 'undefined' &&
+          !window.location.pathname.startsWith('/login')
+        ) {
           window.location.href = '/login';
         }
       }
@@ -115,7 +133,11 @@ class ApiClient {
   }
 
   async getCurrentUser() {
-    return this.request<any>('/auth/me/');
+    // noRedirectOn401: true — this is a silent probe called by AuthContext on
+    // every page mount. A 401 here just means "no active session"; the caller
+    // (AuthContext) handles it by setting user = null. Redirecting here would
+    // kick unauthenticated visitors off every public/marketing page.
+    return this.request<any>('/auth/me/', { noRedirectOn401: true });
   }
 
   // Users

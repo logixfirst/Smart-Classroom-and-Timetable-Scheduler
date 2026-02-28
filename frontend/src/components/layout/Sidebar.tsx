@@ -170,7 +170,8 @@ export default function Sidebar({
             alt="Cadence logo"
             width={32}
             height={32}
-            style={{ flexShrink: 0, objectFit: 'contain', borderRadius: '50%', mixBlendMode: 'multiply' }}
+            quality={100}
+            style={{ flexShrink: 0, objectFit: 'contain' }}
           />
 
           {/* Wordmark — hidden only when collapsed on desktop; always shown in mobile drawer */}
