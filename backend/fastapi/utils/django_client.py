@@ -63,11 +63,44 @@ def _get_db_pool() -> psycopg2.pool.ThreadedConnectionPool:
     return _db_pool
 
 
+# ---------------------------------------------------------------------------
+# Track which pool connections have already been initialised.
+# We cannot attach attributes to psycopg2.extensions.connection — it is a
+# C-extension type with __slots__ and no __dict__.  A module-level set of
+# connection object IDs is the standard workaround.
+# ---------------------------------------------------------------------------
+_initialized_conn_ids: set = set()
+
+
 def _init_conn(conn) -> None:
-    """One-time per-connection setup: statement timeout."""
+    """One-time per-connection setup: autocommit + statement timeout.
+
+    Called only for connections not yet in _initialized_conn_ids.
+
+    Ordering is critical for psycopg2:
+      1. autocommit MUST be set before opening any cursor.  Setting it after
+         a cursor.execute() raises "set_session cannot be used inside a
+         transaction".
+      2. statement_timeout is applied via SET after autocommit is enabled.
+    """
+    # Step 1: flip autocommit BEFORE touching any cursor
+    conn.autocommit = True
+    # Step 2: set statement timeout (no open transaction — safe)
     with conn.cursor() as cur:
         cur.execute("SET statement_timeout = '30s'")
-    conn.autocommit = True
+    # Step 3: record this connection as configured
+    _initialized_conn_ids.add(id(conn))
+
+
+def _is_conn_initialized(conn) -> bool:
+    """Return True if conn has already been configured by _init_conn."""
+    return id(conn) in _initialized_conn_ids
+
+
+def _on_conn_closed(conn) -> None:
+    """Remove a connection's ID from the tracking set when it is discarded."""
+    _initialized_conn_ids.discard(id(conn))
+
 
 
 class DjangoAPIClient:
@@ -90,9 +123,15 @@ class DjangoAPIClient:
     # Connection helpers
     # ------------------------------------------------------------------
     def _borrow_conn(self):
-        """Borrow a connection from the pool for one query."""
+        """Borrow a connection from the pool for one query.
+
+        Calls _init_conn only for connections that have not yet been configured.
+        Already-initialised connections (autocommit=True, timeout set) are
+        returned directly without any extra setup.
+        """
         conn = self._pool.getconn()
-        _init_conn(conn)
+        if not _is_conn_initialized(conn):
+            _init_conn(conn)
         return conn
 
     def _return_conn(self, conn) -> None:
@@ -100,6 +139,8 @@ class DjangoAPIClient:
         try:
             self._pool.putconn(conn)
         except Exception as exc:
+            # Connection is unusable — discard tracking entry and drop it
+            _on_conn_closed(conn)
             logger.warning("[DB-POOL] putconn error: %s", exc)
 
     async def close(self):
