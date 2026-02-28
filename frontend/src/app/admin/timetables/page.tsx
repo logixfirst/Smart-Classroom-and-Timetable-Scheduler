@@ -34,11 +34,18 @@ function formatETA(seconds: number | null): string {
   return `~${Math.ceil(seconds / 60)}m left`
 }
 
-function RunningJobRow({ job, onNavigate }: { job: RunningJob; onNavigate: () => void }) {
-  const { progress, isConnected } = useProgress(job.job_id)
+function RunningJobRow({ job, onNavigate, onJobFailed }: { job: RunningJob; onNavigate: () => void; onJobFailed: () => void }) {
+  const { progress, isConnected } = useProgress(
+    job.job_id,
+    undefined,
+    () => { onJobFailed() },  // called when SSE reports failed / cancelled
+  )
 
+  const isFailed    = progress?.status === 'failed' || progress?.status === 'cancelled'
   const pct         = progress?.overall_progress ?? 0
-  const stage       = progress?.stage ? (STAGE_LABELS[progress.stage] ?? progress.stage) : 'Connecting…'
+  const stage       = isFailed
+    ? (progress?.status === 'cancelled' ? 'Cancelled' : 'Generation failed')
+    : (progress?.stage ? (STAGE_LABELS[progress.stage] ?? progress.stage) : 'Connecting…')
   const eta         = progress?.eta_seconds ?? null
   const hasProgress = pct > 0
 
@@ -46,8 +53,8 @@ function RunningJobRow({ job, onNavigate }: { job: RunningJob; onNavigate: () =>
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '12px 14px',
-      background: 'var(--color-bg-page)',
-      border: '1px solid var(--color-border)',
+      background: isFailed ? 'var(--color-danger-subtle, #fff5f5)' : 'var(--color-bg-page)',
+      border: `1px solid ${isFailed ? 'var(--color-danger)' : 'var(--color-border)'}`,
       borderRadius: 'var(--radius-md)',
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -66,52 +73,68 @@ function RunningJobRow({ job, onNavigate }: { job: RunningJob; onNavigate: () =>
               {job.academic_year} · Sem {job.semester}
             </span>
           )}
+          {isFailed && (
+            <span style={{
+              fontSize: 11, fontWeight: 600,
+              color: 'var(--color-danger-text, #c53030)',
+              background: 'var(--color-danger-subtle, #fff5f5)',
+              border: '1px solid var(--color-danger)',
+              padding: '1px 7px', borderRadius: 4, flexShrink: 0,
+            }}>
+              {progress?.status === 'cancelled' ? 'Cancelled' : 'Failed'}
+            </span>
+          )}
         </div>
 
         {/* Stage + ETA row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+          <span style={{ fontSize: 12, color: isFailed ? 'var(--color-danger-text, #c53030)' : 'var(--color-text-secondary)' }}>
             {stage}
           </span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', flexShrink: 0, marginLeft: 8 }}>
-            {hasProgress
-              ? <>{Math.round(pct)}% &nbsp;<span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>{formatETA(eta)}</span></>
-              : <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>{isConnected ? formatETA(eta) : 'Connecting…'}</span>
-            }
-          </span>
+          {!isFailed && (
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', flexShrink: 0, marginLeft: 8 }}>
+              {hasProgress
+                ? <>{Math.round(pct)}% &nbsp;<span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>{formatETA(eta)}</span></>
+                : <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>{isConnected ? formatETA(eta) : 'Connecting…'}</span>
+              }
+            </span>
+          )}
         </div>
 
-        {/* Progress bar — blue fill + white shine beam, exact status-page pattern */}
+        {/* Progress bar — red on failure, blue otherwise */}
         <div style={{ position: 'relative', height: 4, background: 'var(--color-bg-surface-3)', borderRadius: 2, overflow: 'hidden' }}>
-          {/* Blue fill — always visible, min 8% so it shows from the moment the job appears */}
+          {/* Fill — always visible, min 8% so it shows from the moment the job appears */}
           <div style={{
             position: 'absolute', top: 0, left: 0, height: '100%',
-            width: `${Math.max(pct, 8)}%`,
-            background: 'var(--color-primary)', borderRadius: 2,
+            width: isFailed ? '100%' : `${Math.max(pct, 8)}%`,
+            background: isFailed ? 'var(--color-danger)' : 'var(--color-primary)',
+            borderRadius: 2,
             transition: 'width 600ms ease',
-            animation: 'progress-fill-breathe 2s ease-in-out infinite',
+            animation: isFailed ? 'none' : 'progress-fill-breathe 2s ease-in-out infinite',
           }} />
-          {/* White shine beam clipped to fill width */}
-          <div style={{
-            position: 'absolute', top: 0, left: 0, height: '100%',
-            width: `${Math.max(pct, 8)}%`,
-            overflow: 'hidden', borderRadius: 2,
-          }}>
-            <span style={{
-              position: 'absolute', inset: 0, width: '50%',
-              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%)',
-              animation: 'progress-shine 1.8s linear infinite',
-            }} />
-          </div>
+          {/* White shine beam clipped to fill width — only when running */}
+          {!isFailed && (
+            <div style={{
+              position: 'absolute', top: 0, left: 0, height: '100%',
+              width: `${Math.max(pct, 8)}%`,
+              overflow: 'hidden', borderRadius: 2,
+            }}>
+              <span style={{
+                position: 'absolute', inset: 0, width: '50%',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%)',
+                animation: 'progress-shine 1.8s linear infinite',
+              }} />
+            </div>
+          )}
         </div>
       </div>
 
       <button
         onClick={onNavigate}
-        className="btn-primary"
+        className={isFailed ? 'btn-secondary' : 'btn-primary'}
         style={{ fontSize: 12, height: 32, padding: '0 14px', flexShrink: 0 }}
       >
-        View Progress
+        {isFailed ? 'View Details' : 'View Progress'}
       </button>
     </div>
   )
@@ -412,6 +435,7 @@ export default function AdminTimetablesPage() {
                 key={job.job_id}
                 job={job}
                 onNavigate={() => router.push(`/admin/timetables/status/${job.job_id}`)}
+                onJobFailed={loadTimetableData}
               />
             ))}
           </div>

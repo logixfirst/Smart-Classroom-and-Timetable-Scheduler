@@ -112,13 +112,27 @@ export function useProgress(
           }
         })
 
-        // Job completed
+        // Job completed or terminal (failed / cancelled)
         eventSource.addEventListener('done', (event) => {
           if (!isMounted) return
-          const data = JSON.parse(event.data)
-          console.log(`[SSE] Job done: ${data.status}`)
-          if (data.status === 'completed' && onComplete && progress) {
-            onComplete(progress)
+          try {
+            const data = JSON.parse(event.data)
+            console.log(`[SSE] Job done: ${data.status}`)
+            if (data.status === 'completed') {
+              if (onComplete && progress) onComplete(progress)
+            } else {
+              // 'failed' or 'cancelled' — notify caller so the UI can react
+              // immediately rather than waiting for the next background poll.
+              const msg =
+                data.status === 'cancelled'
+                  ? 'Generation was cancelled'
+                  : 'Generation failed — check logs for details'
+              console.warn(`[SSE] Terminal non-success: ${data.status}`)
+              if (onError) onError(msg)
+            }
+          } catch (parseErr) {
+            console.error('[SSE] Failed to parse done event:', parseErr)
+            if (onError) onError('Unexpected error in generation')
           }
           eventSource.close()
           setIsConnected(false)
