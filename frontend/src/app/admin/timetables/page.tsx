@@ -34,11 +34,11 @@ function formatETA(seconds: number | null): string {
   return `~${Math.ceil(seconds / 60)}m left`
 }
 
-function RunningJobRow({ job, onNavigate, onJobFailed }: { job: RunningJob; onNavigate: () => void; onJobFailed: () => void }) {
+function RunningJobRow({ job, onNavigate, onJobFailed }: { job: RunningJob; onNavigate: () => void; onJobFailed: (jobId: string) => void }) {
   const { progress, isConnected } = useProgress(
     job.job_id,
     undefined,
-    () => { onJobFailed() },  // called when SSE reports failed / cancelled
+    () => { onJobFailed(job.job_id) },  // called when SSE reports failed / cancelled
   )
 
   const isFailed    = progress?.status === 'failed' || progress?.status === 'cancelled'
@@ -220,6 +220,11 @@ export default function AdminTimetablesPage() {
   // Running-job poll: derive from main timetables list (no separate fetch)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const emptyPollCount = useRef(0)
+  // Jobs that have transitioned to a terminal state via SSE but whose DB status
+  // may not have propagated to the timetables list yet.  Excluding them here
+  // prevents the failed card from lingering in the running banner between the
+  // SSE signal and the next loadTimetableData() response.
+  const [terminatedJobIds, setTerminatedJobIds] = useState<Set<string>>(() => new Set())
 
   const { user } = useAuth()
   const router = useRouter()
@@ -229,7 +234,10 @@ export default function AdminTimetablesPage() {
   const runningJobs = useMemo<RunningJob[]>(
     () =>
       timetables
-        .filter(t => (t.status as string) === 'running' || t.status === 'pending')
+        .filter(t =>
+          !terminatedJobIds.has(t.id) &&
+          ((t.status as string) === 'running' || t.status === 'pending')
+        )
         .map(t => ({
           job_id: t.id,
           progress: 0,
@@ -240,7 +248,7 @@ export default function AdminTimetablesPage() {
           academic_year: t.academic_year,
           semester: t.semester,
         })),
-    [timetables]
+    [timetables, terminatedJobIds]
   )
 
   const loadTimetableData = useCallback(async () => {
@@ -263,6 +271,8 @@ export default function AdminTimetablesPage() {
       setTotalCount(data.count || 0)
 
       const listItems = transformJobs(jobs)
+      // Clear terminated IDs now that the updated statuses are in the list.
+      setTerminatedJobIds(new Set())
       setTimetables(listItems)
 
       // Background-prefetch variants for the 3 most-recent completed/failed jobs.
@@ -435,7 +445,12 @@ export default function AdminTimetablesPage() {
                 key={job.job_id}
                 job={job}
                 onNavigate={() => router.push(`/admin/timetables/status/${job.job_id}`)}
-                onJobFailed={loadTimetableData}
+                onJobFailed={(jobId) => {
+                  // 1. Immediately drop from the running banner
+                  setTerminatedJobIds(prev => new Set(prev).add(jobId))
+                  // 2. Refresh list so it appears in the grid with failed status
+                  loadTimetableData()
+                }}
               />
             ))}
           </div>
