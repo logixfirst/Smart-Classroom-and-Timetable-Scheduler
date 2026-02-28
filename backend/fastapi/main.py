@@ -13,6 +13,7 @@ from fastapi import FastAPI
 import uvicorn
 
 # Core setup
+import multiprocessing
 from core.logging_config import setup_logging
 from core.lifespan import lifespan
 
@@ -30,8 +31,14 @@ from api.routers import (
     websocket_router
 )
 
-# Initialize logging first
-setup_logging()
+# Initialize logging — ONLY in the main process.
+# On Windows, ProcessPoolExecutor uses the 'spawn' start method, which
+# re-imports __main__ (this file) in every worker subprocess.  Without
+# this guard, setup_logging() would fire 6 extra times (once per
+# PARALLEL_CLUSTERS worker), truncating the log file ('w' mode) and
+# wasting ~80 MB RAM per worker importing the full FastAPI app.
+if multiprocessing.current_process().name == 'MainProcess':
+    setup_logging()
 
 # Create FastAPI application
 app = FastAPI(

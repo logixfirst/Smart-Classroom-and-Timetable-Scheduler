@@ -113,13 +113,25 @@ class CacheManager:
             logger.error(f"[CACHE] Serialization error for {cache_key}: {e}")
             return
         
-        # Store in Redis
+        # Store in Redis — skip oversized payloads that would reliably timeout.
+        # BHU-scale datasets (2494+ courses with sections/students) serialise to
+        # 10-30 MB; pushing that over a socket exceeds socket_timeout and blocks
+        # the load stage for 10+ seconds before falling back to memory cache anyway.
+        # Threshold: 5 MB (Redis best-practice: keep values < 1-5 MB).
+        _MAX_REDIS_BYTES = 5 * 1024 * 1024  # 5 MB
         if self.redis_client:
-            try:
-                self.redis_client.setex(cache_key, ttl, serialized_data)
-                logger.debug(f"[CACHE] Redis SET: {cache_key} (TTL: {ttl}s)")
-            except Exception as e:
-                logger.warning(f"[CACHE] Redis write error: {e}")
+            payload_bytes = len(serialized_data.encode('utf-8'))
+            if payload_bytes > _MAX_REDIS_BYTES:
+                logger.warning(
+                    f"[CACHE] Skipping Redis for {resource_type} key — payload too large "
+                    f"({payload_bytes / 1024 / 1024:.1f} MB > 5 MB). Using memory cache only."
+                )
+            else:
+                try:
+                    self.redis_client.setex(cache_key, ttl, serialized_data)
+                    logger.debug(f"[CACHE] Redis SET: {cache_key} (TTL: {ttl}s)")
+                except Exception as e:
+                    logger.warning(f"[CACHE] Redis write error: {e}")
         
         # Store in memory cache as fallback
         self.memory_cache[cache_key] = {

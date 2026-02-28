@@ -61,9 +61,10 @@ def setup_logging():
         console_handler = logging.NullHandler()
     console_handler.setFormatter(logging.Formatter(log_format))
     
-    # Create file handler — mode='w' truncates the file on every restart
-    # so fastapi_log.txt always reflects the current session only.
-    file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
+    # Create file handler — mode='a' appends so that worker-subprocess
+    # re-entries (Windows ProcessPoolExecutor spawn) never truncate the log.
+    # The file is cleared explicitly by clear.py / on manual restart only.
+    file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
     file_handler.setFormatter(logging.Formatter(log_format))
     
     # Configure root logger

@@ -123,7 +123,10 @@ async def lifespan(app: FastAPI):
             redis_kwargs: dict = {
                 "decode_responses": True,
                 "socket_connect_timeout": 5,
-                "socket_timeout": 10,
+                # 30 s: accommodates large-ish Redis writes (e.g. student/faculty
+                # blobs up to 5 MB) without triggering spurious timeout warnings.
+                # Payloads > 5 MB are skipped by CacheManager before reaching here.
+                "socket_timeout": 30,
                 "retry_on_timeout": True,
             }
             if redis_url.startswith("rediss://"):
