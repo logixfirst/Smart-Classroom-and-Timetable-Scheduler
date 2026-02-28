@@ -58,22 +58,20 @@ class ApiClient {
 
       // Handle 401 Unauthorized - try to refresh token
       if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/refresh')) {
-        const refreshed = await this.refreshToken();
-        if (refreshed) {
-          // Retry original request after refresh (preserve original options).
-          return this.request<T>(endpoint, options);
-        }
-        // Refresh failed — redirect to login only when:
-        //   1. This is not a silent auth-probe (noRedirectOn401 is false), AND
-        //   2. We are not already on an auth page (guard against redirect loops).
-        // NOTE: useRouter() is a React hook and MUST NOT be called outside a
-        // component. Use window.location for imperative redirects from class methods.
-        if (
-          !noRedirectOn401 &&
-          typeof window !== 'undefined' &&
-          !window.location.pathname.startsWith('/login')
-        ) {
-          window.location.href = '/login';
+        // For silent auth-probes (noRedirectOn401=true, e.g. checkAuth on mount),
+        // skip the refresh entirely. A 401 here simply means "no active session" —
+        // there are no cookies to refresh with. Attempting a refresh would only
+        // produce a second wasted 401 in the console / network tab.
+        if (!noRedirectOn401) {
+          const refreshed = await this.refreshToken();
+          if (refreshed) {
+            // Retry original request after successful token refresh.
+            return this.request<T>(endpoint, options);
+          }
+          // Refresh failed — redirect to login (guard against loops on /login).
+          if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login';
+          }
         }
       }
 
