@@ -40,5 +40,5 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return null
   }
 
-  return <DashboardLayout role="admin">{children}</DashboardLayout>
+  return <DashboardLayout>{children}</DashboardLayout>
 }

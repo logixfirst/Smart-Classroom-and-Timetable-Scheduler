@@ -48,7 +48,7 @@ export default function FacultySchedule() {
 
   if (loading) {
     return (
-      <DashboardLayout role="faculty">
+      <DashboardLayout>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <GoogleSpinner size={48} className="mx-auto mb-4" />

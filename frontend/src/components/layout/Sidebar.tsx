@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
@@ -147,7 +146,7 @@ export default function Sidebar({
 
       {/* Sidebar */}
       <div
-        className={`sidebar-drawer fixed top-0 bottom-0 left-0 z-[60] md:z-30 flex flex-col transform md:translate-x-0 ${
+        className={`sidebar-drawer fixed top-0 md:top-16 bottom-0 left-0 z-[60] md:z-30 flex flex-col transform md:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}
         style={{
@@ -156,64 +155,10 @@ export default function Sidebar({
           backgroundColor: 'var(--color-sidebar-bg)',
           borderRight: '1px solid var(--color-sidebar-border)',
           transition: 'width 150ms ease-out',
-          height: '100dvh',
         }}
       >
-        {/* Nav header zone — 56px, mirrors app-header height. Owns branding + sidebar toggle. */}
-        <div
-          className="flex items-center flex-shrink-0 px-3 gap-2"
-          style={{ height: 'var(--header-height)', borderBottom: '1px solid var(--color-sidebar-border)' }}
-        >
-          {/* Logo — always visible, infinite resolution, transparent bg */}
-          <Image
-            src="/logo2.png"
-            alt="Cadence logo"
-            width={32}
-            height={32}
-            quality={100}
-            style={{ flexShrink: 0, objectFit: 'contain', borderRadius: '50%' }}
-          />
-
-          {/* Wordmark — hidden only when collapsed on desktop; always shown in mobile drawer */}
-          {(!sidebarCollapsed || sidebarOpen) && (
-            <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap' }}>
-              Cadence
-            </span>
-          )}
-
-          {/* Flex spacer — only when icon-only on desktop */}
-          {sidebarCollapsed && !sidebarOpen && <div style={{ flex: 1 }} />}
-
-          {/* Collapse chevron — desktop only; tap-outside-backdrop closes mobile drawer */}
-          <button
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="hidden md:flex icon-button flex-shrink-0"
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            style={{ width: '28px', height: '28px' }}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{
-                transform: sidebarCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 150ms ease-out',
-                color: 'var(--color-text-muted)',
-              }}
-            >
-              <polyline points="10 4 6 8 10 12"/>
-            </svg>
-          </button>
-        </div>
-
         {/* Navigation */}
-        <nav className="flex-1 flex flex-col p-2 gap-0.5 overflow-y-auto overflow-x-hidden scrollbar-hide">
+        <nav className="flex-1 flex flex-col p-2 pt-3 gap-0.5 overflow-y-auto overflow-x-hidden scrollbar-hide">
           {items.map(item => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
             return (

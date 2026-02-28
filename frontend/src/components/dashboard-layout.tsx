@@ -1,385 +1,560 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import Image from 'next/image'
-import { usePathname, useRouter } from 'next/navigation'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import Sidebar from '@/components/layout/Sidebar'
+import { usePathname, useRouter } from 'next/navigation'
+import { useTheme } from 'next-themes'
+import {
+  Menu,
+  Search,
+  Mic,
+  Settings,
+  Bell,
+  LogOut,
+  Sun,
+  Moon,
+  User as UserIcon,
+  X,
+  LayoutDashboard,
+  CalendarDays,
+  BookOpen,
+  Users,
+  GraduationCap,
+  CheckCircle2,
+  FileText,
+  Calendar,
+  SlidersHorizontal,
+} from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface NavItem {
+  label: string
+  href: string
+  icon: React.ElementType
+  badge?: boolean
+}
 
 interface DashboardLayoutProps {
   children: React.ReactNode
-  role: 'admin' | 'faculty' | 'student'
-  pageTitle?: string
-  pageDescription?: string
 }
 
-export default function DashboardLayout({
-  children,
-  role,
-  pageTitle,
-  pageDescription,
-}: DashboardLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+// ─── Nav definitions ──────────────────────────────────────────────────────────
 
-  // Restore persisted sidebar state after hydration
-  useEffect(() => {
-    const stored = localStorage.getItem('sidebar-collapsed')
-    if (stored !== null) setSidebarCollapsed(stored === 'true')
-  }, [])
+const ADMIN_NAV: NavItem[] = [
+  { label: 'Dashboard',          href: '/admin/dashboard',        icon: LayoutDashboard },
+  { label: 'Timetables',         href: '/admin/timetables',       icon: CalendarDays },
+  { label: 'Academic Structure', href: '/admin/academic/schools', icon: BookOpen },
+  { label: 'Faculty',            href: '/admin/faculty',          icon: Users },
+  { label: 'Students',           href: '/admin/students',         icon: GraduationCap },
+  { label: 'Approvals',          href: '/admin/approvals',        icon: CheckCircle2, badge: true },
+  { label: 'Logs',               href: '/admin/logs',             icon: FileText },
+]
 
-  // Persist sidebar collapsed state
-  useEffect(() => {
-    localStorage.setItem('sidebar-collapsed', String(sidebarCollapsed))
-  }, [sidebarCollapsed])
-  const [showSignOutDialog, setShowSignOutDialog] = useState(false)
-  const [showSettings, setShowSettings] = useState(false)
-  const [showNotifications, setShowNotifications] = useState(false)
-  const [copiedJobRef, setCopiedJobRef] = useState(false)
-  const settingsRef = useRef<HTMLDivElement>(null)
-  const notificationsRef = useRef<HTMLDivElement>(null)
-  const pathname = usePathname()
-  const router = useRouter()
+const FACULTY_NAV: NavItem[] = [
+  { label: 'Dashboard',   href: '/faculty/dashboard',   icon: LayoutDashboard },
+  { label: 'My Schedule', href: '/faculty/schedule',    icon: Calendar },
+  { label: 'Preferences', href: '/faculty/preferences', icon: SlidersHorizontal },
+]
 
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const STUDENT_NAV: NavItem[] = [
+  { label: 'Dashboard',    href: '/student/dashboard',  icon: LayoutDashboard },
+  { label: 'My Timetable', href: '/student/timetable',  icon: CalendarDays },
+]
 
-  // Human-readable labels for routes whose last real segment is a resource ID
-  const UUID_PARENT_LABELS: Record<string, string> = {
-    status: 'Generation Status',
-  }
+const NAV_MAP: Record<string, NavItem[]> = {
+  admin: ADMIN_NAV,
+  faculty: FACULTY_NAV,
+  student: STUDENT_NAV,
+}
 
-  const getPageInfo = (): { title: string; jobRef: string | null; fullId: string | null } => {
-    const segments = pathname.split('/').filter(Boolean)
-    if (segments.length === 0) return { title: 'Dashboard', jobRef: null, fullId: null }
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-    const last = segments[segments.length - 1]
+/** Deterministic hue from a string → Google-style avatar colour. */
+function seedHsl(name: string): string {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
+  return `hsl(${Math.abs(h) % 360},55%,45%)`
+}
 
-    if (UUID_RE.test(last)) {
-      const parent = segments[segments.length - 2] ?? ''
-      const label =
-        UUID_PARENT_LABELS[parent] ??
-        (parent.charAt(0).toUpperCase() + parent.slice(1).replace(/-/g, ' '))
-      return { title: label, jobRef: '#' + last.slice(0, 8).toUpperCase(), fullId: last }
-    }
+/** Resolve display name + two-letter initials from user object. */
+function resolveUser(u: {
+  username: string
+  email?: string
+  first_name?: string
+  last_name?: string
+}) {
+  const full =
+    [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || u.username
+  const initials = full
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+  return { full, initials }
+}
 
-    return {
-      title:
-        segments.length > 1
-          ? last.charAt(0).toUpperCase() + last.slice(1).replace(/-/g, ' ')
-          : 'Dashboard',
-      jobRef: null,
-      fullId: null,
-    }
-  }
+// ─── Avatar ───────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
-        setShowSettings(false)
-      }
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
-        setShowNotifications(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+function Avatar({ name, size = 32 }: { name: string; size?: number }) {
+  const { initials } = resolveUser({ username: name })
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-full font-semibold text-white select-none shrink-0"
+      style={{
+        width: size,
+        height: size,
+        fontSize: size * 0.375,
+        background: seedHsl(name),
+      }}
+    >
+      {initials}
+    </span>
+  )
+}
+
+// ─── NavItemRow ───────────────────────────────────────────────────────────────
+
+function NavItemRow({
+  item,
+  active,
+  collapsed,
+  pendingApprovals,
+  onClick,
+}: {
+  item: NavItem
+  active: boolean
+  collapsed: boolean
+  pendingApprovals: number
+  onClick?: () => void
+}) {
+  const Icon = item.icon
+  const showBadge = item.badge && pendingApprovals > 0
 
   return (
-    <>
-      <div
-        className={`min-h-screen transition-colors duration-300 ${
-          showSignOutDialog ? 'blur-sm' : ''
-        }`}
-        style={{ backgroundColor: 'var(--color-bg-page)' }}
+    <Link
+      href={item.href}
+      onClick={onClick}
+      title={collapsed ? item.label : undefined}
+      className={[
+        'relative flex items-center gap-3 rounded-[24px] h-10 my-0.5',
+        'transition-colors duration-150 select-none',
+        collapsed ? 'justify-center w-10 mx-auto px-0' : 'px-4 mx-2',
+        active
+          ? 'bg-[#c2e7ff] dark:bg-[#004a77] font-semibold text-[#001d35] dark:text-white'
+          : 'text-[#444746] dark:text-[#bdc1c6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134]',
+      ].join(' ')}
+    >
+      <span className="relative shrink-0">
+        <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
+        {showBadge && (
+          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-[#202124]" />
+        )}
+      </span>
+      <span
+        className={[
+          'text-sm whitespace-nowrap transition-all duration-200',
+          collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100',
+        ].join(' ')}
       >
-        <Sidebar
-          sidebarOpen={sidebarOpen}
-          sidebarCollapsed={sidebarCollapsed}
-          setSidebarOpen={setSidebarOpen}
-          setSidebarCollapsed={setSidebarCollapsed}
-          role={role}
-          setShowSignOutDialog={setShowSignOutDialog}
-        />
+        {item.label}
+      </span>
+    </Link>
+  )
+}
 
-        {/* Main content */}
-        <div
-          className={`transition-all duration-150 ease-out ${
-            sidebarCollapsed ? 'md:ml-[60px]' : 'md:ml-[240px]'
-          }`}
-        >
-          {/* Header */}
-          <header
-            className="app-header sticky top-0 z-30"
-            style={{
-              backgroundColor: 'var(--color-header-bg)',
-              borderBottom: '1px solid var(--color-header-border)',
-              height: 'var(--header-height)',
-            }}
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function DashboardLayout({ children }: DashboardLayoutProps) {
+  const { user, logout } = useAuth()
+  const { theme, setTheme } = useTheme()
+  const pathname  = usePathname()
+  const router    = useRouter()
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [sidebarOpen,  setSidebarOpen]  = useState(true)    // desktop expanded
+  const [mobileOpen,   setMobileOpen]   = useState(false)   // mobile drawer
+  const [profileOpen,  setProfileOpen]  = useState(false)   // avatar dropdown
+  const [showSignOut,  setShowSignOut]  = useState(false)   // confirm dialog
+  const [searchOpen,   setSearchOpen]   = useState(false)   // mobile search overlay
+  const [pendingApprovals]              = useState(0)        // extend with SWR if needed
+  const [mounted,      setMounted]      = useState(false)
+
+  const profileRef = useRef<HTMLDivElement>(null)
+  const searchRef  = useRef<HTMLInputElement>(null)
+
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const role      = (user?.role ?? 'student') as 'admin' | 'faculty' | 'student'
+  const navItems  = NAV_MAP[role] ?? STUDENT_NAV
+  const { full: displayName } = resolveUser(
+    user ?? { username: 'User', email: '', first_name: '', last_name: '' }
+  )
+  const rolePill = { admin: 'Admin', faculty: 'Faculty', student: 'Student' }[role]
+
+  // ── Mount / responsive init ────────────────────────────────────────────────
+  useEffect(() => {
+    setMounted(true)
+    const init = () => {
+      if (window.innerWidth < 1024) {
+        setSidebarOpen(false)
+        setMobileOpen(false)
+      }
+    }
+    init()
+    const onResize = () => {
+      if (window.innerWidth >= 768) setMobileOpen(false)
+      if (window.innerWidth < 1024) setSidebarOpen(false)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  // ── Close profile dropdown on outside click ────────────────────────────────
+  useEffect(() => {
+    if (!profileOpen) return
+    const handler = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node))
+        setProfileOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [profileOpen])
+
+  // ── Auto-focus search input when mobile overlay opens ─────────────────────
+  useEffect(() => {
+    if (searchOpen) setTimeout(() => searchRef.current?.focus(), 60)
+  }, [searchOpen])
+
+  // ── Hamburger ─────────────────────────────────────────────────────────────
+  const handleHamburger = useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setMobileOpen((v) => !v)
+    } else {
+      setSidebarOpen((v) => !v)
+    }
+  }, [])
+
+  // ── Sign-out ───────────────────────────────────────────────────────────────
+  const handleSignOut = async () => {
+    setShowSignOut(false)
+    await logout()
+    router.push('/login')
+  }
+
+  // ── Content area left margin transitions with sidebar width ───────────────
+  // SSR-safe: render SSR-default (expanded) then update after mount.
+  const contentMarginCls = mounted
+    ? [
+        'transition-[margin-left] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
+        sidebarOpen ? 'md:ml-[256px]' : 'md:ml-[72px]',
+      ].join(' ')
+    : 'md:ml-[256px]'
+
+  const collapsed = !sidebarOpen && !mobileOpen
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-[#f8f9fa] dark:bg-[#111111] font-sans">
+
+      {/* ══════════════════════════════════════════════════════════
+          HEADER  (fixed, full-width, z-50)
+      ══════════════════════════════════════════════════════════ */}
+      <header className="fixed top-0 left-0 right-0 z-50 flex items-center h-14 md:h-16 px-2 md:px-4 gap-1 bg-white dark:bg-[#202124] border-b border-[#e0e0e0] dark:border-[#3c4043]">
+
+        {/* Left: hamburger + wordmark */}
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={handleHamburger}
+            aria-label="Toggle sidebar"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-[#444746] dark:text-[#bdc1c6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
           >
-            <div className="flex items-center justify-between px-4 lg:px-6 h-full gap-3">
-              {/* Left: Hamburger + Logo + Title */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {/* On desktop: only visible when sidebar is collapsed (the sidebar chevron handles expand).
-                    On mobile: always visible to open the drawer. */}
-                <button
-                  onClick={() => {
-                    if (window.matchMedia('(min-width: 768px)').matches) {
-                      setSidebarCollapsed(c => !c)
-                    } else {
-                      setSidebarOpen(true)
-                    }
-                  }}
-                  className={`icon-button ${sidebarCollapsed ? '' : 'md:hidden'}`}
-                  aria-label="Toggle navigation"
-                >
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
-                    <line x1="3" y1="5" x2="17" y2="5"/>
-                    <line x1="3" y1="10" x2="17" y2="10"/>
-                    <line x1="3" y1="15" x2="17" y2="15"/>
-                  </svg>
-                </button>
+            <Menu size={20} />
+          </button>
 
-                {/* Logo — mobile only; sidebar owns branding on desktop */}
-                <Image
-                  className="md:hidden"
-                  src="/logo2.png"
-                  alt="Cadence logo"
-                  width={32}
-                  height={32}
-                  style={{ flexShrink: 0, objectFit: 'contain', borderRadius: '50%', mixBlendMode: 'multiply' }}
-                />
+          <Link
+            href={`/${role}/dashboard`}
+            className="flex items-center gap-1 px-1 select-none"
+          >
+            <span className="font-bold text-sm leading-none tracking-tight">
+              <span className="text-[#4285F4]">S</span>
+              <span className="text-[#EA4335]">I</span>
+              <span className="text-[#FBBC04]">H</span>
+              <span className="text-[#34A853]">28</span>
+            </span>
+          </Link>
+        </div>
 
-                <span
-                  className="hidden sm:inline md:hidden"
-                  style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-primary)' }}
-                >
-                  Cadence
-                </span>
+        {/* Centre: pill search bar — hidden on mobile */}
+        <div className="hidden md:flex flex-1 justify-center px-4">
+          <div className="relative w-full max-w-[720px]">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#5f6368] dark:text-[#9aa0a6]">
+              <Search size={18} />
+            </span>
+            <input
+              type="search"
+              placeholder="Search timetables, faculty, rooms…"
+              className={[
+                'w-full h-11 pl-[3rem] pr-12 rounded-[24px] text-sm outline-none',
+                'bg-[#f1f3f4] dark:bg-[#303134]',
+                'text-[#202124] dark:text-[#e8eaed]',
+                'placeholder:text-[#9aa0a6]',
+                'border border-transparent',
+                'focus:bg-white dark:focus:bg-[#202124]',
+                'focus:border-[#dfe1e5] dark:focus:border-[#5f6368]',
+                'focus:shadow-[0_1px_6px_rgba(32,33,36,0.28)]',
+                'transition-[background-color,box-shadow,border-color] duration-150',
+              ].join(' ')}
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#5f6368] dark:text-[#9aa0a6]">
+              <Mic size={18} />
+            </span>
+          </div>
+        </div>
 
-                {/* UUID Job ID badge */}
-                {(() => {
-                  const { jobRef, fullId } = getPageInfo()
-                  if (!jobRef || !fullId) return null
-                  return (
-                    <div className="hidden md:block relative group">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(fullId)
-                          setCopiedJobRef(true)
-                          setTimeout(() => setCopiedJobRef(false), 2000)
-                        }}
-                        className="inline-flex items-center gap-1 font-mono cursor-pointer select-none"
-                        style={{
-                          fontSize: '11px',
-                          padding: '2px 8px',
-                          borderRadius: 'var(--radius-md)',
-                          background: 'var(--color-bg-surface-2)',
-                          color: 'var(--color-text-muted)',
-                          border: '1px solid var(--color-border)',
-                          letterSpacing: '0.03em',
-                        }}
-                      >
-                        {copiedJobRef ? (
-                          <>
-                            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3 shrink-0"><path d="M2 6l3 3 5-5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            {jobRef}
-                            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3 h-3 shrink-0 opacity-50"><rect x="1" y="3" width="7" height="8" rx="1"/><path d="M4 3V2a1 1 0 011-1h5a1 1 0 011 1v7a1 1 0 01-1 1h-1"/></svg>
-                          </>
-                        )}
-                      </button>
-                      {/* Tooltip */}
-                      <div className="absolute left-0 top-full mt-2 z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-200">
-                        <div
-                          className="text-[11px] font-mono px-3 py-2 rounded-lg shadow-lg whitespace-nowrap"
-                          style={{ background: 'var(--color-bg-surface-3)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-dropdown)' }}
-                        >
-                          <p className="text-[10px] font-sans" style={{ color: 'var(--color-text-muted)', marginBottom: '2px' }}>Job ID</p>
-                          {fullId}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })()}
-              </div>
+        {/* Right: search-icon (mobile) + settings + bell + avatar */}
+        <div className="flex items-center gap-0.5 ml-auto shrink-0">
 
-              {/* Center: Search bar */}
-              <div className="hidden md:flex flex-1 justify-center max-w-md">
-                <div className="relative w-[280px] focus-within:w-[400px] transition-[width] duration-200 ease-out">
-                  <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                    width="16" height="16" viewBox="0 0 16 16" fill="none"
-                    style={{ color: 'var(--color-text-muted)' }}
-                  >
-                    <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
-                    <line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    className="header-search w-full"
-                    aria-label="Search"
-                  />
+          {/* Mobile search icon */}
+          <button
+            onClick={() => setSearchOpen(true)}
+            aria-label="Search"
+            className="md:hidden w-10 h-10 flex items-center justify-center rounded-full text-[#444746] dark:text-[#bdc1c6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
+          >
+            <Search size={20} />
+          </button>
+
+          {/* Settings */}
+          <button
+            aria-label="Settings"
+            className="w-10 h-10 flex items-center justify-center rounded-full text-[#444746] dark:text-[#bdc1c6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
+          >
+            <Settings size={20} />
+          </button>
+
+          {/* Bell */}
+          <button
+            aria-label="Notifications"
+            className="relative w-10 h-10 flex items-center justify-center rounded-full text-[#444746] dark:text-[#bdc1c6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
+          >
+            <Bell size={20} />
+            {pendingApprovals > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-[1.5px] ring-white dark:ring-[#202124]" />
+            )}
+          </button>
+
+          {/* Avatar + dropdown */}
+          <div className="relative ml-1" ref={profileRef}>
+            <button
+              onClick={() => setProfileOpen((v) => !v)}
+              aria-label="Account menu"
+              className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1a73e8] focus-visible:ring-offset-1"
+            >
+              <Avatar name={displayName} size={32} />
+            </button>
+
+            {/* Dropdown */}
+            {profileOpen && (
+              <div className="absolute right-0 top-[calc(100%+8px)] w-72 rounded-2xl shadow-xl bg-white dark:bg-[#292a2d] border border-[#e0e0e0] dark:border-[#3c4043] overflow-hidden z-[60]">
+
+                {/* User info header */}
+                <div className="flex items-center gap-3 px-4 py-3.5 border-b border-[#e0e0e0] dark:border-[#3c4043]">
+                  <Avatar name={displayName} size={40} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#202124] dark:text-[#e8eaed] truncate">
+                      {displayName}
+                    </p>
+                    <p className="text-xs text-[#5f6368] dark:text-[#9aa0a6] truncate">
+                      {user?.email ?? ''}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Right: Notification + Settings */}
-              <div className="flex items-center gap-1">
-                {/* Mobile search icon — scrolls to / focuses a search overlay */}
-                <button
-                  className="md:hidden icon-button"
-                  aria-label="Search"
-                  onClick={() => {
-                    const el = document.querySelector<HTMLInputElement>('.header-search')
-                    if (el) { el.scrollIntoView({ behavior: 'smooth' }); el.focus() }
-                  }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 16 16" fill="none" style={{ color: 'var(--color-text-secondary)' }}>
-                    <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
-                    <line x1="10" y1="10" x2="14" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                </button>
-
-                {/* Notifications */}
-                <div className="relative" ref={notificationsRef}>
-                  <button
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className="header-circle-notification"
-                    aria-label="Notifications"
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
-                      <path d="M13.73 21a2 2 0 01-3.46 0"/>
-                    </svg>
-                    <span className="notification-badge" style={{ width: '7px', height: '7px', top: '12px', right: '9px' }} />
+                {/* Actions */}
+                <div className="py-1">
+                  <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors text-left">
+                    <UserIcon size={16} />
+                    Profile Settings
                   </button>
-                  {showNotifications && (
-                    <div
-                      className="absolute right-0 mt-1 w-80 rounded-lg"
-                      style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-dropdown)' }}
-                    >
-                      <div className="p-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        <h3 style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)', margin: 0 }}>Notifications</h3>
-                      </div>
-                      <div className="max-h-96 overflow-y-auto">
-                        <div
-                          className="p-3 cursor-pointer hover:bg-[var(--color-bg-surface-2)] transition-colors"
-                          style={{ borderBottom: '1px solid var(--color-border)' }}
-                        >
-                          <p style={{ fontSize: '13px', color: 'var(--color-text-primary)', margin: 0 }}>New timetable generated</p>
-                          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px', marginBottom: 0 }}>2 hours ago</p>
-                        </div>
-                      </div>
-                      <Link
-                        href={`/${role}/notifications`}
-                        className="block p-3 text-center"
-                        style={{ fontSize: '13px', color: 'var(--color-primary)', borderTop: '1px solid var(--color-border)' }}
-                        onClick={() => setShowNotifications(false)}
-                      >
-                        View all
-                      </Link>
-                    </div>
-                  )}
+                  <button
+                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors text-left"
+                  >
+                    {mounted && theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                    {mounted && theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                  </button>
                 </div>
 
-                {/* Settings */}
-                <div className="relative" ref={settingsRef}>
+                <div className="h-px bg-[#e0e0e0] dark:bg-[#3c4043]" />
+
+                <div className="py-1">
                   <button
-                    onClick={() => setShowSettings(!showSettings)}
-                    className="header-circle-btn"
-                    aria-label="Settings"
+                    onClick={() => { setProfileOpen(false); setShowSignOut(true) }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors text-left"
                   >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-                    </svg>
+                    <LogOut size={16} />
+                    Sign out
                   </button>
-                  {showSettings && (
-                    <div
-                      className="absolute right-0 mt-1 w-48 rounded-lg"
-                      style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-dropdown)' }}
-                    >
-                      <button
-                        className="w-full px-4 py-2 text-left flex items-center gap-2 hover:bg-[var(--color-bg-surface-2)] transition-colors"
-                        style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-                        My Profile
-                      </button>
-                      <button
-                        className="w-full px-4 py-2 text-left flex items-center gap-2 hover:bg-[var(--color-bg-surface-2)] transition-colors"
-                        style={{ fontSize: '13px', color: 'var(--color-text-primary)' }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="3"/>
-                          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-                        </svg>
-                        Preferences
-                      </button>
-                      <button
-                        onClick={() => { setShowSignOutDialog(true); setShowSettings(false) }}
-                        className="w-full px-4 py-2 text-left flex items-center gap-2 hover:bg-[var(--color-danger-subtle)] transition-colors"
-                        style={{ fontSize: '13px', color: 'var(--color-danger)', borderTop: '1px solid var(--color-border)' }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                        Sign Out
-                      </button>
-                    </div>
-                  )}
                 </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* ══════════════════════════════════════════════════════════
+          MOBILE SEARCH OVERLAY
+      ══════════════════════════════════════════════════════════ */}
+      {searchOpen && (
+        <div className="md:hidden fixed inset-0 z-[60] bg-white dark:bg-[#202124] flex flex-col">
+          <div className="flex items-center h-14 px-2 gap-1 border-b border-[#e0e0e0] dark:border-[#3c4043]">
+            <button
+              aria-label="Close search"
+              onClick={() => setSearchOpen(false)}
+              className="w-10 h-10 flex items-center justify-center rounded-full text-[#444746] dark:text-[#bdc1c6] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors shrink-0"
+            >
+              <X size={20} />
+            </button>
+            <input
+              ref={searchRef}
+              type="search"
+              placeholder="Search timetables, faculty, rooms…"
+              className="flex-1 h-10 px-2 text-sm bg-transparent outline-none text-[#202124] dark:text-[#e8eaed] placeholder:text-[#9aa0a6]"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════
+          MOBILE BACKDROP (behind open drawer)
+      ══════════════════════════════════════════════════════════ */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/40"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ══════════════════════════════════════════════════════════
+          SIDEBAR
+      ══════════════════════════════════════════════════════════ */}
+      <aside
+        className={[
+          'fixed left-0 top-0 h-full z-[45] flex flex-col',
+          'bg-white dark:bg-[#202124]',
+          'border-r border-[#e0e0e0] dark:border-[#3c4043]',
+          // Below header on desktop/tablet; full-height drawer on mobile
+          'pt-14 md:pt-16',
+          // Mobile: off-canvas (translateX) / Desktop: width transition
+          'transition-[width,transform] duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]',
+          // Mobile open/closed
+          mobileOpen ? 'translate-x-0 w-[256px]' : '-translate-x-full w-[256px] md:translate-x-0',
+          // Desktop width: depends on sidebarOpen; mobile open overrides to 256px
+          !mobileOpen && (sidebarOpen ? 'md:w-[256px]' : 'md:w-[72px]'),
+        ].filter(Boolean).join(' ')}
+      >
+        {/* Nav items */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2">
+          {navItems.map((item) => {
+            const active = pathname === item.href || pathname.startsWith(item.href + '/')
+            return (
+              <NavItemRow
+                key={item.href}
+                item={item}
+                active={active}
+                collapsed={collapsed}
+                pendingApprovals={pendingApprovals}
+                onClick={() => { if (mobileOpen) setMobileOpen(false) }}
+              />
+            )
+          })}
+        </nav>
+
+        {/* Role badge at bottom */}
+        <div
+          className={[
+            'shrink-0 py-4 flex',
+            collapsed ? 'justify-center px-0' : 'px-4',
+          ].join(' ')}
+        >
+          {collapsed ? (
+            <span
+              title={rolePill}
+              className="w-8 h-8 rounded-full bg-[#e8f0fe] dark:bg-[#1a3a5c] text-[#1a73e8] dark:text-[#8ab4f8] flex items-center justify-center"
+            >
+              <UserIcon size={14} />
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#e8f0fe] dark:bg-[#1a3a5c] text-[#1a73e8] dark:text-[#8ab4f8] text-xs font-semibold select-none">
+              <UserIcon size={12} />
+              {rolePill}
+            </span>
+          )}
+        </div>
+      </aside>
+
+      {/* ══════════════════════════════════════════════════════════
+          CONTENT AREA
+      ══════════════════════════════════════════════════════════ */}
+      <main
+        className={[
+          contentMarginCls,
+          'mt-14 md:mt-16',
+          'min-h-[calc(100vh-56px)] md:min-h-[calc(100vh-64px)]',
+          'p-3 md:p-6',
+          '[&>*]:rounded-2xl',
+        ].join(' ')}
+      >
+        {children}
+      </main>
+
+      {/* ══════════════════════════════════════════════════════════
+          SIGN-OUT CONFIRMATION DIALOG
+      ══════════════════════════════════════════════════════════ */}
+      {showSignOut && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowSignOut(false)}
+            aria-hidden="true"
+          />
+
+          {/* Dialog card */}
+          <div className="relative w-full max-w-sm bg-white dark:bg-[#292a2d] rounded-2xl shadow-2xl border border-[#e0e0e0] dark:border-[#3c4043] p-6 flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <span className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0 mt-0.5">
+                <LogOut size={18} className="text-red-600 dark:text-red-400" />
+              </span>
+              <div>
+                <h2 className="text-base font-semibold text-[#202124] dark:text-[#e8eaed]">
+                  Sign out?
+                </h2>
+                <p className="text-sm text-[#5f6368] dark:text-[#9aa0a6] mt-1">
+                  Are you sure you want to sign out of SIH28?
+                </p>
               </div>
             </div>
-          </header>
 
-          <main
-            style={{ backgroundColor: 'var(--color-bg-page)', padding: '24px', minHeight: 'calc(100vh - 56px)' }}
-          >
-            {children}
-          </main>
-        </div>
-      </div>
-
-      {/* Sign Out Confirmation Dialog */}
-      {showSignOutDialog && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'var(--color-bg-overlay)', backdropFilter: 'blur(2px)' }}
-        >
-          <div
-            className="w-full max-w-sm rounded-xl p-6"
-            style={{
-              background: 'var(--color-bg-surface)',
-              border: '1px solid var(--color-border)',
-              boxShadow: 'var(--shadow-modal)',
-            }}
-          >
-            <h3
-              className="mb-2"
-              style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)' }}
-            >
-              Sign Out
-            </h3>
-            <p
-              className="mb-6"
-              style={{ fontSize: '14px', color: 'var(--color-text-secondary)' }}
-            >
-              Are you sure you want to sign out?
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setShowSignOutDialog(false)} className="btn-secondary">
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowSignOut(false)}
+                className="px-5 py-2 rounded-full text-sm font-medium text-[#444746] dark:text-[#e3e3e3] hover:bg-[#f1f3f4] dark:hover:bg-[#303134] transition-colors"
+              >
                 Cancel
               </button>
-              <button onClick={() => router.push('/login')} className="btn-danger">
-                Sign Out
+              <button
+                onClick={handleSignOut}
+                className="px-5 py-2 rounded-full text-sm font-medium bg-red-600 hover:bg-red-700 active:bg-red-800 text-white transition-colors"
+              >
+                Sign out
               </button>
             </div>
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }

@@ -128,7 +128,7 @@ export default function StudentTimetable() {
 
   if (loading) {
     return (
-      <DashboardLayout role="student">
+      <DashboardLayout>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <GoogleSpinner size={32} className="mx-auto mb-4" />
@@ -141,7 +141,7 @@ export default function StudentTimetable() {
 
   if (error) {
     return (
-      <DashboardLayout role="student">
+      <DashboardLayout>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="text-red-600 dark:text-red-400 mb-4">⚠️</div>
@@ -155,7 +155,7 @@ export default function StudentTimetable() {
   }
 
   return (
-    <DashboardLayout role="student">
+    <DashboardLayout>
       <div className="space-responsive">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">

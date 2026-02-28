@@ -182,7 +182,7 @@ export default function StudentDashboard() {
   }
 
   return (
-    <DashboardLayout role="student">
+    <DashboardLayout>
       <div className="space-y-4 sm:space-y-6">
         {/* Welcome Section */}
         <div className="card">
