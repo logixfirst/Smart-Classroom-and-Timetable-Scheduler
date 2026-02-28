@@ -195,8 +195,8 @@ export default function AdminDashboard() {
 
       {/* ── Page Header ───────────────────────────────────────────────────── */}
       <div>
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Dashboard</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+        <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Dashboard</h1>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
           Overview of your institution’s academic operations.
         </p>
       </div>
@@ -208,21 +208,21 @@ export default function AdminDashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Users</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Total Users</p>
               {loading
                 ? <div className="loading-skeleton h-8 w-24 rounded-md mt-1" />
-                : <p className="text-2xl lg:text-3xl font-semibold text-gray-900 dark:text-white truncate mt-1">{stats.totalUsers.toLocaleString()}</p>
+                : <p className="text-2xl lg:text-3xl font-semibold truncate mt-1" style={{ color: 'var(--color-text-primary)' }}>{stats.totalUsers.toLocaleString()}</p>
               }
             </div>
-            <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 ml-3">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-primary)' }}>
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-green-600 dark:text-green-400 font-medium">↗ 12%</span>
-            <span className="ml-2 text-gray-400 dark:text-gray-500">vs last month</span>
+            <span className="font-medium" style={{ color: 'var(--color-success-text)' }}>↗ 12%</span>
+            <span className="ml-2" style={{ color: 'var(--color-text-muted)' }}>vs last month</span>
           </div>
         </div>
 
@@ -230,38 +230,38 @@ export default function AdminDashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Active Courses</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Active Courses</p>
               {loading
                 ? <div className="loading-skeleton h-8 w-20 rounded-md mt-1" />
-                : <p className="text-2xl lg:text-3xl font-semibold text-gray-900 dark:text-white truncate mt-1">{stats.activeCourses.toLocaleString()}</p>
+                : <p className="text-2xl lg:text-3xl font-semibold truncate mt-1" style={{ color: 'var(--color-text-primary)' }}>{stats.activeCourses.toLocaleString()}</p>
               }
             </div>
-            <div className="w-11 h-11 bg-green-600 rounded-xl flex items-center justify-center flex-shrink-0 ml-3">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-success)' }}>
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-green-600 dark:text-green-400 font-medium">↗ 8%</span>
-            <span className="ml-2 text-gray-400 dark:text-gray-500">vs last month</span>
+            <span className="font-medium" style={{ color: 'var(--color-success-text)' }}>↗ 8%</span>
+            <span className="ml-2" style={{ color: 'var(--color-text-muted)' }}>vs last month</span>
           </div>
         </div>
 
-        {/* Pending Approvals */}
+        {/* Pending Approvals */
         <div
           className="card clickable-card"
           onClick={() => router.push('/admin/approvals')}
         >
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Pending Approvals</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Pending Approvals</p>
               {loading
                 ? <div className="loading-skeleton h-8 w-16 rounded-md mt-1" />
-                : <p className="text-2xl lg:text-3xl font-semibold text-gray-900 dark:text-white truncate mt-1">{stats.pendingApprovals.toLocaleString()}</p>
+                : <p className="text-2xl lg:text-3xl font-semibold truncate mt-1" style={{ color: 'var(--color-text-primary)' }}>{stats.pendingApprovals.toLocaleString()}</p>
               }
             </div>
-            <div className="w-11 h-11 bg-amber-500 rounded-xl flex items-center justify-center flex-shrink-0 ml-3">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-warning)' }}>
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -276,20 +276,20 @@ export default function AdminDashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-400">System Health</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>System Health</p>
               {loading
                 ? <div className="loading-skeleton h-8 w-16 rounded-md mt-1" />
-                : <p className="text-2xl lg:text-3xl font-semibold text-gray-900 dark:text-white truncate mt-1">{stats.systemHealth}%</p>
+                : <p className="text-2xl lg:text-3xl font-semibold truncate mt-1" style={{ color: 'var(--color-text-primary)' }}>{stats.systemHealth}%</p>
               }
             </div>
-            <div className="w-11 h-11 bg-green-600 rounded-xl flex items-center justify-center flex-shrink-0 ml-3">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-success)' }}>
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 016.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
               </svg>
             </div>
           </div>
           <div className="mt-4 flex items-center text-sm">
-            <span className="text-green-600 dark:text-green-400 font-medium">All services online</span>
+            <span className="font-medium" style={{ color: 'var(--color-success-text)' }}>All services online</span>
           </div>
         </div>
 
@@ -305,22 +305,23 @@ export default function AdminDashboard() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {loading ? (
-            <div className="col-span-full text-center py-4 text-gray-500">Loading faculty...</div>
+            <div className="col-span-full text-center py-4" style={{ color: 'var(--color-text-muted)' }}>Loading faculty...</div>
           ) : faculty.length === 0 ? (
-            <div className="col-span-full text-center py-4 text-gray-500">
+            <div className="col-span-full text-center py-4" style={{ color: 'var(--color-text-muted)' }}>
               No faculty data available
             </div>
           ) : (
             faculty.map((faculty: any) => (
               <div
                 key={faculty.id}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700"
+                className="flex items-center justify-between p-3 rounded-lg border"
+                style={{ background: 'var(--color-bg-surface-2)', borderColor: 'var(--color-border)' }}
               >
                 <div className="flex-1 min-w-0 mr-3">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
                     {faculty.name}
                   </p>
-                  <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                  <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
                     {faculty.department || 'N/A'}
                   </p>
                 </div>
@@ -334,8 +335,8 @@ export default function AdminDashboard() {
                       console.log(`Faculty ${faculty.id} availability:`, e.target.checked)
                     }}
                   />
-                  <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                  <span className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                  <div className="w-9 h-5 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600" style={{ background: 'var(--color-bg-surface-3)' }}></div>
+                  <span className="ml-2 text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
                     {faculty.isAvailable ? 'Available' : 'Unavailable'}
                   </span>
                 </label>
@@ -353,28 +354,28 @@ export default function AdminDashboard() {
             <p className="card-description">Real-time service status</p>
           </div>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="flex items-center justify-between p-3 rounded-lg border" style={{ background: 'var(--color-success-subtle)', borderColor: 'var(--color-success)' }}>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                   Django API
                 </span>
               </div>
               <span className="badge badge-success">Online</span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="flex items-center justify-between p-3 rounded-lg border" style={{ background: 'var(--color-success-subtle)', borderColor: 'var(--color-success)' }}>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                   FastAPI AI Service
                 </span>
               </div>
               <span className="badge badge-success">Online</span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="flex items-center justify-between p-3 rounded-lg border" style={{ background: 'var(--color-success-subtle)', borderColor: 'var(--color-success)' }}>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                   Database Connection
                 </span>
               </div>
@@ -395,12 +396,12 @@ export default function AdminDashboard() {
               className="btn-secondary text-left p-3 disabled:opacity-50"
             >
               <div className="flex items-center gap-2 mb-1">
-                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 shrink-0" style={{ color: 'var(--color-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4 4m0 0L8 8m4 4V4" />
                 </svg>
                 <span className="text-sm font-medium">Import CSV</span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Bulk upload data</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Bulk upload data</p>
             </button>
             <button
               onClick={() => handleDataAction('export')}
@@ -408,12 +409,12 @@ export default function AdminDashboard() {
               className="btn-secondary text-left p-3 disabled:opacity-50"
             >
               <div className="flex items-center gap-2 mb-1">
-                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 shrink-0" style={{ color: 'var(--color-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0L8 12m4-4v12" />
                 </svg>
                 <span className="text-sm font-medium">Export PDF</span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Generate reports</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Generate reports</p>
             </button>
             <button
               onClick={() => handleDataAction('backup')}
@@ -421,12 +422,12 @@ export default function AdminDashboard() {
               className="btn-secondary text-left p-3 disabled:opacity-50"
             >
               <div className="flex items-center gap-2 mb-1">
-                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 shrink-0" style={{ color: 'var(--color-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                 </svg>
                 <span className="text-sm font-medium">Backup DB</span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Create snapshot</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Create snapshot</p>
             </button>
             <button
               onClick={() => handleDataAction('restore')}
@@ -434,12 +435,12 @@ export default function AdminDashboard() {
               className="btn-secondary text-left p-3 disabled:opacity-50"
             >
               <div className="flex items-center gap-2 mb-1">
-                <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 shrink-0" style={{ color: 'var(--color-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 <span className="text-sm font-medium">Restore</span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">From backup</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>From backup</p>
             </button>
           </div>
         </div>
@@ -455,47 +456,47 @@ export default function AdminDashboard() {
           <div className="space-y-3">
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                   Timetable Approved
                 </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
                   priya.patel@cadence.edu
                 </p>
               </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+              <span className="text-xs flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
                 2 min ago
               </span>
             </div>
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                   User Role Changed
                 </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
                   harsh.sharma@cadence.edu
                 </p>
               </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+              <span className="text-xs flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>
                 15 min ago
               </span>
             </div>
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                   Course Updated
                 </p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
                   rajesh.kumar@cadence.edu
                 </p>
               </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">1h ago</span>
+              <span className="text-xs flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>1h ago</span>
             </div>
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Login Failed</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 truncate">unknown</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Login Failed</p>
+                <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>unknown</p>
               </div>
-              <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">2h ago</span>
+              <span className="text-xs flex-shrink-0" style={{ color: 'var(--color-text-muted)' }}>2h ago</span>
             </div>
           </div>
         </div>
@@ -508,24 +509,24 @@ export default function AdminDashboard() {
           <div className="space-y-3">
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Admin</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">All Access</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Admin</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>All Access</p>
               </div>
-              <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">-</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>-</span>
             </div>
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Faculty</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Schedule View</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Faculty</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Schedule View</p>
               </div>
-              <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">-</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>-</span>
             </div>
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">HOD</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Dept. Management</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>HOD</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Dept. Management</p>
               </div>
-              <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">-</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>-</span>
             </div>
           </div>
         </div>
@@ -541,24 +542,24 @@ export default function AdminDashboard() {
           <div className="space-y-3">
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Academic Year</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">2024-25</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Academic Year</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>2024-25</p>
               </div>
-              <button className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
+              <button className="text-xs hover:underline" style={{ color: 'var(--color-primary)' }}>Edit</button>
             </div>
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Semester Dates</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Jul 1 – Dec 15</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Semester Dates</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Jul 1 – Dec 15</p>
               </div>
-              <button className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
+              <button className="text-xs hover:underline" style={{ color: 'var(--color-primary)' }}>Edit</button>
             </div>
             <div className="interactive-element flex items-center justify-between p-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Holiday List</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">15 holidays configured</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Holiday List</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>15 holidays configured</p>
               </div>
-              <button className="text-xs text-blue-600 dark:text-blue-400 hover:underline">Edit</button>
+              <button className="text-xs hover:underline" style={{ color: 'var(--color-primary)' }}>Edit</button>
             </div>
           </div>
         </div>
@@ -571,20 +572,20 @@ export default function AdminDashboard() {
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between text-sm mb-1.5">
-                <span className="text-gray-600 dark:text-gray-400 font-medium">Classroom Usage</span>
-                <span className="font-semibold text-green-600 dark:text-green-400">87%</span>
+                <span className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>Classroom Usage</span>
+                <span className="font-semibold" style={{ color: 'var(--color-success-text)' }}>87%</span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div className="bg-green-500 h-2 rounded-full transition-all duration-500 w-[87%]" />
+              <div className="w-full rounded-full h-2" style={{ background: 'var(--color-bg-surface-3)' }}>
+                <div className="h-2 rounded-full transition-all duration-500 w-[87%]" style={{ background: 'var(--color-success)' }} />
               </div>
             </div>
             <div>
               <div className="flex items-center justify-between text-sm mb-1.5">
-                <span className="text-gray-600 dark:text-gray-400 font-medium">Faculty Load</span>
-                <span className="font-semibold text-amber-600 dark:text-amber-400">73%</span>
+                <span className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>Faculty Load</span>
+                <span className="font-semibold" style={{ color: 'var(--color-warning-text)' }}>73%</span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div className="bg-amber-400 h-2 rounded-full transition-all duration-500 w-[73%]" />
+              <div className="w-full rounded-full h-2" style={{ background: 'var(--color-bg-surface-3)' }}>
+                <div className="h-2 rounded-full transition-all duration-500 w-[73%]" style={{ background: 'var(--color-warning)' }} />
               </div>
             </div>
           </div>
@@ -596,21 +597,21 @@ export default function AdminDashboard() {
             <p className="card-description">AI-powered conflict analysis</p>
           </div>
           <div className="space-y-3">
-            <div className="flex items-center gap-3 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="flex items-center gap-3 p-3 rounded-lg border" style={{ background: 'var(--color-danger-subtle)', borderColor: 'var(--color-danger)' }}>
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
-              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                 3 Schedule conflicts
               </span>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <div className="flex items-center gap-3 p-3 rounded-lg border" style={{ background: 'var(--color-warning-subtle)', borderColor: 'var(--color-warning)' }}>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                 5 Room overlaps
               </span>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+            <div className="flex items-center gap-3 p-3 rounded-lg border" style={{ background: 'var(--color-success-subtle)', borderColor: 'var(--color-success)' }}>
               <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>
                 12 Resolved today
               </span>
             </div>
@@ -625,27 +626,27 @@ export default function AdminDashboard() {
           <p className="card-description">Alerts and announcements</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-l-yellow-500 rounded-lg">
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+          <div className="p-4 border-l-4 rounded-lg" style={{ background: 'var(--color-warning-subtle)', borderLeftColor: 'var(--color-warning)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
               AI Engine Update
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
               Optimization algorithm improved by 15%
             </p>
           </div>
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-500 rounded-lg">
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+          <div className="p-4 border-l-4 rounded-lg" style={{ background: 'var(--color-info-subtle)', borderLeftColor: 'var(--color-primary)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
               New Faculty Added
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
               3 new faculty members registered
             </p>
           </div>
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 border-l-4 border-l-green-500 rounded-lg">
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+          <div className="p-4 border-l-4 rounded-lg" style={{ background: 'var(--color-success-subtle)', borderLeftColor: 'var(--color-success)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
               Backup Complete
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
               Daily system backup successful
             </p>
           </div>

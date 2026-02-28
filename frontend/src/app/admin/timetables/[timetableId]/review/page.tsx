@@ -123,20 +123,22 @@ function formatTimeRange(start?: string, end?: string): string {
   return `${formatTime12Hour(start)} - ${formatTime12Hour(end)}`
 }
 
-// 12 perceptually-distinct subject colour palettes (bg / border / title / subtitle)
-const SUBJECT_PALETTES = [
-  { bg: 'bg-blue-100 dark:bg-blue-900/40',    border: 'border-blue-300 dark:border-blue-600',    title: 'text-blue-900 dark:text-blue-100',    sub: 'text-blue-700 dark:text-blue-300'    },
-  { bg: 'bg-emerald-100 dark:bg-emerald-900/40', border: 'border-emerald-300 dark:border-emerald-600', title: 'text-emerald-900 dark:text-emerald-100', sub: 'text-emerald-700 dark:text-emerald-300' },
-  { bg: 'bg-violet-100 dark:bg-violet-900/40',  border: 'border-violet-300 dark:border-violet-600',  title: 'text-violet-900 dark:text-violet-100',   sub: 'text-violet-700 dark:text-violet-300'  },
-  { bg: 'bg-amber-100 dark:bg-amber-900/40',    border: 'border-amber-300 dark:border-amber-600',    title: 'text-amber-900 dark:text-amber-100',    sub: 'text-amber-700 dark:text-amber-300'    },
-  { bg: 'bg-rose-100 dark:bg-rose-900/40',      border: 'border-rose-300 dark:border-rose-600',      title: 'text-rose-900 dark:text-rose-100',      sub: 'text-rose-700 dark:text-rose-300'      },
-  { bg: 'bg-cyan-100 dark:bg-cyan-900/40',      border: 'border-cyan-300 dark:border-cyan-600',      title: 'text-cyan-900 dark:text-cyan-100',      sub: 'text-cyan-700 dark:text-cyan-300'      },
-  { bg: 'bg-fuchsia-100 dark:bg-fuchsia-900/40',border: 'border-fuchsia-300 dark:border-fuchsia-600',title: 'text-fuchsia-900 dark:text-fuchsia-100', sub: 'text-fuchsia-700 dark:text-fuchsia-300' },
-  { bg: 'bg-lime-100 dark:bg-lime-900/40',      border: 'border-lime-300 dark:border-lime-600',      title: 'text-lime-900 dark:text-lime-100',      sub: 'text-lime-700 dark:text-lime-300'      },
-  { bg: 'bg-sky-100 dark:bg-sky-900/40',        border: 'border-sky-300 dark:border-sky-600',        title: 'text-sky-900 dark:text-sky-100',        sub: 'text-sky-700 dark:text-sky-300'        },
-  { bg: 'bg-orange-100 dark:bg-orange-900/40',  border: 'border-orange-300 dark:border-orange-600',  title: 'text-orange-900 dark:text-orange-100',  sub: 'text-orange-700 dark:text-orange-300'  },
-  { bg: 'bg-teal-100 dark:bg-teal-900/40',      border: 'border-teal-300 dark:border-teal-600',      title: 'text-teal-900 dark:text-teal-100',      sub: 'text-teal-700 dark:text-teal-300'      },
-  { bg: 'bg-pink-100 dark:bg-pink-900/40',      border: 'border-pink-300 dark:border-pink-600',      title: 'text-pink-900 dark:text-pink-100',      sub: 'text-pink-700 dark:text-pink-300'      },
+// 12 perceptually-distinct accent colours — Google Calendar style.
+// Each entry is just one saturated colour; the card itself stays neutral
+// (surface background + 3 px left border) so text is always legible.
+const SUBJECT_PALETTES: { accent: string }[] = [
+  { accent: '#4285f4' }, // blue
+  { accent: '#0f9d58' }, // green
+  { accent: '#9334e6' }, // purple
+  { accent: '#ea4335' }, // red
+  { accent: '#fa7b17' }, // orange
+  { accent: '#00897b' }, // teal
+  { accent: '#1e88e5' }, // indigo-blue
+  { accent: '#e91e63' }, // pink
+  { accent: '#7cb342' }, // lime-green
+  { accent: '#f9ab00' }, // amber
+  { accent: '#00acc1' }, // cyan
+  { accent: '#8d6e63' }, // warm brown
 ]
 
 // Deterministic palette index from a string key
@@ -157,7 +159,7 @@ function ScoreRing({ score, size = 72 }: { score: number; size?: number }) {
   const color = pct >= 80 ? '#16a34a' : pct >= 60 ? '#ca8a04' : '#dc2626'
   return (
     <svg width={size} height={size} className="rotate-[-90deg]">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={8} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-border)" strokeWidth={8} />
       <circle
         cx={size / 2} cy={size / 2} r={r} fill="none"
         stroke={color} strokeWidth={8}
@@ -171,7 +173,8 @@ function ScoreRing({ score, size = 72 }: { score: number; size?: number }) {
         fill="currentColor"
         fontSize={size < 64 ? 11 : 14}
         fontWeight={700}
-        className="text-gray-800 dark:text-gray-100 [transform:rotate(90deg)] [transform-origin:center]"
+        className="[transform:rotate(90deg)] [transform-origin:center]"
+        style={{ fill: 'var(--color-text-primary)' }}
       >
         {pct.toFixed(0)}%
       </text>
@@ -182,18 +185,18 @@ function ScoreRing({ score, size = 72 }: { score: number; size?: number }) {
 // Thin labelled metric bar
 function MetricBar({ label, value }: { label: string; value: number }) {
   const pct = Math.min(Math.max(value ?? 0, 0), 100)
-  const barColor = pct >= 80 ? 'bg-green-500' : pct >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+  const barColor = pct >= 80 ? 'var(--color-success)' : pct >= 60 ? 'var(--color-warning)' : 'var(--color-danger)'
   return (
     <div className="space-y-0.5">
-      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>{label}</span>
-        <span className="font-medium text-gray-700 dark:text-gray-200">{pct.toFixed(0)}%</span>
+      <div className="flex justify-between text-xs">
+        <span style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+        <span className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>{pct.toFixed(0)}%</span>
       </div>
-      <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-bg-surface-3)' }}>
         <div
-          className={`h-full rounded-full ${barColor} transition-all duration-500 [width:var(--pct)]`}
+          className="h-full rounded-full transition-all duration-500 [width:var(--pct)]"
           aria-label={`${label}: ${pct.toFixed(0)}%`}
-          style={{ '--pct': `${pct}%` } as React.CSSProperties}
+          style={{ '--pct': `${pct}%`, background: barColor } as React.CSSProperties}
         />
       </div>
     </div>
@@ -494,14 +497,14 @@ export default function TimetableReviewPage() {
     }
   }
 
-// Build stable subject → palette mapping from the active variant's entries.
+// Build stable subject → accent colour mapping from the active variant's entries.
   // (variants[] carries empty timetable_entries; actual entries are in activeVariant)
   const subjectPaletteMap = useMemo(() => {
-    const map = new Map<string, (typeof SUBJECT_PALETTES)[0]>()
+    const map = new Map<string, string>() // key → accent hex
     ;(activeVariant?.timetable_entries || []).forEach(e => {
       const key = e.subject_id ?? e.subject_code ?? ''
       if (key && !map.has(key)) {
-        map.set(key, SUBJECT_PALETTES[subjectPaletteIndex(key)])
+        map.set(key, SUBJECT_PALETTES[subjectPaletteIndex(key)].accent)
       }
     })
     return map
@@ -586,7 +589,7 @@ export default function TimetableReviewPage() {
 
     if (entries.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center py-16 text-gray-500 dark:text-gray-400">
+        <div className="flex flex-col items-center justify-center py-16" style={{ color: 'var(--color-text-muted)' }}>
           <svg className="w-12 h-12 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
               d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -595,7 +598,7 @@ export default function TimetableReviewPage() {
           <p className="text-xs mt-1 opacity-70">The server may be slow. Click retry to try again.</p>
           <button
             onClick={() => loadVariantEntries(variant)}
-            className="mt-4 px-4 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+            className="mt-4 btn-primary text-xs"
           >
             Retry
           </button>
@@ -633,14 +636,14 @@ export default function TimetableReviewPage() {
     const daysToShow = activeDay === 'all' ? DAYS.map((_, i) => i) : [activeDay as number]
 
     // Build subject legend entries
-    const legendItems: Array<{ key: string; label: string; palette: (typeof SUBJECT_PALETTES)[0] }> = []
+    const legendItems: Array<{ key: string; label: string; name: string; accent: string }> = []
     const seenKeys = new Set<string>()
     deptFiltered.forEach(e => {
       const key = e.subject_id ?? e.subject_code ?? ''
       if (key && !seenKeys.has(key)) {
         seenKeys.add(key)
-        const p = subjectPaletteMap.get(key) ?? SUBJECT_PALETTES[0]
-        legendItems.push({ key, label: e.subject_code ?? key, palette: p })
+        const accent = subjectPaletteMap.get(key) ?? SUBJECT_PALETTES[0].accent
+        legendItems.push({ key, label: e.subject_code ?? key, name: e.subject_name ?? e.subject_code ?? key, accent })
       }
     })
 
@@ -652,11 +655,11 @@ export default function TimetableReviewPage() {
             <button
               key={i}
               onClick={() => setActiveDay(d)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                activeDay === d
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
+              className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
+              style={activeDay === d
+                ? { background: 'var(--color-primary)', color: '#fff' }
+                : { background: 'var(--color-bg-surface-2)', color: 'var(--color-text-secondary)' }
+              }
             >
               {d === 'all' ? 'All Days' : DAY_SHORT[d as number]}
             </button>
@@ -664,78 +667,99 @@ export default function TimetableReviewPage() {
         </div>
 
         {/* Grid */}
-        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm print:shadow-none print:border-gray-400">
+        <div className="overflow-x-auto rounded-xl shadow-sm print:shadow-none" style={{ border: '1px solid var(--color-border)' }}>
           <table className="min-w-full text-xs border-collapse">
             <thead>
-              <tr className="bg-gray-50 dark:bg-gray-800">
-                <th className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-800 px-3 py-3 text-left font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-r border-gray-200 dark:border-gray-700 w-24 min-w-[6rem]">
+              <tr style={{ background: 'var(--color-bg-surface-2)' }}>
+                <th className="sticky left-0 z-10 px-3 py-3 text-left font-semibold uppercase tracking-wider border-b border-r w-24 min-w-[6rem]" style={{ background: 'var(--color-bg-surface-2)', color: 'var(--color-text-muted)', borderColor: 'var(--color-border)' }}>
                   Time
                 </th>
                 {daysToShow.map(di => (
                   <th
                     key={di}
-                    className="px-3 py-3 text-center font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-b border-r border-gray-200 dark:border-gray-700 min-w-[8rem]"
+                    className="px-3 py-3 text-center font-semibold uppercase tracking-wider border-b border-r min-w-[8rem]"
+                    style={{ color: 'var(--color-text-secondary)', borderColor: 'var(--color-border)' }}
                   >
                     {DAYS[di]}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+            <tbody>
               {timeSlots.length === 0 ? (
                 <tr>
-                  <td colSpan={daysToShow.length + 1} className="py-10 text-center text-gray-400 dark:text-gray-500 text-sm">
+                  <td colSpan={daysToShow.length + 1} className="py-10 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
                     No classes scheduled for this filter
                   </td>
                 </tr>
               ) : timeSlots.map(time => (
-                <tr key={time} className="group hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
-                  <td className="sticky left-0 z-10 bg-white dark:bg-gray-900 group-hover:bg-gray-50/50 dark:group-hover:bg-gray-800/30 px-3 py-3 font-medium text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700 whitespace-nowrap align-top">
+                <tr key={time} className="group transition-colors" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <td
+                    className="sticky left-0 z-10 px-3 py-3 font-medium border-r whitespace-nowrap align-top"
+                    style={{ background: 'var(--color-bg-surface)', color: 'var(--color-text-secondary)', borderColor: 'var(--color-border)' }}
+                  >
                     {time.includes('-') ? formatTimeRange(...time.split('-') as [string, string]) : time}
                   </td>
                   {daysToShow.map(di => {
                     const cellEntries = grid[`${di}-${time}`] ?? []
                     return (
-                      <td key={di} className="px-2 py-2 align-top border-r border-gray-100 dark:border-gray-700/50">
+                      <td key={di} className="px-2 py-2 align-top border-r" style={{ borderColor: 'var(--color-border)' }}>
                         {cellEntries.length > 0 ? (
                           <div className="space-y-1.5">
                             {cellEntries.map((entry, idx) => {
                               const key = entry.subject_id ?? entry.subject_code ?? ''
-                              const p = subjectPaletteMap.get(key) ?? SUBJECT_PALETTES[0]
+                              const accent = subjectPaletteMap.get(key) ?? SUBJECT_PALETTES[0].accent
+                              // Hex alpha: 18 = ~10% for tint background
+                              const bgTint = `${accent}18`
                               return (
                                 <div
                                   key={idx}
-                                  className={`${p.bg} ${p.border} border rounded-lg px-2 py-1.5 space-y-0.5 shadow-sm`}
+                                  className="rounded-md overflow-hidden"
+                                  style={{
+                                    borderLeft: `3px solid ${accent}`,
+                                    background: bgTint,
+                                  }}
                                 >
-                                  <div className={`font-bold text-xs leading-tight truncate ${p.title}`}>
-                                    {entry.subject_name
-                                      ? `${entry.subject_code} — ${entry.subject_name}`
-                                      : (entry.subject_code ?? '—')}
-                                  </div>
-                                  <div className={`text-xs truncate ${p.sub}`}>
-                                    {entry.faculty_name ?? ''}
-                                  </div>
-                                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
-                                    {entry.room_number && (
-                                      <span className={`inline-flex items-center gap-0.5 text-[10px] ${p.sub} font-medium`}>
-                                        <svg className="w-2.5 h-2.5 opacity-70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5" />
-                                        </svg>
-                                        {entry.room_number}
-                                      </span>
+                                  <div className="px-2 pt-1.5 pb-1.5 space-y-0.5">
+                                    {/* Subject code — accent coloured, tight */}
+                                    <div className="text-[10px] font-bold leading-none tracking-wide uppercase truncate" style={{ color: accent }}>
+                                      {entry.subject_code ?? '—'}
+                                    </div>
+                                    {/* Subject name */}
+                                    <div className="font-semibold text-[11px] leading-tight truncate" style={{ color: 'var(--color-text-primary)' }}>
+                                      {entry.subject_name ?? entry.subject_code ?? '—'}
+                                    </div>
+                                    {/* Faculty */}
+                                    {entry.faculty_name && (
+                                      <div className="text-[10px] leading-tight truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                                        {entry.faculty_name}
+                                      </div>
                                     )}
-                                    {entry.batch_name && (
-                                      <span className={`inline-flex items-center gap-0.5 text-[10px] ${p.sub} font-medium`}>
-                                        <svg className="w-2.5 h-2.5 opacity-70 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
-                                        </svg>
-                                        {entry.batch_name}
-                                      </span>
-                                    )}
-                                    {entry.duration_minutes && (
-                                      <span className={`text-[10px] ${p.sub} opacity-70`}>
-                                        {entry.duration_minutes}m
-                                      </span>
+                                    {/* Room · Batch · Duration */}
+                                    {(entry.room_number || entry.batch_name || entry.duration_minutes) && (
+                                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                        {entry.room_number && (
+                                          <span className="inline-flex items-center gap-0.5 text-[9px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                                            <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5" />
+                                            </svg>
+                                            {entry.room_number}
+                                          </span>
+                                        )}
+                                        {entry.batch_name && (
+                                          <span className="inline-flex items-center gap-0.5 text-[9px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                                            <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
+                                            </svg>
+                                            {entry.batch_name}
+                                          </span>
+                                        )}
+                                        {entry.duration_minutes && (
+                                          <span className="text-[9px] font-medium" style={{ color: 'var(--color-text-muted)' }}>
+                                            {entry.duration_minutes}m
+                                          </span>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -744,7 +768,7 @@ export default function TimetableReviewPage() {
                           </div>
                         ) : (
                           <div className="h-full min-h-[2rem] flex items-center justify-center">
-                            <span className="w-1 h-1 rounded-full bg-gray-200 dark:bg-gray-700" />
+                            <span className="w-1 h-1 rounded-full" style={{ background: 'var(--color-border)' }} />
                           </div>
                         )}
                       </td>
@@ -759,17 +783,21 @@ export default function TimetableReviewPage() {
         {/* Subject legend */}
         {legendItems.length > 0 && (
           <div className="pt-2 print:pt-4">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+            <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>
               Subject Legend
             </p>
             <div className="flex flex-wrap gap-2">
-              {legendItems.map(({ key, label, palette }) => (
-                <span
+              {legendItems.map(({ key, label, name, accent }) => (
+                <div
                   key={key}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${palette.bg} ${palette.border} border ${palette.title}`}
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs"
+                  style={{ background: `${accent}18`, borderLeft: `3px solid ${accent}` }}
                 >
-                  {label}
-                </span>
+                  <span className="font-bold text-[10px] uppercase tracking-wide leading-none" style={{ color: accent }}>
+                    {label}
+                  </span>
+                  <span className="font-medium" style={{ color: 'var(--color-text-secondary)' }}>{name}</span>
+                </div>
               ))}
             </div>
           </div>
@@ -782,10 +810,10 @@ export default function TimetableReviewPage() {
   // Entries for the grid load in the background and show an inline skeleton.
   if (loadingMeta) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="flex items-center justify-center min-h-screen" style={{ background: 'var(--color-bg-page)' }}>
         <div className="text-center space-y-4">
           <GoogleSpinner size={64} className="mx-auto" />
-          <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">Loading timetable variants…</p>
+          <p className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Loading timetable variants…</p>
         </div>
       </div>
     )
@@ -793,20 +821,20 @@ export default function TimetableReviewPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="flex items-center justify-center min-h-screen" style={{ background: 'var(--color-bg-page)' }}>
         <div className="text-center space-y-4 max-w-sm mx-auto px-4">
-          <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto">
-            <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ background: 'var(--color-danger-subtle)' }}>
+            <svg className="w-8 h-8" style={{ color: 'var(--color-danger-text)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
           <div>
-            <p className="text-xl font-semibold text-gray-900 dark:text-white">Failed to Load</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{error}</p>
+            <p className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Failed to Load</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>{error}</p>
           </div>
           <button
             onClick={() => router.push('/admin/timetables')}
-            className="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+            className="btn-primary text-sm"
           >
             ← Back to Timetables
           </button>
@@ -823,12 +851,12 @@ export default function TimetableReviewPage() {
       ? v.id : best
   }, null)
 
-  const statusConfig = {
-    approved: { label: 'Approved', cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-    rejected: { label: 'Rejected', cls: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
-    pending_review: { label: 'Pending Review', cls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
-    published: { label: 'Published', cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
-    draft: { label: 'Draft', cls: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' },
+  const statusConfig: Record<string, { label: string; badge: string }> = {
+    approved:       { label: 'Approved',       badge: 'badge badge-success' },
+    rejected:       { label: 'Rejected',        badge: 'badge badge-danger'  },
+    pending_review: { label: 'Pending Review',  badge: 'badge badge-warning' },
+    published:      { label: 'Published',       badge: 'badge badge-info'    },
+    draft:          { label: 'Draft',           badge: 'badge badge-neutral' },
   }
   const status = workflow?.status ?? 'draft'
   const statusInfo = statusConfig[status] ?? statusConfig.draft
@@ -841,36 +869,39 @@ export default function TimetableReviewPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 print:bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div className="space-y-6 print:bg-white">
 
-        {/* ── Page Header ── */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      {/* ── Page Header ── */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <nav className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 mb-1">
-              <button onClick={() => router.push('/admin/timetables')} className="hover:text-gray-600 dark:hover:text-gray-300">
+            <nav className="flex items-center gap-1.5 text-xs mb-1" style={{ color: 'var(--color-text-muted)' }}>
+              <button
+                onClick={() => router.push('/admin/timetables')}
+                className="hover:underline transition-colors"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
                 Timetables
               </button>
               <span>/</span>
-              <span className="text-gray-600 dark:text-gray-300">Review Variants</span>
+              <span style={{ color: 'var(--color-text-secondary)' }}>Review Variants</span>
             </nav>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+            <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>
               Timetable Review
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              {workflow?.department_id && <span className="font-medium text-gray-700 dark:text-gray-300">{workflow.department_id}</span>}
+            <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+              {workflow?.department_id && <span className="font-medium" style={{ color: 'var(--color-text-primary)' }}>{workflow.department_id}</span>}
               {workflow?.semester && <span> · Semester {workflow.semester}</span>}
               {workflow?.academic_year && <span> · {workflow.academic_year}</span>}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.cls}`}>
+            <span className={statusInfo.badge}>
               {statusInfo.label}
             </span>
             <button
               onClick={() => router.push('/admin/timetables')}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="btn-secondary flex items-center gap-1.5 text-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -882,7 +913,7 @@ export default function TimetableReviewPage() {
                 <button
                   onClick={() => setShowApprovalModal(true)}
                   disabled={!selectedVariantId || actionLoading}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors shadow-sm"
+                  className="btn-success flex items-center gap-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -892,7 +923,7 @@ export default function TimetableReviewPage() {
                 <button
                   onClick={() => setShowRejectionModal(true)}
                   disabled={actionLoading}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors shadow-sm"
+                  className="btn-danger flex items-center gap-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -907,13 +938,13 @@ export default function TimetableReviewPage() {
         {/* ── Variant Cards ── */}
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100">
+            <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>
               Generated Variants
-              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-normal">
+              <span className="ml-2 badge badge-neutral font-normal">
                 {variants.length}
               </span>
             </h2>
-            <p className="text-xs text-gray-400 dark:text-gray-500">Click a variant to preview its timetable below</p>
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Click a variant to preview its timetable below</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -927,20 +958,23 @@ export default function TimetableReviewPage() {
                 <div
                   key={variant.id}
                   onClick={() => loadVariantEntries(variant)}
-                  className={`relative flex flex-col rounded-xl border-2 cursor-pointer transition-all duration-200 overflow-hidden ${
-                    isActive
-                      ? 'border-blue-500 dark:border-blue-400 shadow-lg shadow-blue-100 dark:shadow-blue-900/30 bg-white dark:bg-gray-800'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 bg-white dark:bg-gray-800 hover:shadow-md'
-                  }`}
+                  className={`relative flex flex-col rounded-xl border-2 cursor-pointer transition-all duration-200 overflow-hidden`}
+                  style={isActive
+                    ? { borderColor: 'var(--color-primary)', background: 'var(--color-bg-surface)', boxShadow: 'var(--shadow-card)' }
+                    : { borderColor: 'var(--color-border)', background: 'var(--color-bg-surface)' }
+                  }
                 >
                   {/* Top accent stripe */}
-                  <div className={`h-1 w-full ${isActive ? 'bg-blue-500' : 'bg-gray-100 dark:bg-gray-700'}`} />
+                  <div
+                    className="h-1 w-full"
+                    style={{ background: isActive ? 'var(--color-primary)' : 'var(--color-border)' }}
+                  />
 
                   {/* Badges row */}
                   <div className="flex items-center justify-between px-4 pt-3 pb-1">
                     <div className="flex items-center gap-1.5">
                       {isActive && (
-                        <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-semibold rounded-full">
+                        <span className="badge badge-info flex items-center gap-1">
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                           </svg>
@@ -948,12 +982,12 @@ export default function TimetableReviewPage() {
                         </span>
                       )}
                       {isBest && (
-                        <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-xs font-semibold rounded-full">
+                        <span className="badge badge-warning">
                           ★ Best
                         </span>
                       )}
                       {variant.is_selected && (
-                        <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-xs font-semibold rounded-full">
+                        <span className="badge badge-success">
                           Selected
                         </span>
                       )}
@@ -963,18 +997,21 @@ export default function TimetableReviewPage() {
                   <div className="px-4 pb-4 flex-1 flex flex-col">
                     {/* Score ring + title */}
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="flex-shrink-0 text-gray-800 dark:text-gray-100">
+                      <div className="flex-shrink-0" style={{ color: 'var(--color-text-primary)' }}>
                         <ScoreRing score={qm.overall_score ?? 0} size={64} />
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-gray-900 dark:text-white text-base leading-tight">
+                        <p className="font-bold text-base leading-tight" style={{ color: 'var(--color-text-primary)' }}>
                           Variant {variant.variant_number}
                         </p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 capitalize">
+                        <p className="text-xs mt-0.5 capitalize" style={{ color: 'var(--color-text-muted)' }}>
                           {variant.optimization_priority?.replace(/_/g, ' ') ?? 'Standard'}
                         </p>
                         <div className="flex items-center gap-1 mt-1">
-                          <span className={`text-xs font-semibold ${(qm.total_conflicts ?? 0) === 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          <span
+                            className="text-xs font-semibold"
+                            style={{ color: (qm.total_conflicts ?? 0) === 0 ? 'var(--color-success-text)' : 'var(--color-danger-text)' }}
+                          >
                             {(qm.total_conflicts ?? 0) === 0 ? '✓ No conflicts' : `${qm.total_conflicts} conflict${qm.total_conflicts === 1 ? '' : 's'}`}
                           </span>
                         </div>
@@ -995,9 +1032,9 @@ export default function TimetableReviewPage() {
                         { label: 'Hours', val: st.total_hours ?? 0 },
                         { label: 'Subjects', val: st.unique_subjects ?? 0 },
                       ].map(({ label, val }) => (
-                        <div key={label} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg py-1.5 px-1">
-                          <p className="text-[11px] text-gray-400 dark:text-gray-500">{label}</p>
-                          <p className="text-sm font-bold text-gray-800 dark:text-gray-100">{val}</p>
+                        <div key={label} className="rounded-lg py-1.5 px-1" style={{ background: 'var(--color-bg-surface-2)' }}>
+                          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
+                          <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>{val}</p>
                         </div>
                       ))}
                     </div>
@@ -1012,11 +1049,11 @@ export default function TimetableReviewPage() {
                         <>
                           <button
                             onClick={e => { e.stopPropagation(); loadVariantEntries(variant) }}
-                            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-                              isActive
-                                ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-700 dark:hover:text-blue-300'
-                            }`}
+                            className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors`}
+                            style={isActive
+                              ? { background: 'var(--color-primary-subtle)', color: 'var(--color-primary)' }
+                              : { background: 'var(--color-bg-surface-2)', color: 'var(--color-text-secondary)' }
+                            }
                           >
                             {isActive ? 'Currently Viewing' : 'View Timetable'}
                           </button>
@@ -1024,7 +1061,7 @@ export default function TimetableReviewPage() {
                             <button
                               onClick={e => { e.stopPropagation(); handleVariantSelect(variant.id) }}
                               disabled={actionLoading}
-                              className="px-3 py-1.5 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                              className="btn-primary px-3 py-1.5 text-xs disabled:opacity-50"
                             >
                               Select
                             </button>
@@ -1041,14 +1078,22 @@ export default function TimetableReviewPage() {
 
         {/* ── Timetable View ── */}
         {activeVariant && (
-          <section id="timetable-view" ref={gridSectionRef} className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+          <section
+            id="timetable-view"
+            ref={gridSectionRef}
+            className="rounded-xl overflow-hidden"
+            style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-card)' }}
+          >
             {/* Section header */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+            <div
+              className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
+              style={{ borderBottom: '1px solid var(--color-border)' }}
+            >
               <div>
-                <h2 className="text-base font-bold text-gray-900 dark:text-white">
+                <h2 className="card-title">
                   Variant {activeVariant.variant_number} — Timetable
                 </h2>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 capitalize">
+                <p className="text-xs mt-0.5 capitalize" style={{ color: 'var(--color-text-muted)' }}>
                   {activeVariant.optimization_priority?.replace(/_/g, ' ') ?? 'Standard'} &nbsp;·&nbsp;
                   Generated {new Date(activeVariant.generated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </p>
@@ -1081,7 +1126,7 @@ export default function TimetableReviewPage() {
                       }
                     }}
                     aria-label="Filter by department"
-                    className="px-2.5 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    className="input-primary px-2.5 py-1.5 text-xs"
                   >
                     <option value="all">All Departments</option>
                     {uniqueDepartments.map(dept => (
@@ -1093,7 +1138,7 @@ export default function TimetableReviewPage() {
                 {/* Print button */}
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors print:hidden"
+                  className="btn-secondary flex items-center gap-1.5 text-xs print:hidden"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -1104,16 +1149,39 @@ export default function TimetableReviewPage() {
             </div>
 
             {/* Statistics strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-gray-100 dark:divide-gray-700 border-b border-gray-100 dark:border-gray-700 print:hidden">
+            <div className="grid grid-cols-2 sm:grid-cols-4 print:hidden" style={{ borderBottom: '1px solid var(--color-border)' }}>
               {[
-                { icon: '📚', label: 'Total Classes', val: activeStats?.total_classes ?? 0 },
-                { icon: '⏱', label: 'Total Hours', val: activeStats?.total_hours ?? 0 },
-                { icon: '🏫', label: 'Unique Rooms', val: activeStats?.unique_rooms ?? 0 },
-                { icon: '👩‍🏫', label: 'Faculty Members', val: activeStats?.unique_faculty ?? 0 },
+                {
+                  icon: (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                  ),
+                  label: 'Total Classes', val: activeStats?.total_classes ?? 0,
+                },
+                {
+                  icon: (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  ),
+                  label: 'Total Hours', val: activeStats?.total_hours ?? 0,
+                },
+                {
+                  icon: (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m7-10h.01M12 15h.01" /></svg>
+                  ),
+                  label: 'Unique Rooms', val: activeStats?.unique_rooms ?? 0,
+                },
+                {
+                  icon: (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  ),
+                  label: 'Faculty Members', val: activeStats?.unique_faculty ?? 0,
+                },
               ].map(({ icon, label, val }) => (
-                <div key={label} className="px-5 py-3 text-center">
-                  <p className="text-xs text-gray-400 dark:text-gray-500">{icon} {label}</p>
-                  <p className="text-xl font-bold text-gray-900 dark:text-white mt-0.5">{val}</p>
+                <div key={label} className="px-5 py-3 text-center" style={{ borderRight: '1px solid var(--color-border)' }}>
+                  <div className="flex items-center justify-center gap-1.5 mb-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {icon}
+                    <p className="text-xs">{label}</p>
+                  </div>
+                  <p className="text-xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{val}</p>
                 </div>
               ))}
             </div>
@@ -1131,37 +1199,37 @@ export default function TimetableReviewPage() {
         {/* ── Approval Modal ── */}
         {showApprovalModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-md w-full">
+            <div className="rounded-2xl shadow-[var(--shadow-modal)] p-6 max-w-md w-full" style={{ background: 'var(--color-bg-surface)' }}>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-success-subtle)' }}>
+                  <svg className="w-5 h-5" style={{ color: 'var(--color-success-text)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Approve Timetable</h3>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>Approve Timetable</h3>
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>
                 This will approve the selected variant and make it available for publishing.
               </p>
               <textarea
                 value={approvalComments}
                 onChange={e => setApprovalComments(e.target.value)}
                 placeholder="Optional comments for approvers…"
-                className="w-full px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-4 resize-none focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                className="input-primary w-full mb-4 resize-none"
                 rows={3}
               />
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setShowApprovalModal(false)}
                   disabled={actionLoading}
-                  className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  className="btn-secondary text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleApprove}
                   disabled={actionLoading}
-                  className="px-5 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:opacity-50"
+                  className="btn-success text-sm disabled:opacity-50"
                 >
                   {actionLoading ? 'Approving…' : 'Approve'}
                 </button>
@@ -1173,23 +1241,23 @@ export default function TimetableReviewPage() {
         {/* ── Rejection Modal ── */}
         {showRejectionModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-md w-full">
+            <div className="rounded-2xl shadow-[var(--shadow-modal)] p-6 max-w-md w-full" style={{ background: 'var(--color-bg-surface)' }}>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-danger-subtle)' }}>
+                  <svg className="w-5 h-5" style={{ color: 'var(--color-danger-text)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Reject Timetable</h3>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>Reject Timetable</h3>
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>
                 Please provide a reason so the scheduling team can make improvements.
               </p>
               <textarea
                 value={rejectionReason}
                 onChange={e => setRejectionReason(e.target.value)}
                 placeholder="Reason for rejection (required)…"
-                className="w-full px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-4 resize-none focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                className="input-primary w-full mb-4 resize-none"
                 rows={4}
                 required
               />
@@ -1197,14 +1265,14 @@ export default function TimetableReviewPage() {
                 <button
                   onClick={() => setShowRejectionModal(false)}
                   disabled={actionLoading}
-                  className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  className="btn-secondary text-sm"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleReject}
                   disabled={actionLoading || !rejectionReason.trim()}
-                  className="px-5 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium disabled:opacity-50"
+                  className="btn-danger text-sm disabled:opacity-50"
                 >
                   {actionLoading ? 'Rejecting…' : 'Reject'}
                 </button>
@@ -1213,7 +1281,6 @@ export default function TimetableReviewPage() {
           </div>
         )}
 
-      </div>
     </div>
   )
 }

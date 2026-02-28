@@ -73,8 +73,8 @@ export default function CreateTimetablePage() {
     <div className="max-w-5xl mx-auto">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-[#2C2C2C] dark:text-white mb-2">Generate Timetable</h1>
-          <p className="text-sm text-[#606060] dark:text-[#aaaaaa]">Configure time slots and generate timetable for all departments</p>
+          <h1 className="text-2xl font-semibold mb-2" style={{ color: 'var(--color-text-primary)' }}>Generate Timetable</h1>
+          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Configure time slots and generate timetable for all departments</p>
         </div>
         <button
           type="submit"
@@ -94,14 +94,14 @@ export default function CreateTimetablePage() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        <div className="mb-6 p-4 rounded-lg" style={{ background: 'var(--color-danger-subtle)', border: '1px solid var(--color-danger)' }}>
+          <p className="text-sm" style={{ color: 'var(--color-danger-text)' }}>{error}</p>
         </div>
       )}
 
       <form id="timetable-form" onSubmit={handleSubmit} className="space-y-6">
         <div className="card">
-          <h3 className="text-base font-semibold text-[#2C2C2C] dark:text-white mb-5">Basic Information</h3>
+          <h3 className="text-base font-semibold mb-5" style={{ color: 'var(--color-text-primary)' }}>Basic Information</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="form-group">
               <label htmlFor="academic-year" className="form-label">
@@ -141,7 +141,7 @@ export default function CreateTimetablePage() {
         </div>
 
         <div className="card">
-          <h3 className="text-base font-semibold text-[#2C2C2C] dark:text-white mb-5">Schedule Configuration</h3>
+          <h3 className="text-base font-semibold mb-5" style={{ color: 'var(--color-text-primary)' }}>Schedule Configuration</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             <div className="form-group">
               <label htmlFor="working-days" className="form-label">Working Days</label>
@@ -196,16 +196,16 @@ export default function CreateTimetablePage() {
             </div>
           </div>
 
-          <div className="mt-6 p-5 bg-[#F5F5F5] dark:bg-[#2A2A2A] rounded-lg border border-[#E0E0E0] dark:border-[#404040]">
+          <div className="mt-6 p-5 rounded-lg" style={{ background: 'var(--color-bg-surface-2)', border: '1px solid var(--color-border)' }}>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
                 checked={formData.lunch_break_enabled}
                 onChange={e => setFormData({ ...formData, lunch_break_enabled: e.target.checked })}
                 disabled={isGenerating}
-                className="w-4 h-4 rounded border-[#E0E0E0] dark:border-[#404040]"
+                className="w-4 h-4 rounded"
               />
-              <span className="text-sm font-medium text-[#2C2C2C] dark:text-white">Enable Lunch Break</span>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>Enable Lunch Break</span>
             </label>
             {formData.lunch_break_enabled && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">

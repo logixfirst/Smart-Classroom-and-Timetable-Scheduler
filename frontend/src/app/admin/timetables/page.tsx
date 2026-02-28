@@ -15,17 +15,61 @@ interface RunningJob {
   time_remaining_seconds?: number | null
 }
 
+// ── Status chip — semantic CSS-var colours, no hardcoded hex ─────────────────
+const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; label: string }> = {
+  approved:  { bg: 'var(--color-success-subtle)', text: 'var(--color-success-text)', dot: 'var(--color-success)', label: 'Approved'  },
+  completed: { bg: 'var(--color-success-subtle)', text: 'var(--color-success-text)', dot: 'var(--color-success)', label: 'Completed' },
+  pending:   { bg: 'var(--color-warning-subtle)', text: 'var(--color-warning-text)', dot: 'var(--color-warning)', label: 'Pending'   },
+  running:   { bg: 'var(--color-info-subtle)',    text: 'var(--color-info)',          dot: 'var(--color-primary)', label: 'Running'  },
+  draft:     { bg: 'var(--color-bg-surface-2)',   text: 'var(--color-text-secondary)', dot: 'var(--color-text-muted)', label: 'Draft' },
+  rejected:  { bg: 'var(--color-danger-subtle)',  text: 'var(--color-danger-text)',   dot: 'var(--color-danger)', label: 'Rejected'  },
+  failed:    { bg: 'var(--color-danger-subtle)',  text: 'var(--color-danger-text)',   dot: 'var(--color-danger)', label: 'Failed'    },
+}
+
+function StatusChip({ status, isRunning }: { status: string; isRunning?: boolean }) {
+  const key   = isRunning ? 'running' : status
+  const cfg   = STATUS_CONFIG[key] ?? STATUS_CONFIG['draft']
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '2px 8px', borderRadius: 12, flexShrink: 0,
+      background: cfg.bg, color: cfg.text, fontSize: 12, fontWeight: 500,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+      {cfg.label}
+    </span>
+  )
+}
+
+// ── Metric tile — top-of-page summary cards ───────────────────────────────────
+function MetricTile({ value, label, color }: { value: number; label: string; color: string }) {
+  return (
+    <div style={{
+      background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
+      borderRadius: 'var(--radius-lg)', padding: '16px 20px', textAlign: 'center',
+    }}>
+      <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1, fontFamily: "'Poppins', sans-serif" }}>
+        {value}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4, fontWeight: 500 }}>
+        {label}
+      </div>
+    </div>
+  )
+}
+
 const CACHE_KEY = 'admin_timetables_cache'
 const CACHE_TTL_MS = 60_000 // 60 s stale-while-revalidate window
 
 function transformJobs(jobs: any[]): TimetableListItem[] {
   return jobs.map((job: any) => ({
     id: job.job_id || job.id,
+    year: parseInt((job.academic_year || '2024').split('-')[0]) || new Date().getFullYear(),
     department: job.organization_name || 'All Departments',
     batch: job.batch?.batch_name || null,
     semester: job.semester || 1,
     academic_year: job.academic_year || '2024-25',
-    status: job.status || 'draft',
+    status: (job.status || 'draft') as TimetableListItem['status'],
     lastUpdated: new Date(job.updated_at || job.created_at).toLocaleDateString(),
     conflicts: job.conflicts_count || 0,
     score: job.quality_score || null,
@@ -61,7 +105,7 @@ export default function AdminTimetablesPage() {
   const runningJobs = useMemo<RunningJob[]>(
     () =>
       timetables
-        .filter(t => t.status === 'running' || t.status === 'pending')
+        .filter(t => (t.status as string) === 'running' || t.status === 'pending')
         .map(t => ({
           job_id: t.id,
           progress: 0,
@@ -98,7 +142,7 @@ export default function AdminTimetablesPage() {
       // This warms the Redis cache so clicking any of those timetables is instant,
       // even if Redis has evicted the keys since the initial cache-warm on completion.
       const toPrewarm = listItems
-        .filter((t: TimetableListItem) => t.status === 'completed' || t.status === 'failed')
+        .filter((t: TimetableListItem) => (t.status as string) === 'completed' || (t.status as string) === 'failed')
         .slice(0, 3)
       toPrewarm.forEach((job: TimetableListItem) => {
         fetch(`${API_BASE}/timetable/variants/?job_id=${job.id}`, {
@@ -112,7 +156,7 @@ export default function AdminTimetablesPage() {
       } catch { /* quota exceeded – ignore */ }
 
       // Stop background polling once no running jobs remain
-      const hasActive = listItems.some(t => t.status === 'running' || t.status === 'pending')
+      const hasActive = listItems.some(t => (t.status as string) === 'running' || t.status === 'pending')
       if (!hasActive) {
         emptyPollCount.current += 1
         if (emptyPollCount.current >= 2 && pollingRef.current) {
@@ -147,378 +191,318 @@ export default function AdminTimetablesPage() {
   const getGroupedBySemester = useMemo(() => () => {
     const grouped: { [key: string]: TimetableListItem[] } = {}
 
-    timetables.forEach(timetable => {
-      const key = `${timetable.academic_year}-${timetable.semester}`
-      if (!grouped[key]) {
-        grouped[key] = []
-      }
-      grouped[key].push(timetable)
-    })
+    // Exclude running/pending jobs — they are shown in the active-jobs banner above,
+    // not in the timetables grid (they have no reviewable schedule yet).
+    timetables
+      .filter(t => (t.status as string) !== 'running' && t.status !== 'pending')
+      .forEach(timetable => {
+        const key = `${timetable.academic_year}-${timetable.semester}`
+        if (!grouped[key]) {
+          grouped[key] = []
+        }
+        grouped[key].push(timetable)
+      })
 
     return grouped
   }, [timetables])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return 'text-[#4CAF50] bg-[#4CAF50]/10 dark:bg-[#4CAF50]/20'
-      case 'pending':
-        return 'text-[#FF9800] bg-[#FF9800]/10 dark:bg-[#FF9800]/20'
-      case 'draft':
-        return 'text-[#6B6B6B] dark:text-[#B3B3B3] bg-[#E0E0E0] dark:bg-[#404040]'
-      case 'rejected':
-        return 'text-[#F44336] bg-[#F44336]/10 dark:bg-[#F44336]/20'
-      default:
-        return 'text-[#6B6B6B] dark:text-[#B3B3B3] bg-[#E0E0E0] dark:bg-[#404040]'
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return '✅'
-      case 'pending':
-        return '⏳'
-      case 'draft':
-        return '📝'
-      case 'rejected':
-        return '❌'
-      default:
-        return '📄'
-    }
-  }
+  // ── Derived counts for summary tiles ─────────────────────────────────────
+  const counts = useMemo(() => ({
+    approved:  timetables.filter(t => t.status === 'approved').length,
+    pending:   timetables.filter(t => t.status === 'pending').length,
+    draft:     timetables.filter(t => t.status === 'draft').length,
+    rejected:  timetables.filter(t => t.status === 'rejected').length,
+  }), [timetables])
 
   const groupedTimetables = getGroupedBySemester()
 
-  // Show skeleton only on the very first load (no stale data yet)
+  // ── Skeleton: first load only (no stale data) ────────────────────────────
   if (loading && timetables.length === 0) {
     return (
       <div className="space-y-6">
-        <div className="flex justify-end">
-          <div className="h-9 w-48 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{ height: 74, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)' }} className="animate-pulse" />
+          ))}
         </div>
         <TimetableListSkeleton cards={6} />
       </div>
     )
   }
 
+  // ── Error state ──────────────────────────────────────────────────────────
   if (error) {
     return (
-      <div className="space-y-6">
-        <div className="card border-[#F44336] bg-[#F44336]/5">
-          <div className="card-header">
-            <div className="flex items-center gap-3">
-              <svg
-                className="w-6 h-6 text-[#F44336]"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <h3 className="text-lg font-semibold text-[#F44336]">Error Loading Timetables</h3>
-            </div>
+      <div className="card" style={{ borderColor: 'var(--color-danger)' }}>
+        <div className="card-header">
+          <div className="flex items-center gap-3">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <h3 className="card-title" style={{ color: 'var(--color-danger)' }}>Failed to load timetables</h3>
           </div>
-          <p className="text-sm text-[#2C2C2C] dark:text-[#FFFFFF]">{error}</p>
-          <button onClick={loadTimetableData} className="btn-primary mt-4">
-            Retry
-          </button>
         </div>
+        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{error}</p>
+        <button onClick={loadTimetableData} className="btn-primary mt-4">Retry</button>
       </div>
     )
   }
 
   return (
-      <div className="space-y-6">
-        {/* Running Jobs Banner - Show for any running/queued jobs */}
-        {runningJobs.length > 0 && (
-          <div className="card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-            <div className="card-header">
-              <h3 className="font-semibold text-blue-900 dark:text-blue-100">🔄 Generation in Progress</h3>
-            </div>
-            <div className="space-y-3">
-              {runningJobs.map((job) => (
-                <div key={job.job_id} className="p-4 bg-white dark:bg-gray-800 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {job.message}
-                    </span>
-                    <button
-                      onClick={() => router.push(`/admin/timetables/status/${job.job_id}`)}
-                      className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                    >
-                      View Details →
-                    </button>
+    <div className="space-y-5">
+
+      {/* ── 1. Summary metric tiles ──────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <MetricTile value={counts.approved}  label="Approved"  color="var(--color-success-text)" />
+        <MetricTile value={counts.pending}   label="Pending"   color="var(--color-warning-text)" />
+        <MetricTile value={counts.draft}     label="Draft"     color="var(--color-text-secondary)" />
+        <MetricTile value={counts.rejected}  label="Rejected"  color="var(--color-danger-text)" />
+      </div>
+
+      {/* ── 2. Page toolbar ──────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>
+            Timetables
+          </h2>
+          <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+            {totalCount} schedule{totalCount !== 1 ? 's' : ''} across all semesters
+          </p>
+        </div>
+        <Link href="/admin/timetables/new" className="btn-primary" style={{ flexShrink: 0 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          <span className="hidden sm:inline">Generate Timetable</span>
+          <span className="sm:hidden">Generate</span>
+        </Link>
+      </div>
+
+      {/* ── 3. Active-jobs banner ────────────────────────────────────────── */}
+      {runningJobs.length > 0 && (
+        <div style={{
+          background: 'var(--color-info-subtle)', border: '1px solid var(--color-primary)',
+          borderRadius: 'var(--radius-lg)', padding: '14px 16px',
+        }}>
+          <div className="flex items-center justify-between" style={{ marginBottom: 10 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-info)' }}>
+              Generation in progress — {runningJobs.length} job{runningJobs.length > 1 ? 's' : ''} running
+            </span>
+          </div>
+          <div className="space-y-3">
+            {runningJobs.map(job => (
+              <div key={job.job_id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
+                    {job.message}
+                    {job.time_remaining_seconds && job.time_remaining_seconds > 0 && (
+                      <span style={{ marginLeft: 8 }}>
+                        · {Math.floor(job.time_remaining_seconds / 60)}m {job.time_remaining_seconds % 60}s remaining
+                      </span>
+                    )}
                   </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-                      <span>{job.progress}%</span>
-                      {job.time_remaining_seconds && job.time_remaining_seconds > 0 && (
-                        <span>
-                          {Math.floor(job.time_remaining_seconds / 60)}m {job.time_remaining_seconds % 60}s remaining
-                        </span>
-                      )}
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden relative">
-                      <div
-                        className="h-2 rounded-full transition-all duration-500 relative overflow-hidden"
-                        style={{ 
-                          width: `${job.progress}%`,
-                          background: 'linear-gradient(90deg, #1976D2 0%, #2196F3 50%, #42A5F5 100%)'
-                        }}
-                      >
-                        <div
-                          className="absolute inset-0"
-                          style={{
-                            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
-                            backgroundSize: '200% 100%',
-                            animation: 'shimmer 2s linear infinite',
-                          }}
-                        />
-                      </div>
-                    </div>
+                  <div style={{ height: 4, background: 'var(--color-bg-surface-3)', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', width: `${job.progress || 0}%`,
+                      background: 'var(--color-primary)', borderRadius: 2,
+                      transition: 'width 600ms ease',
+                      minWidth: job.progress > 0 ? 0 : '6%',
+                    }} />
                   </div>
                 </div>
-              ))}
-            </div>
+                <button
+                  onClick={() => router.push(`/admin/timetables/status/${job.job_id}`)}
+                  className="btn-secondary"
+                  style={{ fontSize: 12, height: 28, padding: '0 10px', flexShrink: 0 }}
+                >
+                  View
+                </button>
+              </div>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-end">
-          <div className="flex flex-col sm:flex-row gap-3 ml-auto">
-            <Link
-              href="/admin/timetables/new"
-              className="btn-primary flex items-center justify-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a9 9 0 117.072 0l-.548.547A3.374 3.374 0 0014.846 21H9.154a3.374 3.374 0 00-2.879-1.453l-.548-.547z"
-                />
-              </svg>
-              <span className="hidden sm:inline">Generate New Timetable</span>
-              <span className="sm:hidden">Generate</span>
-            </Link>
+      {/* ── 4. Timetables content ────────────────────────────────────────── */}
+      <div>
+        {/* Section header + view toggle */}
+        <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+            Department Timetables
+          </span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['grid', 'list'] as const).map(mode => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                style={{
+                  height: 28, padding: '0 12px', fontSize: 12, fontWeight: 500,
+                  borderRadius: 6, cursor: 'pointer', border: '1px solid',
+                  borderColor: viewMode === mode ? 'var(--color-primary)' : 'var(--color-border)',
+                  background: viewMode === mode ? 'var(--color-primary-subtle)' : 'transparent',
+                  color: viewMode === mode ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  textTransform: 'capitalize',
+                }}
+              >
+                {mode}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Timetables */}
-        <div className="space-y-6">
-
-            {/* View Mode Toggle */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Department Timetables</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Course-centric schedules for all semesters</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-[#2196F3] text-white'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  Grid View
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`px-4 py-2 text-sm rounded-lg transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-[#2196F3] text-white'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  List View
-                </button>
-              </div>
-            </div>
-
-            {/* Timetables by Semester */}
-            <div className="space-y-4">
-          {Object.keys(groupedTimetables).length === 0 ? (
-            <div className="card">
-              <div className="text-center py-8 sm:py-12">
-                <div className="text-4xl sm:text-6xl mb-4">📅</div>
-                <h3 className="text-base sm:text-lg font-medium text-[#0f0f0f] dark:text-white mb-2">
-                  No Timetables Found
-                </h3>
-                <p className="text-sm text-[#606060] dark:text-[#aaaaaa] mb-4 sm:mb-6 px-4">
-                  No timetables have been created yet.
-                </p>
-                <Link href="/admin/timetables/new" className="btn-primary">
-                  Create First Timetable
-                </Link>
-              </div>
-            </div>
-          ) : (
-            Object.entries(groupedTimetables)
+        {/* Groups */}
+        {Object.keys(groupedTimetables).length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto 12px' }}>
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 6px' }}>No timetables yet</p>
+            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: '0 0 16px' }}>
+              Generate your first timetable to get started.
+            </p>
+            <Link href="/admin/timetables/new" className="btn-primary">Generate Timetable</Link>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {Object.entries(groupedTimetables)
               .sort(([a], [b]) => b.localeCompare(a))
-              .map(([semesterKey, semesterTimetables]) => {
+              .map(([semesterKey, items]) => {
                 const [academicYear, semester] = semesterKey.split('-')
                 return (
                   <div key={semesterKey} className="card">
-                    <div className="card-header">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    {/* Group header */}
+                    <div className="card-header" style={{ paddingBottom: 12 }}>
+                      <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="card-title">
-                            {academicYear} - Semester {semester}
-                          </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            {semesterTimetables.length} course{semesterTimetables.length !== 1 ? 's' : ''} scheduled
+                          <h3 className="card-title">{academicYear} · Semester {semester}</h3>
+                          <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                            {items.length} course{items.length !== 1 ? 's' : ''} &nbsp;·&nbsp;
+                            {items.filter(t => t.status === 'approved').length} approved
                           </p>
                         </div>
-                        <span className="badge badge-info">
-                          {semesterTimetables.filter(t => t.status === 'approved').length} approved
-                        </span>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
-                      {semesterTimetables
-                        .sort((a, b) => (a.department || '').localeCompare(b.department || ''))
-                        .map(timetable => {
-                          // Check if this job is currently running
-                          const isRunning = runningJobs.some(job => job.job_id === timetable.id)
-                          const targetUrl = isRunning 
-                            ? `/admin/timetables/status/${timetable.id}`
-                            : `/admin/timetables/${timetable.id}/review`
-                          
-                          return (
-                          <Link
-                            key={timetable.id}
-                            href={targetUrl}
-                            className="block p-3 sm:p-4 bg-white dark:bg-[#1E1E1E] border border-[#E0E0E0] dark:border-[#2A2A2A] rounded-lg hover:border-[#2196F3] dark:hover:border-[#2196F3] transition-colors"
-                          >
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-[#2C2C2C] dark:text-[#FFFFFF] truncate">
-                                  {timetable.department}
-                                </h4>
-                                <p className="text-sm text-[#6B6B6B] dark:text-[#B3B3B3]">
-                                  {timetable.batch || 'All Students'}
-                                </p>
-                              </div>
-                              <span
-                                className={`px-2 py-1 text-xs font-medium flex-shrink-0 ml-2 rounded ${isRunning ? 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' : getStatusColor(
-                                  timetable.status
-                                )}`}
+                    {/* Items — grid or list */}
+                    {viewMode === 'grid' ? (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {items
+                          .sort((a, b) => (a.department ?? '').localeCompare(b.department ?? ''))
+                          .map(t => {
+                            const isRunning = runningJobs.some(j => j.job_id === t.id)
+                            const href = isRunning ? `/admin/timetables/status/${t.id}` : `/admin/timetables/${t.id}/review`
+                            return (
+                              <Link key={t.id} href={href} style={{
+                                display: 'block', padding: '14px 16px',
+                                background: 'var(--color-bg-page)', border: '1px solid var(--color-border)',
+                                borderRadius: 'var(--radius-md)', textDecoration: 'none',
+                                transition: 'border-color 120ms, background 120ms',
+                              }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-primary)'; (e.currentTarget as HTMLElement).style.background = 'var(--color-primary-subtle)' }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--color-border)'; (e.currentTarget as HTMLElement).style.background = 'var(--color-bg-page)' }}
                               >
-                                {isRunning ? '🔄 Running' : `${getStatusIcon(timetable.status)} ${timetable.status.charAt(0).toUpperCase() + timetable.status.slice(1)}`}
-                              </span>
-                            </div>
-
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-[#606060] dark:text-[#aaaaaa]">
-                                  Last Updated:
-                                </span>
-                                <span className="text-[#0f0f0f] dark:text-white">
-                                  {timetable.lastUpdated}
-                                </span>
-                              </div>
-
-                              {timetable.score && (
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-[#606060] dark:text-[#aaaaaa]">Score:</span>
-                                  <span className="font-medium text-[#00ba7c]">
-                                    {timetable.score}/10
-                                  </span>
+                                <div className="flex items-start justify-between gap-2" style={{ marginBottom: 10 }}>
+                                  <div style={{ minWidth: 0 }}>
+                                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
+                                      {t.department}
+                                    </p>
+                                    <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
+                                      {t.batch ?? 'All Students'}
+                                    </p>
+                                  </div>
+                                  <StatusChip status={t.status} isRunning={isRunning} />
                                 </div>
-                              )}
-
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-[#606060] dark:text-[#aaaaaa]">Conflicts:</span>
-                                <span
-                                  className={`font-medium ${
-                                    timetable.conflicts > 0 ? 'text-[#ff4444]' : 'text-[#00ba7c]'
-                                  }`}
-                                >
-                                  {timetable.conflicts}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, borderTop: '1px solid var(--color-border)', paddingTop: 10 }}>
+                                  <div className="flex items-center justify-between">
+                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Updated</span>
+                                    <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{t.lastUpdated}</span>
+                                  </div>
+                                  {t.score != null && (
+                                    <div className="flex items-center justify-between">
+                                      <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Quality score</span>
+                                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-success-text)' }}>{t.score}/10</span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center justify-between">
+                                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Conflicts</span>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: t.conflicts > 0 ? 'var(--color-danger-text)' : 'var(--color-success-text)' }}>
+                                      {t.conflicts}
+                                    </span>
+                                  </div>
+                                </div>
+                              </Link>
+                            )
+                          })}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {items
+                          .sort((a, b) => (a.department ?? '').localeCompare(b.department ?? ''))
+                          .map(t => {
+                            const isRunning = runningJobs.some(j => j.job_id === t.id)
+                            const href = isRunning ? `/admin/timetables/status/${t.id}` : `/admin/timetables/${t.id}/review`
+                            return (
+                              <Link key={t.id} href={href} style={{
+                                display: 'flex', alignItems: 'center', gap: 12,
+                                padding: '10px 4px', textDecoration: 'none',
+                                borderBottom: '1px solid var(--color-border)',
+                                transition: 'background 100ms',
+                              }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--color-primary-subtle)' }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                              >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                                    {t.department}
+                                  </span>
+                                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{t.batch ?? 'All Students'}</span>
+                                </div>
+                                <StatusChip status={t.status} isRunning={isRunning} />
+                                {t.score != null && (
+                                  <span style={{ fontSize: 12, color: 'var(--color-success-text)', fontWeight: 600, flexShrink: 0 }}>
+                                    {t.score}/10
+                                  </span>
+                                )}
+                                <span style={{ fontSize: 12, color: t.conflicts > 0 ? 'var(--color-danger-text)' : 'var(--color-success-text)', fontWeight: 600, flexShrink: 0, minWidth: 48, textAlign: 'right' }}>
+                                  {t.conflicts} conflict{t.conflicts !== 1 ? 's' : ''}
                                 </span>
-                              </div>
-                            </div>
-
-                            <div className="mt-3 pt-3 border-t border-[#e5e5e5] dark:border-[#3d3d3d]">
-                              <span className="text-xs text-[#065fd4] font-medium group-hover:text-[#0856c1] transition-colors duration-200">
-                                {isRunning ? '⏱️ View Progress →' : '👁️ View Details →'}
-                              </span>
-                            </div>
-                          </Link>
-                        )})
-                      }
-                    </div>
+                                <span style={{ fontSize: 12, color: 'var(--color-text-muted)', flexShrink: 0 }}>{t.lastUpdated}</span>
+                              </Link>
+                            )
+                          })}
+                      </div>
+                    )}
                   </div>
                 )
-              })
-          )}
-            </div>
-        </div>
-
-        {/* Pagination */}
-        {totalCount > 20 && (
-          <div className="flex justify-center gap-2">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1 || loading}
-              className="btn-secondary px-4 py-2 disabled:opacity-50"
-            >
-              ← Previous
-            </button>
-            <span className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400">
-              Page {currentPage} of {Math.ceil(totalCount / 20)}
-            </span>
-            <button
-              onClick={() => setCurrentPage(p => p + 1)}
-              disabled={currentPage >= Math.ceil(totalCount / 20) || loading}
-              className="btn-secondary px-4 py-2 disabled:opacity-50"
-            >
-              Next →
-            </button>
+              })}
           </div>
         )}
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-          <div className="card text-center p-3 sm:p-4">
-            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#00ba7c]">
-              {timetables.filter(t => t.status === 'approved').length}
-            </div>
-            <div className="text-xs sm:text-sm text-[#606060] dark:text-[#aaaaaa] mt-1">
-              Approved
-            </div>
-          </div>
-          <div className="card text-center p-3 sm:p-4">
-            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#f9ab00]">
-              {timetables.filter(t => t.status === 'pending').length}
-            </div>
-            <div className="text-xs sm:text-sm text-[#606060] dark:text-[#aaaaaa] mt-1">
-              Pending
-            </div>
-          </div>
-          <div className="card text-center p-3 sm:p-4">
-            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#606060] dark:text-[#aaaaaa]">
-              {timetables.filter(t => t.status === 'draft').length}
-            </div>
-            <div className="text-xs sm:text-sm text-[#606060] dark:text-[#aaaaaa] mt-1">Draft</div>
-          </div>
-          <div className="card text-center p-3 sm:p-4">
-            <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#ff4444]">
-              {timetables.filter(t => t.status === 'rejected').length}
-            </div>
-            <div className="text-xs sm:text-sm text-[#606060] dark:text-[#aaaaaa] mt-1">
-              Rejected
-            </div>
-          </div>
-        </div>
       </div>
+
+      {/* ── 5. Pagination ───────────────────────────────────────────────── */}
+      {totalCount > 20 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1 || loading}
+            className="btn-secondary"
+            style={{ height: 32, padding: '0 12px', fontSize: 13 }}
+          >
+            ← Prev
+          </button>
+          <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', padding: '0 4px' }}>
+            Page {currentPage} of {Math.ceil(totalCount / 20)}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => p + 1)}
+            disabled={currentPage >= Math.ceil(totalCount / 20) || loading}
+            className="btn-secondary"
+            style={{ height: 32, padding: '0 12px', fontSize: 13 }}
+          >
+            Next →
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

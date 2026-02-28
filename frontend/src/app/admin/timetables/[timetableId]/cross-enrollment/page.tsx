@@ -53,162 +53,145 @@ export default function CrossEnrollmentPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center py-12">
-            <GoogleSpinner size={48} className="mx-auto" />
-            <p className="mt-4 text-gray-600">Loading cross-enrollment data...</p>
-          </div>
+      <div className="flex items-center justify-center py-24">
+        <div className="text-center space-y-4">
+          <GoogleSpinner size={48} className="mx-auto" />
+          <p className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Loading cross-enrollment data…</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <button onClick={() => router.back()} className="text-blue-600 hover:text-blue-700 mb-4">
-            ← Back
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900">Cross-Enrollment Analysis</h1>
-          <p className="text-gray-600 mt-2">NEP 2020 Compliance - Track interdepartmental enrollments</p>
+    <div className="space-y-6">
+
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <button onClick={() => router.back()} className="btn-ghost text-sm flex items-center gap-1.5">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back
+        </button>
+        <div>
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>Cross-Enrollment Analysis</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>NEP 2020 Compliance — Track interdepartmental enrollments</p>
         </div>
+      </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-600">Outgoing Students</div>
-                <div className="text-3xl font-bold text-blue-600">{outgoing?.total_outgoing || 0}</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  To {outgoing?.departments_count || 0} departments
-                </div>
-              </div>
-              <div className="text-4xl">→</div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-gray-600">Incoming Students</div>
-                <div className="text-3xl font-bold text-green-600">{incoming?.total_incoming || 0}</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  From {incoming?.departments_count || 0} departments
-                </div>
-              </div>
-              <div className="text-4xl">←</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="border-b border-gray-200">
-            <div className="flex">
-              <button
-                onClick={() => setActiveTab('outgoing')}
-                className={`px-6 py-3 font-medium ${
-                  activeTab === 'outgoing'
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Our Students Taking Other Courses ({outgoing?.total_outgoing || 0})
-              </button>
-              <button
-                onClick={() => setActiveTab('incoming')}
-                className={`px-6 py-3 font-medium ${
-                  activeTab === 'incoming'
-                    ? 'border-b-2 border-green-600 text-green-600'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Other Students Taking Our Courses ({incoming?.total_incoming || 0})
-              </button>
-            </div>
-          </div>
-
-          <div className="p-6">
-            {activeTab === 'outgoing' && (
-              <div className="space-y-4">
-                {outgoing?.outgoing_enrollments?.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    No outgoing cross-enrollments found
-                  </div>
-                ) : (
-                  outgoing?.outgoing_enrollments?.map((enrollment: any, idx: number) => (
-                    <div key={idx} className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold text-blue-900">
-                          → {enrollment.target_department}
-                        </h3>
-                        <span className="px-3 py-1 bg-blue-600 text-white text-sm rounded-full">
-                          {enrollment.course_count} courses
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        {enrollment.courses?.map((course: any, cidx: number) => (
-                          <div key={cidx} className="flex items-center gap-2 text-sm">
-                            <span className="font-mono font-medium text-blue-700">{course.code}</span>
-                            <span className="text-gray-700">{course.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-
-            {activeTab === 'incoming' && (
-              <div className="space-y-4">
-                {incoming?.incoming_enrollments?.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    No incoming cross-enrollments found
-                  </div>
-                ) : (
-                  incoming?.incoming_enrollments?.map((enrollment: any, idx: number) => (
-                    <div key={idx} className="bg-green-50 rounded-lg p-4 border border-green-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold text-green-900">
-                          ← {enrollment.source_department}
-                        </h3>
-                        <span className="px-3 py-1 bg-green-600 text-white text-sm rounded-full">
-                          {enrollment.course_count} courses
-                        </span>
-                      </div>
-                      <div className="space-y-2">
-                        {enrollment.courses?.map((course: any, cidx: number) => (
-                          <div key={cidx} className="flex items-center gap-2 text-sm">
-                            <span className="font-mono font-medium text-green-700">{course.code}</span>
-                            <span className="text-gray-700">{course.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* NEP 2020 Compliance Badge */}
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 border border-purple-200">
-          <div className="flex items-center gap-3">
-            <div className="text-4xl">🎓</div>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="card" style={{ borderLeft: '4px solid var(--color-primary)' }}>
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-purple-900">NEP 2020 Compliant</h3>
-              <p className="text-sm text-purple-700 mt-1">
-                Cross-departmental enrollment tracking enables flexible learning paths and interdisciplinary education as per National Education Policy 2020.
-              </p>
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Outgoing Students</p>
+              <p className="text-3xl font-bold mt-1" style={{ color: 'var(--color-primary)' }}>{outgoing?.total_outgoing ?? 0}</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>To {outgoing?.departments_count ?? 0} departments</p>
             </div>
+            <svg className="w-8 h-8 flex-shrink-0" style={{ color: 'var(--color-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+            </svg>
+          </div>
+        </div>
+        <div className="card" style={{ borderLeft: '4px solid var(--color-success)' }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>Incoming Students</p>
+              <p className="text-3xl font-bold mt-1" style={{ color: 'var(--color-success-text)' }}>{incoming?.total_incoming ?? 0}</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>From {incoming?.departments_count ?? 0} departments</p>
+            </div>
+            <svg className="w-8 h-8 flex-shrink-0" style={{ color: 'var(--color-success)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+            </svg>
           </div>
         </div>
       </div>
+
+      {/* Tabs + content */}
+      <div className="card p-0 overflow-hidden">
+        <div className="flex border-b" style={{ borderColor: 'var(--color-border)' }}>
+          {([
+            { key: 'outgoing' as const, label: `Our Students → Other Departments (${outgoing?.total_outgoing ?? 0})` },
+            { key: 'incoming' as const, label: `Other Students → Our Courses (${incoming?.total_incoming ?? 0})` },
+          ]).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className="px-5 py-3 text-sm font-medium transition-colors border-b-2 -mb-px"
+              style={
+                activeTab === tab.key
+                  ? { borderBottomColor: 'var(--color-primary)', color: 'var(--color-primary)', background: 'transparent' }
+                  : { borderBottomColor: 'transparent', color: 'var(--color-text-secondary)', background: 'transparent' }
+              }
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-6 space-y-4">
+          {activeTab === 'outgoing' && (
+            outgoing?.outgoing_enrollments?.length === 0
+              ? <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>No outgoing cross-enrollments found</p>
+              : outgoing?.outgoing_enrollments?.map((enrollment: any, idx: number) => (
+                <div key={idx} className="rounded-lg p-4" style={{ background: 'var(--color-info-subtle)', border: '1px solid var(--color-primary)' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-sm" style={{ color: 'var(--color-primary)' }}>→ {enrollment.target_department}</h3>
+                    <span className="badge badge-info">{enrollment.course_count} courses</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {enrollment.courses?.map((course: any, cidx: number) => (
+                      <div key={cidx} className="flex items-center gap-2 text-sm">
+                        <span className="font-mono font-medium text-xs" style={{ color: 'var(--color-primary)' }}>{course.code}</span>
+                        <span style={{ color: 'var(--color-text-secondary)' }}>{course.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+          )}
+
+          {activeTab === 'incoming' && (
+            incoming?.incoming_enrollments?.length === 0
+              ? <p className="text-sm text-center py-8" style={{ color: 'var(--color-text-muted)' }}>No incoming cross-enrollments found</p>
+              : incoming?.incoming_enrollments?.map((enrollment: any, idx: number) => (
+                <div key={idx} className="rounded-lg p-4" style={{ background: 'var(--color-success-subtle)', border: '1px solid var(--color-success)' }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-sm" style={{ color: 'var(--color-success-text)' }}>← {enrollment.source_department}</h3>
+                    <span className="badge badge-success">{enrollment.course_count} courses</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {enrollment.courses?.map((course: any, cidx: number) => (
+                      <div key={cidx} className="flex items-center gap-2 text-sm">
+                        <span className="font-mono font-medium text-xs" style={{ color: 'var(--color-success-text)' }}>{course.code}</span>
+                        <span style={{ color: 'var(--color-text-secondary)' }}>{course.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+          )}
+        </div>
+      </div>
+
+      {/* NEP 2020 Compliance Banner */}
+      <div className="card" style={{ background: 'var(--color-info-subtle)', borderLeft: '4px solid var(--color-primary)' }}>
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-primary)' }}>
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm" style={{ color: 'var(--color-primary)' }}>NEP 2020 Compliant</h3>
+            <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+              Cross-departmental enrollment tracking enables flexible learning paths and interdisciplinary education as per National Education Policy 2020.
+            </p>
+          </div>
+        </div>
+      </div>
+
     </div>
   )
 }

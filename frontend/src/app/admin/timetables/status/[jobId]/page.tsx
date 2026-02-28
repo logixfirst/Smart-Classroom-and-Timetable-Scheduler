@@ -97,7 +97,7 @@ const CSS_KEYFRAMES = `
 .page-bg {
   height: 100vh;
   overflow: hidden;
-  background: #F8FAFF;
+  background: var(--color-bg-page);
   background-image: radial-gradient(circle, #CBD5E1 1px, transparent 1px);
   background-size: 24px 24px;
   display: flex;
@@ -155,15 +155,15 @@ const CSS_KEYFRAMES = `
   box-shadow: 0 0 0 4px var(--track-color, #DBEAFE);
   animation: nodePulse 2s ease-in-out infinite;
 }
-.stage-node-idle { background-color: transparent; border-color: #E2E8F0; color: #94A3B8; }
-.stage-label-active { font-size: 11px; max-width: 68px; color: #0F172A; font-weight: 600; }
-.stage-label-idle   { font-size: 11px; max-width: 68px; color: #94A3B8; font-weight: 400; }
+.stage-node-idle { background-color: transparent; border-color: var(--color-border); color: var(--color-text-muted); }
+.stage-label-active { font-size: 11px; max-width: 68px; color: var(--color-text-primary); font-weight: 600; }
+.stage-label-idle   { font-size: 11px; max-width: 68px; color: var(--color-text-muted); font-weight: 400; }
 /* Connector lines */
 .connector-filled { height: 2px; background-color: var(--bar-color, #2563EB); }
 .connector-dashed {
   height: 2px;
   background-image: repeating-linear-gradient(
-    90deg, #E2E8F0 0, #E2E8F0 4px, transparent 4px, transparent 8px
+    90deg, var(--color-border) 0, var(--color-border) 4px, transparent 4px, transparent 8px
   );
 }
 /* Connection status dot */
@@ -418,30 +418,32 @@ export default function TimetableStatusPage() {
   if (error && reconnectAttempt > 5) {
     return (
       <div className={`page-bg ${dmSans.className}`}>
-        <div className="max-w-[680px] w-full bg-white border border-[#E2E8F0] rounded-2xl text-center modal-card modal-card--in">
-          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F172A] font-medium mb-6 -ml-1 transition-colors">
+        <div className="max-w-[680px] w-full rounded-2xl text-center modal-card modal-card--in" style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)' }}>
+          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] font-medium mb-6 -ml-1 transition-colors" style={{ color: 'var(--color-text-secondary)' }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Back to Timetables
           </button>
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: 'var(--color-danger-subtle)' }}>
+            <svg className="w-8 h-8" style={{ color: 'var(--color-danger)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h2 className={`${dmSerifDisplay.className} text-[24px] text-[#0F172A] mb-3`}>
+          <h2 className={`${dmSerifDisplay.className} text-[24px] mb-3`} style={{ color: 'var(--color-text-primary)' }}>
             Connection Lost
           </h2>
-          <p className="text-[#64748B] text-[15px] mb-8 max-w-xs mx-auto">{error}</p>
+          <p className="text-[15px] mb-8 max-w-xs mx-auto" style={{ color: 'var(--color-text-secondary)' }}>{error}</p>
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold rounded-xl text-sm transition-colors"
+              className="px-6 py-2.5 text-white font-semibold rounded-xl text-sm transition-colors"
+              style={{ background: 'var(--color-primary)' }}
             >
               Try Again
             </button>
             <button
               onClick={() => router.push('/admin/timetables')}
-              className="px-6 py-2.5 border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] font-semibold rounded-xl text-sm transition-colors"
+              className="px-6 py-2.5 font-semibold rounded-xl text-sm transition-colors"
+              style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
             >
               Back to Timetables
             </button>
@@ -458,10 +460,10 @@ export default function TimetableStatusPage() {
       <div className={`page-bg ${dmSans.className}`}>
         <div className="center-fade">
           <GoogleSpinner size={48} className="mx-auto mb-6" />
-          <p className="text-[#0F172A] font-semibold text-[17px] mb-1">
+          <p className="font-semibold text-[17px] mb-1" style={{ color: 'var(--color-text-primary)' }}>
             {reconnectAttempt > 0 ? 'Reconnecting...' : 'Connecting...'}
           </p>
-          <p className="text-[#64748B] text-sm">
+          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
             {reconnectAttempt > 0 ? `Attempt ${reconnectAttempt} of 5` : 'Please wait a moment'}
           </p>
         </div>
@@ -474,8 +476,8 @@ export default function TimetableStatusPage() {
   if (progress.status === 'completed') {
     return (
       <div className={`page-bg ${dmSans.className}`}>
-        <div className="max-w-[680px] w-full bg-white border border-[#E2E8F0] rounded-2xl text-center modal-card modal-card--in">
-          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F172A] font-medium mb-4 -ml-1 transition-colors">
+        <div className="max-w-[680px] w-full rounded-2xl text-center modal-card modal-card--in" style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)' }}>
+          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] font-medium mb-4 -ml-1 transition-colors" style={{ color: 'var(--color-text-secondary)' }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Back to Timetables
           </button>
@@ -488,10 +490,10 @@ export default function TimetableStatusPage() {
               className="check-path"
             />
           </svg>
-          <h2 className={`${dmSerifDisplay.className} text-[28px] text-[#0F172A] mb-3`}>
+          <h2 className={`${dmSerifDisplay.className} text-[28px] mb-3`} style={{ color: 'var(--color-text-primary)' }}>
             Timetable Ready
           </h2>
-          <p className="text-[#64748B] text-[15px] mb-8">
+          <p className="text-[15px] mb-8" style={{ color: 'var(--color-text-secondary)' }}>
             {countdown > 0
               ? `Preparing timetable data\u2026 ${countdown}`
               : 'Opening review page\u2026'}
@@ -501,7 +503,8 @@ export default function TimetableStatusPage() {
           </div>
           <button
             onClick={() => router.push(`/admin/timetables/${jobId}/review`)}
-            className="px-8 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold rounded-xl text-sm transition-colors"
+            className="px-8 py-3 text-white font-semibold rounded-xl text-sm transition-colors"
+            style={{ background: 'var(--color-primary)' }}
           >
             View Timetables
           </button>
@@ -518,30 +521,32 @@ export default function TimetableStatusPage() {
       : 'Something went wrong while building the timetable. Please try again.'
     return (
       <div className={`page-bg ${dmSans.className}`}>
-        <div className="max-w-[680px] w-full bg-white border border-[#E2E8F0] rounded-2xl text-center modal-card modal-card--in">
-          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F172A] font-medium mb-6 -ml-1 transition-colors">
+        <div className="max-w-[680px] w-full rounded-2xl text-center modal-card modal-card--in" style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)' }}>
+          <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] font-medium mb-6 -ml-1 transition-colors" style={{ color: 'var(--color-text-secondary)' }}>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Back to Timetables
           </button>
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: 'var(--color-danger-subtle)' }}>
+            <svg className="w-8 h-8" style={{ color: 'var(--color-danger)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h2 className={`${dmSerifDisplay.className} text-[28px] text-[#0F172A] mb-3`}>
+          <h2 className={`${dmSerifDisplay.className} text-[28px] mb-3`} style={{ color: 'var(--color-text-primary)' }}>
             Generation Failed
           </h2>
-          <p className="text-[#64748B] text-[15px] mb-8 max-w-sm mx-auto">{errorMsg}</p>
+          <p className="text-[15px] mb-8 max-w-sm mx-auto" style={{ color: 'var(--color-text-secondary)' }}>{errorMsg}</p>
           <div className="flex gap-3 justify-center">
             <button
               onClick={() => router.push('/admin/timetables/new')}
-              className="px-6 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold rounded-xl text-sm transition-colors"
+              className="px-6 py-2.5 text-white font-semibold rounded-xl text-sm transition-colors"
+              style={{ background: 'var(--color-primary)' }}
             >
               Try Again
             </button>
             <button
               onClick={() => router.push('/admin/timetables')}
-              className="px-6 py-2.5 border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] font-semibold rounded-xl text-sm transition-colors"
+              className="px-6 py-2.5 font-semibold rounded-xl text-sm transition-colors"
+              style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
             >
               Back to Timetables
             </button>
@@ -561,18 +566,19 @@ export default function TimetableStatusPage() {
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Back to Timetables
           </button>
-          <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: 'var(--color-warning-subtle)' }}>
+            <svg className="w-8 h-8" style={{ color: 'var(--color-warning)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
             </svg>
           </div>
-          <h2 className={`${dmSerifDisplay.className} text-[28px] text-[#0F172A] mb-3`}>
+          <h2 className={`${dmSerifDisplay.className} text-[28px] mb-3`} style={{ color: 'var(--color-text-primary)' }}>
             Generation Cancelled
           </h2>
-          <p className="text-[#64748B] text-[15px] mb-8">The timetable generation was stopped.</p>
+          <p className="text-[15px] mb-8" style={{ color: 'var(--color-text-secondary)' }}>The timetable generation was stopped.</p>
           <button
             onClick={() => router.push('/admin/timetables')}
-            className="px-8 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-semibold rounded-xl text-sm transition-colors"
+            className="px-8 py-3 text-white font-semibold rounded-xl text-sm transition-colors"
+            style={{ background: 'var(--color-primary)' }}
           >
             Back to Timetables
           </button>
@@ -599,26 +605,26 @@ export default function TimetableStatusPage() {
       <div className="fixed top-0 left-0 right-0 h-32 pointer-events-none top-gradient" />
 
       {/* Main card */}
-      <div className="relative max-w-[680px] w-full bg-white border border-[#E2E8F0] rounded-2xl modal-card modal-card--in1">
+      <div className="relative max-w-[680px] w-full rounded-2xl modal-card modal-card--in1" style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)' }}>
 
         {/* Back navigation */}
-        <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F172A] font-medium mb-5 -ml-1 transition-colors fu-100">
+        <button onClick={() => router.push('/admin/timetables')} className="flex items-center gap-1.5 text-[13px] font-medium mb-5 -ml-1 transition-colors fu-100" style={{ color: 'var(--color-text-secondary)' }}>
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 3L5 8l5 5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           Back to Timetables
         </button>
 
         {/* Institution badge */}
-        <p className="text-[11px] font-medium uppercase tracking-widest text-[#64748B] mb-2 fu-150">
+        <p className="text-[11px] font-medium uppercase tracking-widest mb-2 fu-150" style={{ color: 'var(--color-text-muted)' }}>
           Banaras Hindu University
         </p>
 
         {/* Heading — DM Sans (parent font), bold */}
-        <h1 className="text-[26px] font-bold text-[#0F172A] mb-1 fu-200">
+        <h1 className={`text-[26px] font-bold mb-1 fu-200`} style={{ color: 'var(--color-text-primary)' }}>
           Building Your Timetable
         </h1>
 
         {/* Subtitle */}
-        <p className="text-[15px] text-[#64748B] mb-5 fu-250">
+        <p className="text-[15px] mb-5 fu-250" style={{ color: 'var(--color-text-secondary)' }}>
           {subtitle}
         </p>
 
@@ -644,10 +650,10 @@ export default function TimetableStatusPage() {
 
         {/* ETA + active stage description */}
         <div className="mt-3 flex items-start justify-between gap-6 fu-400">
-          <p className="text-[13px] text-[#64748B] italic leading-snug">
+          <p className="text-[13px] italic leading-snug" style={{ color: 'var(--color-text-secondary)' }}>
             {activeStage.description}
           </p>
-          <p className="text-[14px] text-[#64748B] whitespace-nowrap shrink-0">
+          <p className="text-[14px] whitespace-nowrap shrink-0" style={{ color: 'var(--color-text-secondary)' }}>
             {formatETADisplay(smoothETA)}
           </p>
         </div>
@@ -692,7 +698,7 @@ export default function TimetableStatusPage() {
         </div>
 
         {/* Separator */}
-        <div className="h-px bg-[#E2E8F0] mb-6" />
+        <div className="h-px mb-6" style={{ background: 'var(--color-border)' }} />
 
         {/* Footer: connection dot + cancel */}
         <div className="flex items-center justify-between flex-wrap gap-3 fu-500">
@@ -701,7 +707,7 @@ export default function TimetableStatusPage() {
             <div
               className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? 'status-dot-live' : reconnectAttempt > 0 ? 'status-dot-warn' : 'status-dot-err'}`}
             />
-            <span className="text-[11px] text-[#64748B]">
+            <span className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
               {isConnected ? 'Live' : reconnectAttempt > 0 ? 'Reconnecting...' : 'Offline'}
             </span>
           </div>
@@ -710,23 +716,26 @@ export default function TimetableStatusPage() {
           {!showCancelConfirm ? (
             <button
               onClick={() => setShowCancelConfirm(true)}
-              className="text-[13px] font-medium text-red-400 hover:text-red-600 border border-red-200 hover:border-red-300 px-4 py-2 rounded-xl transition-colors"
+              className="text-[13px] font-medium border px-4 py-2 rounded-xl transition-colors"
+              style={{ color: 'var(--color-danger-text)', borderColor: 'var(--color-danger)' }}
             >
               Cancel Generation
             </button>
           ) : (
             <div className="flex items-center gap-3 flex-wrap justify-end">
-              <span className="text-[13px] text-[#64748B]">Are you sure? This cannot be undone.</span>
+              <span className="text-[13px]" style={{ color: 'var(--color-text-secondary)' }}>Are you sure? This cannot be undone.</span>
               <button
                 onClick={handleCancel}
                 disabled={isCancelling}
-                className="text-[13px] font-semibold text-white bg-red-500 hover:bg-red-600 disabled:opacity-50 px-4 py-2 rounded-xl transition-colors"
+                className="text-[13px] font-semibold text-white disabled:opacity-50 px-4 py-2 rounded-xl transition-colors"
+                style={{ background: 'var(--color-danger)' }}
               >
                 {isCancelling ? 'Stopping...' : 'Yes, stop'}
               </button>
               <button
                 onClick={() => setShowCancelConfirm(false)}
-                className="text-[13px] font-medium text-[#64748B] hover:text-[#0F172A] px-3 py-2 rounded-xl transition-colors"
+                className="text-[13px] font-medium px-3 py-2 rounded-xl transition-colors"
+                style={{ color: 'var(--color-text-secondary)' }}
               >
                 Keep going
               </button>
