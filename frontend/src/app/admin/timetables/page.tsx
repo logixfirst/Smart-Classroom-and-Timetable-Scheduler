@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { TimetableListSkeleton } from '@/components/LoadingSkeletons'
+import { useProgress } from '@/hooks/useProgress'
 import type { TimetableListItem } from '@/types/timetable'
 
 interface RunningJob {
@@ -18,7 +19,100 @@ interface RunningJob {
   semester?: number
 }
 
-// ── Status chip — semantic CSS-var colours, no hardcoded hex ─────────────────
+// ── Running job row — subscribes to SSE for real-time progress + ETA ─────────
+const STAGE_LABELS: Record<string, string> = {
+  loading:        'Reading data',
+  clustering:     'Organising courses',
+  cpsat_solving:  'Building schedule',
+  ga_optimization:'Refining timetable',
+  rl_refinement:  'Final polish',
+}
+
+function formatETA(seconds: number | null): string {
+  if (seconds === null || seconds < 5) return 'Almost done…'
+  if (seconds < 60) return `~${Math.round(seconds)}s left`
+  return `~${Math.ceil(seconds / 60)}m left`
+}
+
+function RunningJobRow({ job, onNavigate }: { job: RunningJob; onNavigate: () => void }) {
+  const { progress, isConnected } = useProgress(job.job_id)
+
+  const pct         = progress?.overall_progress ?? 0
+  const stage       = progress?.stage ? (STAGE_LABELS[progress.stage] ?? progress.stage) : 'Connecting…'
+  const eta         = progress?.eta_seconds ?? null
+  const hasProgress = pct > 0
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '12px 14px',
+      background: 'var(--color-bg-page)',
+      border: '1px solid var(--color-border)',
+      borderRadius: 'var(--radius-md)',
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* Identity row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {job.department ?? 'All Departments'}
+          </span>
+          {job.academic_year && job.semester && (
+            <span style={{
+              fontSize: 11, color: 'var(--color-text-muted)',
+              background: 'var(--color-bg-surface-2)',
+              padding: '1px 7px', borderRadius: 4,
+              flexShrink: 0, fontWeight: 500,
+            }}>
+              {job.academic_year} · Sem {job.semester}
+            </span>
+          )}
+        </div>
+
+        {/* Stage + ETA row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+          <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+            {stage}
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', flexShrink: 0, marginLeft: 8 }}>
+            {hasProgress
+              ? <>{Math.round(pct)}% &nbsp;<span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>{formatETA(eta)}</span></>
+              : <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>{isConnected ? formatETA(eta) : 'Connecting…'}</span>
+            }
+          </span>
+        </div>
+
+        {/* Progress bar — blue fill + shimmer over it (status page pattern); shimmer-only while connecting */}
+        <div style={{ position: 'relative', height: 4, background: 'var(--color-bg-surface-3)', borderRadius: 2, overflow: 'hidden' }}>
+          {hasProgress ? (
+            <>
+              {/* Blue fill */}
+              <div style={{
+                position: 'absolute', top: 0, left: 0, height: '100%',
+                width: `${pct}%`, background: 'var(--color-primary)',
+                borderRadius: 2, transition: 'width 600ms ease',
+              }} />
+              {/* Shimmer clipped to fill width — sweeps only over the blue bar */}
+              <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: `${pct}%`, overflow: 'hidden', borderRadius: 2 }}>
+                <div className="animate-shimmer" style={{ position: 'absolute', inset: 0 }} />
+              </div>
+            </>
+          ) : (
+            <div className="animate-shimmer" style={{ height: '100%', borderRadius: 2 }} />
+          )}
+        </div>
+      </div>
+
+      <button
+        onClick={onNavigate}
+        className="btn-primary"
+        style={{ fontSize: 12, height: 32, padding: '0 14px', flexShrink: 0 }}
+      >
+        View Progress
+      </button>
+    </div>
+  )
+}
+
 const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; label: string }> = {
   approved:  { bg: 'var(--color-success-subtle)', text: 'var(--color-success-text)', dot: 'var(--color-success)', label: 'Approved'  },
   completed: { bg: 'var(--color-success-subtle)', text: 'var(--color-success-text)', dot: 'var(--color-success)', label: 'Completed' },
@@ -303,54 +397,18 @@ export default function AdminTimetablesPage() {
               </h3>
             </div>
             <p className="card-description">
-              AI engine is building your timetable — typically takes 1–3 minutes
+              AI engine is building your timetable
             </p>
           </div>
 
-          {/* Job rows */}
+          {/* Job rows — each subscribes to its own SSE stream */}
           <div className="space-y-3">
             {runningJobs.map(job => (
-              <div key={job.job_id} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '12px 14px',
-                background: 'var(--color-bg-page)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-              }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {/* Identity */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {job.department ?? 'All Departments'}
-                    </span>
-                    {job.academic_year && job.semester && (
-                      <span style={{
-                        fontSize: 11, color: 'var(--color-text-muted)',
-                        background: 'var(--color-bg-surface-2)',
-                        padding: '1px 7px', borderRadius: 4,
-                        flexShrink: 0, fontWeight: 500,
-                      }}>
-                        {job.academic_year} · Sem {job.semester}
-                      </span>
-                    )}
-                  </div>
-                  {/* Status text */}
-                  <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', margin: '0 0 8px' }}>
-                    {job.message}
-                  </p>
-                  {/* Indeterminate shimmer — no track, just the sweep */}
-                  <div style={{ height: 4, borderRadius: 2, overflow: 'hidden' }}>
-                    <div className="animate-shimmer" style={{ height: '100%', borderRadius: 2 }} />
-                  </div>
-                </div>
-                <button
-                  onClick={() => router.push(`/admin/timetables/status/${job.job_id}`)}
-                  className="btn-primary"
-                  style={{ fontSize: 12, height: 32, padding: '0 14px', flexShrink: 0 }}
-                >
-                  View Progress
-                </button>
-              </div>
+              <RunningJobRow
+                key={job.job_id}
+                job={job}
+                onNavigate={() => router.push(`/admin/timetables/status/${job.job_id}`)}
+              />
             ))}
           </div>
         </div>
