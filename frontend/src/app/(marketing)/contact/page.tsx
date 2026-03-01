@@ -48,7 +48,7 @@ export default function ContactPage() {
             </div>
 
             {/* Form */}
-            <div style={{ background: 'white', borderRadius: '20px', border: '1px solid rgba(27,58,92,0.08)', padding: '32px', boxShadow: '0 4px 24px rgba(27,58,92,0.06)' }}>
+            <div style={{ background: 'white', borderRadius: '20px', border: '1px solid rgba(21,88,214,0.08)', padding: '32px', boxShadow: '0 4px 24px rgba(21,88,214,0.06)' }}>
               <DemoRequestForm />
             </div>
           </div>
@@ -57,13 +57,13 @@ export default function ContactPage() {
           <div className="lg:col-span-2 flex flex-col gap-6">
 
             {/* Contact info */}
-            <div style={{ background: 'white', borderRadius: '16px', border: '1px solid rgba(27,58,92,0.08)', padding: '28px' }}>
+            <div style={{ background: 'white', borderRadius: '16px', border: '1px solid rgba(21,88,214,0.08)', padding: '28px' }}>
               <h3 style={{ fontFamily: 'Poppins, sans-serif', fontSize: '17px', fontWeight: 600, color: 'var(--cadence-ink)', marginBottom: '20px' }}>
                 Get in touch
               </h3>
               <div className="flex flex-col gap-4">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(42,157,143,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(26,115,232,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Mail size={16} color="var(--cadence-teal)" />
                   </div>
                   <div>
@@ -74,7 +74,7 @@ export default function ContactPage() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(42,157,143,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(26,115,232,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Phone size={16} color="var(--cadence-teal)" />
                   </div>
                   <div>
@@ -88,7 +88,7 @@ export default function ContactPage() {
             </div>
 
             {/* Response time */}
-            <div style={{ background: 'rgba(42,157,143,0.06)', border: '1px solid rgba(42,157,143,0.18)', borderRadius: '14px', padding: '20px 24px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ background: 'rgba(26,115,232,0.06)', border: '1px solid rgba(26,115,232,0.18)', borderRadius: '14px', padding: '20px 24px', display: 'flex', alignItems: 'center', gap: '14px' }}>
               <Clock size={20} color="var(--cadence-teal)" style={{ flexShrink: 0 }} />
               <div>
                 <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', fontWeight: 600, color: 'var(--cadence-teal)', marginBottom: '2px' }}>
@@ -101,7 +101,7 @@ export default function ContactPage() {
             </div>
 
             {/* Mini testimonial */}
-            <div style={{ background: 'linear-gradient(135deg, rgba(27,58,92,0.04), rgba(42,157,143,0.06))', border: '1px solid rgba(27,58,92,0.08)', borderRadius: '14px', padding: '24px' }}>
+            <div style={{ background: 'linear-gradient(135deg, rgba(21,88,214,0.04), rgba(26,115,232,0.06))', border: '1px solid rgba(21,88,214,0.08)', borderRadius: '14px', padding: '24px' }}>
               <p style={{ fontFamily: 'Poppins, sans-serif', fontSize: '14px', fontStyle: 'italic', color: 'var(--cadence-ink)', lineHeight: 1.6, marginBottom: '14px' }}>
                 &ldquo;The demo was incredibly tailored — they loaded our actual semester data
                 and generated a real schedule live on the call. We signed up the same day.&rdquo;
@@ -113,7 +113,7 @@ export default function ContactPage() {
             </div>
 
             {/* Security note */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 20px', background: 'white', border: '1px solid rgba(27,58,92,0.08)', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 20px', background: 'white', border: '1px solid rgba(21,88,214,0.08)', borderRadius: '12px' }}>
               <Shield size={16} color="var(--cadence-slate)" style={{ flexShrink: 0 }} />
               <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', color: 'var(--cadence-slate)', lineHeight: 1.5 }}>
                 Your data is safe. We never share contact information with third parties.

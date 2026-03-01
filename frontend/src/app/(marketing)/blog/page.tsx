@@ -72,7 +72,7 @@ export default function BlogIndexPage() {
   return (
     <div style={{ background: 'var(--cadence-off-white)' }}>
       {/* Hero */}
-      <section style={{ background: 'white', borderBottom: '1px solid rgba(27,58,92,0.08)', padding: '72px 24px 56px', textAlign: 'center' }}>
+      <section style={{ background: 'white', borderBottom: '1px solid rgba(21,88,214,0.08)', padding: '72px 24px 56px', textAlign: 'center' }}>
         <span className="mk-eyebrow">The Cadence Blog</span>
         <h1 className="mk-h1" style={{ margin: '8px auto 16px', maxWidth: '600px' }}>
           Insights on academic scheduling and AI education.
@@ -99,7 +99,7 @@ export default function BlogIndexPage() {
               <div style={{ padding: '32px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                   <span className={`mk-tag ${featured.tagClass}`}>{featured.tag}</span>
-                  <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 600, color: 'rgba(42,157,143,0.8)', background: 'rgba(42,157,143,0.08)', padding: '2px 10px', borderRadius: '9999px' }}>
+                  <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 600, color: 'rgba(26,115,232,0.9)', background: 'rgba(26,115,232,0.08)', padding: '2px 10px', borderRadius: '9999px' }}>
                     Featured
                   </span>
                 </div>
@@ -144,7 +144,7 @@ export default function BlogIndexPage() {
                 <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', color: 'var(--cadence-slate)', lineHeight: 1.6, marginBottom: '16px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                   {article.excerpt}
                 </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', borderTop: '1px solid rgba(27,58,92,0.06)', paddingTop: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', borderTop: '1px solid rgba(21,88,214,0.06)', paddingTop: '12px' }}>
                   <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', color: 'var(--cadence-slate)' }}>{article.author}</span>
                   <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', color: 'var(--cadence-slate)' }}>·</span>
                   <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', color: 'var(--cadence-slate)' }}>{article.date}</span>

@@ -8,9 +8,9 @@ export const metadata: Metadata = {
 }
 
 const TEAM = [
-  { name: 'Aryan Sharma',    role: 'AI & Algorithms',         initials: 'AS', color: '#1B3A5C' },
-  { name: 'Priya Menon',     role: 'Backend Engineering',     initials: 'PM', color: '#2A9D8F' },
-  { name: 'Rohan Iyer',      role: 'Frontend Engineering',    initials: 'RI', color: '#1E4D6B' },
+  { name: 'Aryan Sharma',    role: 'AI & Algorithms',         initials: 'AS', color: '#1558D6' },
+  { name: 'Priya Menon',     role: 'Backend Engineering',     initials: 'PM', color: '#1A73E8' },
+  { name: 'Rohan Iyer',      role: 'Frontend Engineering',    initials: 'RI', color: '#1967D2' },
   { name: 'Kavya Nair',      role: 'Product & UX',            initials: 'KN', color: '#0369a1' },
   { name: 'Dev Patel',       role: 'Infrastructure & DevOps', initials: 'DP', color: '#0f766e' },
   { name: 'Aisha Krishnan',  role: 'Data Science & RL',       initials: 'AK', color: '#6d28d9' },
@@ -48,15 +48,15 @@ export default function CompanyPage() {
     <div style={{ background: 'var(--cadence-off-white)' }}>
 
       {/* Mission */}
-      <section style={{ background: 'linear-gradient(135deg, #0F1C2E 0%, #1B3A5C 100%)', padding: '80px 24px 72px' }}>
+      <section style={{ background: '#e8f0fe', padding: '80px 24px 72px' }}>
         <div style={{ maxWidth: '760px', margin: '0 auto', textAlign: 'center' }}>
-          <span className="mk-eyebrow" style={{ background: 'rgba(42,157,143,0.2)', borderColor: 'rgba(42,157,143,0.4)', color: '#3BBFB0' }}>
+          <span className="mk-eyebrow" style={{ background: 'rgba(26,115,232,0.12)', borderColor: 'rgba(26,115,232,0.3)', color: '#1A73E8' }}>
             Our Mission
           </span>
-          <h1 className="mk-h1-white" style={{ marginTop: '8px', marginBottom: '24px' }}>
+          <h1 className="mk-h1" style={{ marginTop: '8px', marginBottom: '24px', color: '#1558D6' }}>
             Scheduling should never be the obstacle to learning.
           </h1>
-          <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '18px', color: 'rgba(255,255,255,0.72)', lineHeight: 1.7 }}>
+          <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '18px', color: '#5F6368', lineHeight: 1.7 }}>
             We built Cadence because we watched academic administrators spend the first two weeks
             of every semester fighting spreadsheets instead of focusing on students.
             We believed a better way was possible. It was.
@@ -135,11 +135,11 @@ export default function CompanyPage() {
           <h2 className="mk-h2" style={{ textAlign: 'center', marginBottom: '48px' }}>How we got here</h2>
           <div style={{ position: 'relative', paddingLeft: '32px' }}>
             {/* Vertical line */}
-            <div style={{ position: 'absolute', left: '8px', top: '8px', bottom: '8px', width: '2px', background: 'rgba(42,157,143,0.2)', borderRadius: '2px' }} />
+            <div style={{ position: 'absolute', left: '8px', top: '8px', bottom: '8px', width: '2px', background: 'rgba(26,115,232,0.2)', borderRadius: '2px' }} />
             {TIMELINE.map((item, i) => (
               <div key={i} style={{ position: 'relative', paddingBottom: i < TIMELINE.length - 1 ? '36px' : 0 }}>
                 {/* Dot */}
-                <div style={{ position: 'absolute', left: '-28px', top: '6px', width: '12px', height: '12px', borderRadius: '50%', background: 'var(--cadence-teal)', border: '3px solid white', boxShadow: '0 0 0 2px rgba(42,157,143,0.3)' }} />
+                <div style={{ position: 'absolute', left: '-28px', top: '6px', width: '12px', height: '12px', borderRadius: '50%', background: 'var(--cadence-teal)', border: '3px solid white', boxShadow: '0 0 0 2px rgba(26,115,232,0.3)' }} />
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '6px', flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', fontWeight: 700, color: 'var(--cadence-teal)', letterSpacing: '0.04em' }}>
                     {item.year}
@@ -164,7 +164,7 @@ export default function CompanyPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {VALUES.map(v => (
               <div key={v.title} className="mk-feature-card" style={{ textAlign: 'center' }}>
-                <div style={{ width: '52px', height: '52px', borderRadius: '16px', background: 'rgba(42,157,143,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                <div style={{ width: '52px', height: '52px', borderRadius: '16px', background: 'rgba(26,115,232,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
                   {v.icon}
                 </div>
                 <h3 className="mk-h3" style={{ fontSize: '20px', marginBottom: '12px' }}>{v.title}</h3>
@@ -176,13 +176,13 @@ export default function CompanyPage() {
       </section>
 
       {/* CTA */}
-      <section style={{ background: 'linear-gradient(135deg, #1B3A5C 0%, #2A9D8F 100%)', padding: '72px 24px', textAlign: 'center' }}>
-        <h2 className="mk-h2-white" style={{ marginBottom: '16px' }}>Want to work with us?</h2>
-        <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '18px', color: 'rgba(255,255,255,0.75)', marginBottom: '32px' }}>
+      <section style={{ background: '#e8f0fe', padding: '72px 24px', textAlign: 'center' }}>
+        <h2 className="mk-h2" style={{ marginBottom: '16px', color: '#1558D6' }}>Want to work with us?</h2>
+        <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '18px', color: '#5F6368', marginBottom: '32px' }}>
           We&apos;re always looking for people who care about education and love hard problems.
         </p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <Link href="/contact" className="mk-btn-primary" style={{ background: 'white', color: 'var(--cadence-navy)' }}>
+          <Link href="/contact" className="mk-btn-primary">
             Get in Touch <ArrowRight size={16} />
           </Link>
         </div>

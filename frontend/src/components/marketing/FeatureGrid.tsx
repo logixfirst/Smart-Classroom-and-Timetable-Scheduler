@@ -35,9 +35,9 @@ function FeatureRow({ eyebrow, heading, body, bullets, imageSide, imagePlacehold
   const imageBlock = (
     <div
       style={{
-        background:   'linear-gradient(135deg, var(--cadence-off-white) 0%, rgba(42,157,143,0.06) 100%)',
+        background:   'linear-gradient(135deg, var(--cadence-off-white) 0%, rgba(26,115,232,0.06) 100%)',
         borderRadius: '20px',
-        border:       '1px solid rgba(27,58,92,0.08)',
+        border:       '1px solid rgba(21,88,214,0.08)',
         minHeight:    '280px',
         display:      'flex',
         alignItems:   'center',
@@ -84,8 +84,8 @@ function ConflictMock() {
               borderRadius: '8px',
               padding:      '10px 8px',
               textAlign:    'center',
-              background:   c.ok ? 'rgba(42,157,143,0.10)' : 'rgba(239,68,68,0.10)',
-              border:       `1px solid ${c.ok ? 'rgba(42,157,143,0.3)' : 'rgba(239,68,68,0.4)'}`,
+              background:   c.ok ? 'rgba(26,115,232,0.10)' : 'rgba(239,68,68,0.10)',
+              border:       `1px solid ${c.ok ? 'rgba(26,115,232,0.3)' : 'rgba(239,68,68,0.4)'}`,
               fontFamily:   'Inter, sans-serif',
               fontSize:     '11px',
               fontWeight:   600,
@@ -102,9 +102,9 @@ function ConflictMock() {
           </div>
         ))}
       </div>
-      <div style={{ marginTop: '16px', background: 'rgba(42,157,143,0.08)', border: '1px solid rgba(42,157,143,0.2)', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <CheckCircle2 size={14} color="#2A9D8F" />
-        <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', color: '#2A9D8F', fontWeight: 600 }}>0 conflicts detected — guaranteed</span>
+      <div style={{ marginTop: '16px', background: 'rgba(26,115,232,0.08)', border: '1px solid rgba(26,115,232,0.2)', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <CheckCircle2 size={14} color="#1A73E8" />
+        <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', color: '#1A73E8', fontWeight: 600 }}>0 conflicts detected — guaranteed</span>
       </div>
     </div>
   )
@@ -123,12 +123,12 @@ function PreferencesMock() {
         FACULTY PREFERENCES
       </div>
       {prefs.map(p => (
-        <div key={p.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(27,58,92,0.06)' }}>
+        <div key={p.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(21,88,214,0.06)' }}>
           <div>
             <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 600, color: 'var(--cadence-ink)' }}>{p.name}</div>
             <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', color: 'var(--cadence-slate)' }}>{p.pref}</div>
           </div>
-          <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: '16px', fontWeight: 700, color: '#2A9D8F' }}>{p.score}%</div>
+          <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: '16px', fontWeight: 700, color: '#1A73E8' }}>{p.score}%</div>
         </div>
       ))}
       <div style={{ marginTop: '12px', textAlign: 'center', fontFamily: 'Inter, sans-serif', fontSize: '11px', color: 'var(--cadence-slate)' }}>
@@ -148,7 +148,7 @@ function SubstitutionMock() {
         { name: 'Prof. K. Iyer',  match: 'Subject expert', conf: 'High',   color: '#16a34a' },
         { name: 'Dr. V. Rao',     match: 'Workload OK',     conf: 'Medium', color: '#ca8a04' },
       ].map(s => (
-        <div key={s.name} style={{ background: 'white', border: '1px solid rgba(27,58,92,0.08)', borderRadius: '10px', padding: '14px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div key={s.name} style={{ background: 'white', border: '1px solid rgba(21,88,214,0.08)', borderRadius: '10px', padding: '14px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 600, color: 'var(--cadence-ink)' }}>{s.name}</div>
             <div style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', color: 'var(--cadence-slate)' }}>{s.match}</div>
@@ -158,7 +158,7 @@ function SubstitutionMock() {
           </div>
         </div>
       ))}
-      <button style={{ marginTop: '8px', width: '100%', padding: '10px', background: 'linear-gradient(135deg,#1B3A5C,#2A9D8F)', color: 'white', border: 'none', borderRadius: '8px', fontFamily: 'Inter, sans-serif', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+      <button style={{ marginTop: '8px', width: '100%', padding: '10px', background: '#1A73E8', color: 'white', border: 'none', borderRadius: '8px', fontFamily: 'Inter, sans-serif', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
         Assign Prof. K. Iyer →
       </button>
     </div>

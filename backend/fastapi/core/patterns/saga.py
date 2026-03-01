@@ -311,7 +311,7 @@ class TimetableGenerationSaga:
             if is_partial_success:
                 logger.info(f"[SAGA] ✅ PARTIAL_SUCCESS: CP-SAT completed, refinement cancelled")
                 # Keep the CP-SAT solution (feasible but not optimized)
-                await self._compensate(job_id)
+                await self._compensate(job_id, is_cancelled=True)
                 return {
                     'success': True,
                     'partial': True,
@@ -324,7 +324,7 @@ class TimetableGenerationSaga:
                 }
             else:
                 logger.warning(f"[SAGA] ❌ CANCELLED: No usable solution (cancelled before CP-SAT)")
-                await self._compensate(job_id)
+                await self._compensate(job_id, is_cancelled=True)
                 return {
                     'success': False,
                     'job_id': job_id,
@@ -870,20 +870,45 @@ class TimetableGenerationSaga:
         _ga_ticks_done = 0  # running counter for smooth progress 75%→90%
 
         for variant_idx in range(NUM_VARIANTS):
+            # ----------------------------------------------------------------
+            # CANCELLATION SAFE POINT — between GA variants.
+            # GA variants call optimizer.optimize() synchronously, blocking the
+            # event loop for the full variant duration (~3-5 s each at BHU scale).
+            # Without this check, a cancel request sat undetected for ALL remaining
+            # variants → 10-15 s latency.  Checking here drops it to <5 s worst case.
+            # The per-generation callback below drops it further to <0.5 s.
+            # ----------------------------------------------------------------
+            token.check_or_raise(f"ga_variant_{variant_idx}")
             try:
                 # Use a different random seed per variant for diversity
                 config = VARIANT_CONFIGS[variant_idx]
                 variant_seed = config['seed']
                 random.seed(variant_seed)
 
-                # Closure captures mutable counter via list wrapper
+                # Closure captures counter AND the cancellation token so the
+                # callback can raise CancellationError every 5 generations,
+                # giving <0.5 s cancel response inside a single variant.
+                # CancellationError propagates because optimizer.py now re-raises
+                # it instead of the generic `except Exception: pass` swallow.
                 _ticks_ref = [_ga_ticks_done]
 
                 def _ga_progress_callback(gen: int, total_gens: int, best_fitness: float,
                                           _ref=_ticks_ref, _tracker=tracker,
-                                          _total=_ga_total_ticks, _job_id=job_id):
-                    """Emit one SSE progress tick per GA generation (75%→90% range)."""
+                                          _total=_ga_total_ticks, _job_id=job_id,
+                                          _token=token, _vidx=variant_idx):
+                    """Emit one SSE progress tick per GA generation (75%→90% range).
+
+                    Also checks cancellation every 5 generations.  The check uses
+                    a synchronous Redis GET (same as all other token checks) which
+                    is safe here because this callback is called from the synchronous
+                    optimizer loop — no event loop interference.
+                    """
                     _ref[0] += 1
+                    # Per-generation cancellation: raises CancellationError which
+                    # propagates through optimizer._optimize_simple → _stage2b_ga
+                    # → saga.execute()'s CancellationError handler.
+                    if gen % 5 == 0:
+                        _token.check_or_raise(f"ga_variant_{_vidx}_gen_{gen}")
                     if _tracker is None:
                         return
                     # Map ticks into the GA stage's 75-90% window
@@ -895,7 +920,7 @@ class TimetableGenerationSaga:
                             stage='ga_optimization',
                             stage_progress=round(fraction * 100, 1),
                             overall_progress=round(overall, 2),
-                            meta={'variant': variant_idx + 1, 'generation': gen,
+                            meta={'variant': _vidx + 1, 'generation': gen,
                                   'best_fitness': round(best_fitness, 2)}
                         )
                     except Exception:
@@ -1328,10 +1353,20 @@ class TimetableGenerationSaga:
             if db_conn:
                 db_conn.close()
 
-    async def _compensate(self, job_id: str):
+    async def _compensate(self, job_id: str, is_cancelled: bool = False):
         """
         Compensation logic for failure/cancellation rollback.
-        Marks the GenerationJob as failed/cancelled in Django's DB.
+
+        Args:
+            job_id:       Generation job UUID.
+            is_cancelled: ``True`` when invoked from a ``CancellationError`` handler
+                          (user-initiated stop) — writes ``'cancelled'`` to the DB.
+                          ``False`` (default) for unhandled errors → ``'failed'``.
+
+        Google/Meta pattern: terminal status MUST accurately reflect the exit reason
+        so the admin dashboard, SSE listener, and Django polling endpoint all agree.
+        Showing ``'failed'`` for an intentional cancel confuses operators and
+        triggers false-positive alerting.
         """
         import json
         import os
@@ -1339,16 +1374,23 @@ class TimetableGenerationSaga:
         from psycopg2.extras import RealDictCursor
         from datetime import datetime, timezone
 
-        logger.warning(f"[SAGA] Compensating for job {job_id}")
+        terminal_status = 'cancelled' if is_cancelled else 'failed'
+        logger.warning(f"[SAGA] Compensating for job {job_id} (status={terminal_status})")
 
-        # Clear Redis flags
+        # Clear ALL ephemeral job keys in ONE pipeline round-trip.
+        # Previously only ``cancel:job:`` was deleted — ``start_time:job:`` and
+        # ``state:job:`` leaked for up to 1 hour causing stale admin-dashboard reads.
         if self.redis_client:
             try:
-                self.redis_client.delete(f"cancel:job:{job_id}")
+                pipe = self.redis_client.pipeline(transaction=False)
+                pipe.delete(f"cancel:job:{job_id}")
+                pipe.delete(f"start_time:job:{job_id}")
+                pipe.delete(f"state:job:{job_id}")
+                pipe.execute()
             except Exception:
                 pass
 
-        # Mark job as failed in Django DB
+        # Mark job in Django DB with the correct terminal status
         db_conn = None
         try:
             db_url = os.getenv(
@@ -1365,10 +1407,10 @@ class TimetableGenerationSaga:
                 cur.execute(
                     """
                     UPDATE generation_jobs
-                    SET status = 'failed', updated_at = %s
+                    SET status = %s, updated_at = %s
                     WHERE id = %s AND status NOT IN ('completed', 'approved')
                     """,
-                    (datetime.now(timezone.utc), job_id)
+                    (terminal_status, datetime.now(timezone.utc), job_id)
                 )
             db_conn.commit()
         except Exception as e:

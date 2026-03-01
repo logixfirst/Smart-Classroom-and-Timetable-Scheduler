@@ -90,7 +90,20 @@ def _init_conn(conn) -> None:
          a cursor.execute() raises "set_session cannot be used inside a
          transaction".
       2. statement_timeout is applied via SET after autocommit is enabled.
+
+    Defense-in-depth guard:
+      ``_ping_conn`` already rolls back the implicit SELECT-1 transaction, but
+      we add a second rollback here so this function is safe regardless of the
+      calling context (e.g. a connection returned from an interrupted query).
     """
+    # Step 0: close any open transaction before changing session parameters.
+    # psycopg2 raises ProgrammingError("set_session cannot be used inside a
+    # transaction") if conn.autocommit is changed while STATUS_BEGIN is active.
+    # conn.rollback() is a no-op when no transaction is in progress.
+    try:
+        conn.rollback()
+    except Exception:
+        pass
     # Step 1: flip autocommit BEFORE touching any cursor
     conn.autocommit = True
     # Step 2: set statement timeout (no open transaction — safe)
@@ -116,13 +129,37 @@ def _ping_conn(conn) -> bool:
     Used to validate pool connections before use.  A failed ping means the
     connection was closed by the server (common on Neon.tech / cloud PG after
     idle timeout) and must be discarded.
+
+    IMPORTANT: ``cursor.execute("SELECT 1")`` implicitly opens a transaction on
+    any connection where ``autocommit=False`` (the psycopg2 default for fresh
+    pool connections).  We **must** roll that transaction back before returning
+    so that the caller can call ``conn.autocommit = True`` in ``_init_conn``
+    without hitting::
+
+        psycopg2.ProgrammingError: set_session cannot be used inside a transaction
     """
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT 1")
+        # Roll back the implicit transaction opened by SELECT 1 on connections
+        # that are not yet in autocommit mode.  rollback() is a no-op when no
+        # transaction is active, so this is unconditionally safe.
+        if not conn.autocommit:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
         return True
     except Exception:
         return False
+
+
+# ---------------------------------------------------------------------------
+# Wake-up lock: ensures only ONE thread drives the cold-start reconnection
+# sequence after all pool connections are found stale (Neon scale-to-zero).
+# Other threads wait while the winner re-establishes connectivity.
+# ---------------------------------------------------------------------------
+_wake_lock = threading.Lock()
 
 
 def _reset_pool() -> None:
@@ -156,8 +193,8 @@ def _get_healthy_conn(
 
         psycopg2.OperationalError: SSL connection has been closed unexpectedly
 
-    This helper catches that at checkout time rather than deep inside a query,
-    discards the dead connection, and retries up to *max_retries* times.
+    Ping failures use exponential backoff (0.5 s, 1 s, 1.5 s …) so the caller
+    is not burned on rapid-fire retries while the DB is still waking up.
     """
     last_exc: Optional[Exception] = None
     for attempt in range(max_retries):
@@ -176,14 +213,16 @@ def _get_healthy_conn(
         # dead partway through a real query.
         if not _ping_conn(conn):
             logger.warning(
-                "[DB-POOL] Stale connection detected on attempt %d — discarding",
-                attempt + 1,
+                "[DB-POOL] Stale connection detected on attempt %d/%d — discarding",
+                attempt + 1, max_retries,
             )
             _on_conn_closed(conn)
             try:
                 pool.putconn(conn, close=True)
             except Exception:
                 pass
+            # Back off before the next checkout so the DB has time to wake.
+            time.sleep(0.5 * (attempt + 1))
             continue
 
         # Connection is alive — apply one-time session settings if needed.
@@ -198,6 +237,7 @@ def _get_healthy_conn(
                     pool.putconn(conn, close=True)
                 except Exception:
                     pass
+                time.sleep(0.5 * (attempt + 1))
                 continue
 
         return conn
@@ -205,6 +245,112 @@ def _get_healthy_conn(
     raise psycopg2.OperationalError(
         f"Could not obtain a healthy DB connection after {max_retries} attempts"
     ) from last_exc
+
+
+def _try_borrow_from_existing_pool() -> Optional[psycopg2.extensions.connection]:
+    """Attempt to borrow a healthy connection from the current global pool.
+
+    Returns a live connection, or None if the pool is absent / fully stale.
+    Called inside _wake_lock to reuse a pool that a previous winner rebuilt.
+    """
+    pool = _db_pool
+    if pool is None:
+        return None
+    try:
+        return _get_healthy_conn(pool, max_retries=2)
+    except psycopg2.OperationalError:
+        return None
+
+
+def _wake_db_and_get_conn() -> psycopg2.extensions.connection:
+    """Single-threaded DB cold-start wakeup (Neon scale-to-zero safe).
+
+    Neon.tech free tier suspends the compute after 5 minutes of inactivity
+    and takes 2–10 seconds to resume.  When all pool connections are stale,
+    every concurrent thread hits _borrow_conn at the same time.
+
+    Double-checked locking pattern:
+      1. ALL threads serialise on _wake_lock.
+      2. The FIRST thread (winner) resets the pool, rebuilds it, and waits
+         for the DB to accept connections (up to ~15 s with backoff).
+      3. Every SUBSEQUENT thread checks _db_pool on entry.  Because the
+         winner already rebuilt it, they borrow directly and return —
+         no second reset, no duplicate wakeup, no pool destruction.
+
+    This guarantees exactly ONE reset + rebuild cycle per cold-start event
+    regardless of how many threads are waiting.
+    """
+    with _wake_lock:
+        # ------------------------------------------------------------------
+        # Step 1 — Double-check: did the lock winner already rebuild the pool?
+        #   This is the critical guard that prevents threads 2…N from each
+        #   calling _reset_pool() and destroying what the previous winner built.
+        # ------------------------------------------------------------------
+        existing_conn = _try_borrow_from_existing_pool()
+        if existing_conn is not None:
+            logger.info(
+                "[DB-POOL] Wake-up: pool already rebuilt by lock winner — borrowed directly",
+            )
+            return existing_conn
+
+        # ------------------------------------------------------------------
+        # Step 2 — We ARE the winner: reset the stale pool and create a fresh
+        #   one.  Subsequent threads will hit the Step 1 guard above.
+        # ------------------------------------------------------------------
+        _reset_pool()
+        new_pool = _get_db_pool()   # creates a fresh ThreadedConnectionPool
+
+        # ------------------------------------------------------------------
+        # Step 3 — wait for the DB to wake (up to ~15 s, 6 attempts)
+        #   delays: 1 s, 2 s, 3 s, 4 s, 5 s  → ~15 s ceiling
+        # ------------------------------------------------------------------
+        MAX_WAKE_RETRIES = 6
+        for attempt in range(MAX_WAKE_RETRIES):
+            try:
+                conn = new_pool.getconn()
+            except psycopg2.pool.PoolError as exc:
+                sleep_s = attempt + 1
+                logger.warning(
+                    "[DB-POOL] Wake-up getconn failed (attempt %d/%d) — waiting %ds: %s",
+                    attempt + 1, MAX_WAKE_RETRIES, sleep_s, exc,
+                )
+                time.sleep(sleep_s)
+                continue
+
+            if _ping_conn(conn):
+                if not _is_conn_initialized(conn):
+                    try:
+                        _init_conn(conn)
+                    except Exception:
+                        _on_conn_closed(conn)
+                        try:
+                            new_pool.putconn(conn, close=True)
+                        except Exception:
+                            pass
+                        time.sleep(attempt + 1)
+                        continue
+                logger.info(
+                    "[DB-POOL] DB woke after %d attempt(s) — connectivity restored",
+                    attempt + 1,
+                )
+                return conn
+
+            # Ping failed — DB still waking; back off, return dead conn, retry
+            _on_conn_closed(conn)
+            try:
+                new_pool.putconn(conn, close=True)
+            except Exception:
+                pass
+            sleep_s = attempt + 1
+            logger.warning(
+                "[DB-POOL] Wake-up ping failed (attempt %d/%d) — waiting %ds",
+                attempt + 1, MAX_WAKE_RETRIES, sleep_s,
+            )
+            time.sleep(sleep_s)
+
+        raise psycopg2.OperationalError(
+            f"DB did not respond after {MAX_WAKE_RETRIES} wake-up attempts (~15 s total)"
+        )
 
 
 class DjangoAPIClient:
@@ -220,14 +366,14 @@ class DjangoAPIClient:
         # Keep a single borrowed connection for the resolve_org_id / close() flow
         # that is NOT used by parallel fetch_* calls (those borrow their own).
         # _get_healthy_conn handles stale/dropped SSL connections automatically.
+        # If the entire pool is stale (Neon cold start), _wake_db_and_get_conn
+        # serialises the reconnection sequence so only one thread drives it.
         try:
             self.db_conn = _get_healthy_conn(self._pool)
         except psycopg2.OperationalError:
-            # Pool may be entirely stale — rebuild it once and retry.
-            logger.warning("[DB-POOL] All connections stale in __init__ — resetting pool")
-            _reset_pool()
-            self._pool = _get_db_pool()
-            self.db_conn = _get_healthy_conn(self._pool, max_retries=2)
+            logger.warning("[DB-POOL] All connections stale in __init__ — entering cold-start wakeup")
+            self.db_conn = _wake_db_and_get_conn()
+            self._pool = _get_db_pool()   # pick up the pool rebuilt by wake helper
         # Pin the primary connection to its birth pool.  If _borrow_conn later
         # replaces self._pool (via a pool reset), close() still returns this
         # connection to the correct pool instead of hitting 'unkeyed connection'.
@@ -240,17 +386,19 @@ class DjangoAPIClient:
     def _borrow_conn(self):
         """Borrow a healthy connection from the pool for one query.
 
-        Routes through _get_healthy_conn so stale SSL connections are detected
-        and replaced before any real query is executed.  If every connection in
-        the pool has been dropped by the server the pool is reset and rebuilt.
+        Fast path: _get_healthy_conn pings, discards stale connections, and
+        returns a live one.  Slow path (Neon cold start / all connections
+        stale): _wake_db_and_get_conn serialises the reconnection with a
+        module-level lock so only ONE thread does the pool-reset + wake cycle
+        while the remaining threads wait and then borrow from the rebuilt pool.
         """
         try:
             return _get_healthy_conn(self._pool)
         except psycopg2.OperationalError:
-            logger.warning("[DB-POOL] All connections stale in _borrow_conn — resetting pool")
-            _reset_pool()
-            self._pool = _get_db_pool()
-            return _get_healthy_conn(self._pool, max_retries=2)
+            logger.warning("[DB-POOL] All connections stale in _borrow_conn — entering cold-start wakeup")
+            conn = _wake_db_and_get_conn()
+            self._pool = _get_db_pool()   # pick up the pool rebuilt by wake helper
+            return conn
 
     def _return_conn(self, conn, pool=None) -> None:
         """Return a borrowed connection back to its pool.
@@ -1062,19 +1210,16 @@ class DjangoAPIClient:
                     """
                     SELECT ce.student_id,
                            ce.offering_id,
-                           ce.enrollment_type,
-                           ce.is_cross_program,
-                           ce.section_name,
                            ce.enrollment_status
                     FROM course_enrollments ce
                     INNER JOIN course_offerings co
                         ON ce.offering_id = co.offering_id
-                        AND co.is_active   = true
-                        AND co.semester_type = %s
+                        AND co.is_active        = true
+                        AND co.semester_type    = %s
                         AND co.offering_status IN ('SCHEDULED', 'ONGOING')
-                    WHERE ce.org_id          = %s
-                      AND ce.is_active       = true
-                      AND ce.enrollment_status = 'ENROLLED'
+                    WHERE ce.org_id             = %s
+                      AND ce.is_active          = true
+                      AND ce.enrollment_status  = 'ENROLLED'
                     """,
                     (semester_type, org_id),
                 )
@@ -1096,12 +1241,12 @@ class DjangoAPIClient:
         enrollments = []
         for row in rows:
             try:
+                # enrollment_type / is_cross_program / section_name are not
+                # stored in the DB schema — use EnrollmentDTO defaults (CORE /
+                # False / None).  These fields exist for future extensibility.
                 enrollments.append(EnrollmentDTO(
                     student_id=str(row["student_id"]),
                     offering_id=str(row["offering_id"]),
-                    enrollment_type=row.get("enrollment_type") or "CORE",
-                    is_cross_program=bool(row.get("is_cross_program", False)),
-                    section_name=row.get("section_name"),
                     enrollment_status=row.get("enrollment_status") or "ENROLLED",
                 ))
             except Exception as exc:

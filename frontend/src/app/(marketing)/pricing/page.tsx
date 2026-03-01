@@ -38,7 +38,7 @@ export default function PricingPage() {
     <div style={{ background: 'var(--cadence-off-white)' }}>
 
       {/* Hero */}
-      <section style={{ background: 'white', borderBottom: '1px solid rgba(27,58,92,0.08)', textAlign: 'center', padding: '72px 24px 56px' }}>
+      <section style={{ background: 'white', borderBottom: '1px solid rgba(21,88,214,0.08)', textAlign: 'center', padding: '72px 24px 56px' }}>
         <span className="mk-eyebrow" style={{ marginBottom: '16px' }}>Pricing</span>
         <h1 className="mk-h1" style={{ marginBottom: '16px' }}>
           Simple pricing.{' '}
@@ -70,12 +70,12 @@ export default function PricingPage() {
       </section>
 
       {/* CTA */}
-      <section style={{ background: 'linear-gradient(135deg, #1B3A5C 0%, #2A9D8F 100%)', padding: '72px 24px', textAlign: 'center' }}>
-        <h2 className="mk-h2-white" style={{ marginBottom: '16px' }}>Still have questions?</h2>
-        <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '18px', color: 'rgba(255,255,255,0.75)', marginBottom: '32px' }}>
+      <section style={{ background: '#e8f0fe', padding: '72px 24px', textAlign: 'center' }}>
+        <h2 className="mk-h2" style={{ marginBottom: '16px', color: '#1558D6' }}>Still have questions?</h2>
+        <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '18px', color: '#5F6368', marginBottom: '32px' }}>
           Talk to our team — we&apos;ll find the right plan for your institution.
         </p>
-        <a href="/contact" className="mk-btn-primary" style={{ fontSize: '16px', padding: '14px 32px', background: 'white', color: 'var(--cadence-navy)' }}>
+        <a href="/contact" className="mk-btn-primary" style={{ fontSize: '16px', padding: '14px 32px' }}>
           Talk to Sales
         </a>
       </section>
@@ -87,7 +87,7 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   // Using details/summary for native accordion (no JS required, SSR-safe)
   return (
     <details
-      style={{ borderBottom: '1px solid rgba(27,58,92,0.08)' }}
+      style={{ borderBottom: '1px solid rgba(21,88,214,0.08)' }}
     >
       <summary
         style={{

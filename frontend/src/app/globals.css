@@ -8,9 +8,9 @@
 :root {
   /* Brand Colors */
   --brand-primary:    #1A73E8;
-  --brand-secondary:  #2A9D8F;
-  --brand-navy:       #1B3A5C;
-  --brand-gradient:   linear-gradient(135deg, #1B3A5C 0%, #2A9D8F 100%);
+  --brand-secondary:  #1A73E8;
+  --brand-navy:       #1558D6;
+  --brand-gradient:   linear-gradient(135deg, #1558D6 0%, #1A73E8 100%);
 
   /* Typography */
   --font-heading: 'Poppins', -apple-system, sans-serif;
@@ -52,7 +52,7 @@
 
 .dark {
   --brand-primary:   #8AB4F8;
-  --brand-secondary: #3BBFB0;
+  --brand-secondary: #4285F4;
   --brand-navy:      #E8EAED;
 }
 
@@ -262,7 +262,8 @@
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight;
     color: var(--color-text-primary);
-    font-family: 'Poppins', 'Inter', sans-serif;
+    /* Product UI uses Inter only — Poppins is marketing-only (mk-h1/mk-h2 classes) */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   }
 
   h1 { @apply text-2xl sm:text-3xl lg:text-4xl leading-tight; }
@@ -1066,15 +1067,15 @@
 
 /* ─── Marketing color tokens ─────────────────────────────────────────────── */
 :root {
-  --cadence-navy:       #1B3A5C;
-  --cadence-navy-mid:   #1E4D6B;
-  --cadence-teal:       #2A9D8F;
-  --cadence-teal-light: #3BBFB0;
+  --cadence-navy:       #1558D6;
+  --cadence-navy-mid:   #1967D2;
+  --cadence-teal:       #1A73E8;
+  --cadence-teal-light: #4285F4;
   --cadence-white:      #FFFFFF;
-  --cadence-off-white:  #F4F6F8;
-  --cadence-slate:      #64748B;
-  --cadence-ink:        #0F1C2E;
-  --cadence-gradient:   linear-gradient(135deg, #1B3A5C 0%, #1E4D6B 50%, #2A9D8F 100%);
+  --cadence-off-white:  #f8f9fa;
+  --cadence-slate:      #5f6368;
+  --cadence-ink:        #202124;
+  --cadence-gradient:   linear-gradient(135deg, #1558D6 0%, #1967D2 50%, #1A73E8 100%);
 }
 
 /* ─── Marketing buttons ────────────────────────────────────────────────────── */
@@ -1226,7 +1227,7 @@
 /* ─── Feature card ────────────────────────────────────────────────────────── */
 .mk-feature-card {
   background: white;
-  border: 1px solid rgba(27,58,92,0.10);
+  border: 1px solid rgba(21,88,214,0.10);
   border-radius: var(--radius-lg);
   padding: var(--space-8);
   transition: border-color 200ms, box-shadow 200ms;
@@ -1247,8 +1248,8 @@
 /* ─── Background grid pattern ────────────────────────────────────────────── */
 .mk-bg-grid {
   background-image:
-    linear-gradient(rgba(27,58,92,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(27,58,92,0.04) 1px, transparent 1px);
+    linear-gradient(rgba(21,88,214,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(21,88,214,0.04) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
@@ -1328,7 +1329,7 @@
 }
 @keyframes mk-cell-resolve {
   0%   { background: rgba(239,68,68,0.15); }
-  100% { background: rgba(42,157,143,0.15); border-color: rgba(42,157,143,0.5); }
+  100% { background: rgba(26,115,232,0.15); border-color: rgba(26,115,232,0.5); }
 }
 @keyframes mk-counter-slide {
   0%   { opacity: 0; transform: translateY(8px); }
@@ -1363,7 +1364,7 @@
 /* ─── Blog card ──────────────────────────────────────────────────────────── */
 .mk-blog-card {
   background: white;
-  border: 1px solid rgba(27,58,92,0.08);
+  border: 1px solid rgba(21,88,214,0.08);
   border-radius: 16px;
   overflow: hidden;
   transition: border-color 200ms, box-shadow 200ms, transform 200ms;
@@ -1373,7 +1374,7 @@
 }
 .mk-blog-card:hover {
   border-color: rgba(26,115,232,0.3);
-  box-shadow: 0 8px 32px rgba(27,58,92,0.08);
+  box-shadow: 0 8px 32px rgba(21,88,214,0.08);
   transform: translateY(-2px);
 }
 
@@ -1381,7 +1382,7 @@
 .mk-input {
   width: 100%;
   padding: var(--space-3) var(--space-4);
-  border: 1.5px solid rgba(27,58,92,0.18);
+  border: 1.5px solid rgba(21,88,214,0.18);
   border-radius: var(--radius-sm);
   font-size: var(--text-base);
   font-family: var(--font-body);
@@ -1408,7 +1409,7 @@
   font-family: var(--font-body);
 }
 .mk-tag-product   { background: rgba(26,115,232,0.12); color: var(--brand-primary); }
-.mk-tag-ai        { background: rgba(27,58,92,0.10);   color: var(--brand-navy); }
+.mk-tag-ai        { background: rgba(21,88,214,0.10);   color: var(--brand-navy); }
 .mk-tag-education { background: rgba(249,115,22,0.10); color: #ea580c; }
 .mk-tag-policy    { background: rgba(139,92,246,0.10); color: #7c3aed; }
 
@@ -1424,7 +1425,7 @@
 
 /* ── Card hover (no JS required) ────────────────────────────── */
 .mk-hover-card {
-  border: 1px solid rgba(27,58,92,0.08);
+  border: 1px solid rgba(21,88,214,0.08);
   transition: box-shadow 200ms ease, border-color 200ms ease;
 }
 .mk-hover-card:hover {

@@ -28,7 +28,7 @@ export function HeroSection() {
           position:   'absolute',
           inset:      0,
           pointerEvents: 'none',
-          background: 'radial-gradient(ellipse 60% 50% at 72% 50%, rgba(42,157,143,0.10) 0%, transparent 70%)',
+          background: 'radial-gradient(ellipse 60% 50% at 72% 50%, rgba(26,115,232,0.10) 0%, transparent 70%)',
         }}
       />
 
@@ -90,11 +90,11 @@ export function HeroSection() {
                     height:       '42px',
                     borderRadius: '50%',
                     background:   'white',
-                    border:       '1.5px solid rgba(27,58,92,0.12)',
+                    border:       '1.5px solid rgba(21,88,214,0.12)',
                     display:      'flex',
                     alignItems:   'center',
                     justifyContent: 'center',
-                    boxShadow:    '0 2px 8px rgba(27,58,92,0.10)',
+                    boxShadow:    '0 2px 8px rgba(21,88,214,0.10)',
                     flexShrink:   0,
                   }}
                 >
@@ -108,7 +108,7 @@ export function HeroSection() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '28px' }}>
               {/* Stacked avatars */}
               <div style={{ display: 'flex' }}>
-                {['#1B3A5C', '#2A9D8F', '#1E4D6B'].map((bg, i) => (
+                {['#1558D6', '#1A73E8', '#1967D2'].map((bg, i) => (
                   <div
                     key={i}
                     style={{

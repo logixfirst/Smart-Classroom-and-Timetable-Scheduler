@@ -52,14 +52,14 @@ export function DemoRequestForm() {
       <div
         style={{
           background:   'white',
-          border:       '1px solid rgba(42,157,143,0.2)',
+          border:       '1px solid rgba(26,115,232,0.2)',
           borderRadius: '16px',
           padding:      '48px 32px',
           textAlign:    'center',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
-          <CheckCircle2 size={52} color="#2A9D8F" />
+          <CheckCircle2 size={52} color="#1A73E8" />
         </div>
         <h3 style={{ fontFamily: 'Poppins, sans-serif', fontSize: '24px', fontWeight: 700, color: 'var(--cadence-ink)', marginBottom: '12px' }}>
           You&rsquo;re booked. We&rsquo;ll confirm within 2 hours.
@@ -67,9 +67,9 @@ export function DemoRequestForm() {
         <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px', color: 'var(--cadence-slate)', marginBottom: '24px' }}>
           Check your email for the meeting invite.
         </p>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(42,157,143,0.08)', border: '1px solid rgba(42,157,143,0.2)', borderRadius: '10px', padding: '10px 20px' }}>
-          <Calendar size={16} color="#2A9D8F" />
-          <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', color: '#2A9D8F', fontWeight: 600 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(26,115,232,0.08)', border: '1px solid rgba(26,115,232,0.2)', borderRadius: '10px', padding: '10px 20px' }}>
+          <Calendar size={16} color="#1A73E8" />
+          <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', color: '#1A73E8', fontWeight: 600 }}>
             A calendar invite is on its way
           </span>
         </div>
@@ -80,7 +80,7 @@ export function DemoRequestForm() {
   const inputStyle = (hasError: boolean) => ({
     width:        '100%',
     padding:      '12px 16px',
-    border:       `1.5px solid ${hasError ? '#ef4444' : 'rgba(27,58,92,0.18)'}`,
+    border:       `1.5px solid ${hasError ? '#ef4444' : 'rgba(21,88,214,0.18)'}`,
     borderRadius: '8px',
     fontSize:     '15px',
     fontFamily:   'Inter, sans-serif',

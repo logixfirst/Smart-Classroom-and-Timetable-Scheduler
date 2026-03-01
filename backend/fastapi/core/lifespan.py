@@ -195,20 +195,27 @@ async def lifespan(app: FastAPI):
     
     # ==================== SHUTDOWN ====================
     logger.info("🛑 Shutting down FastAPI Timetable Generation Service")
-    
+
     try:
         if hasattr(app.state, "memory_monitor"):
             app.state.memory_monitor.stop()
-        
+
         if hasattr(app.state, "redis_client") and app.state.redis_client:
             app.state.redis_client.close()
-        
+
         if hasattr(app.state, "resource_isolation"):
             app.state.resource_isolation.shutdown(wait=True)
-        
+
         import gc
         gc.collect()
         logger.info("FastAPI Timetable Service stopped")
-        
+
+    except asyncio.CancelledError:
+        # Python 3.8+: CancelledError is a BaseException, not Exception.
+        # Raised when uvicorn cancels the lifespan receive() coroutine during
+        # Ctrl+C / SIGTERM before the shutdown event is delivered.  This is
+        # expected behaviour — log it at DEBUG and suppress the noise.
+        logger.debug("Lifespan receive cancelled during shutdown (normal Ctrl+C path)")
+
     except Exception as e:
-        logger.error(f"Shutdown error: {e}")
+        logger.error("Shutdown error: %s", e)

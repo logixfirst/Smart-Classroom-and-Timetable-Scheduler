@@ -127,7 +127,7 @@ export default function BlogArticlePage({ params }: { params: { slug: string } }
         </div>
 
         {/* CTA */}
-        <div style={{ marginTop: '56px', background: 'var(--cadence-off-white)', border: '1px solid rgba(27,58,92,0.08)', borderRadius: '16px', padding: '32px', textAlign: 'center' }}>
+        <div style={{ marginTop: '56px', background: 'var(--cadence-off-white)', border: '1px solid rgba(21,88,214,0.08)', borderRadius: '16px', padding: '32px', textAlign: 'center' }}>
           <h3 style={{ fontFamily: 'Poppins, sans-serif', fontSize: '22px', fontWeight: 700, color: 'var(--cadence-ink)', marginBottom: '12px' }}>
             Ready to see this in action?
           </h3>

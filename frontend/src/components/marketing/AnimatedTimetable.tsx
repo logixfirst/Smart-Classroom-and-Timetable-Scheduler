@@ -12,9 +12,9 @@ const TIMES  = ['8:00', '9:00', '10:00', '11:00', '12:00', '1:00', '2:00']
 
 // Courses with their colors
 const COURSES: { code: string; color: string; bg: string }[] = [
-  { code: 'MATH',  color: '#1B3A5C', bg: 'rgba(27,58,92,0.10)' },
-  { code: 'PHY',   color: '#1E4D6B', bg: 'rgba(30,77,107,0.10)' },
-  { code: 'CS101', color: '#2A9D8F', bg: 'rgba(42,157,143,0.12)' },
+  { code: 'MATH',  color: '#1558D6', bg: 'rgba(21,88,214,0.10)' },
+  { code: 'PHY',   color: '#1967D2', bg: 'rgba(25,103,210,0.10)' },
+  { code: 'CS101', color: '#1A73E8', bg: 'rgba(26,115,232,0.12)' },
   { code: 'ENG',   color: '#0369a1', bg: 'rgba(3,105,161,0.10)' },
   { code: 'LAB',   color: '#0f766e', bg: 'rgba(15,118,110,0.12)' },
   { code: 'CHEM',  color: '#6d28d9', bg: 'rgba(109,40,217,0.10)' },
@@ -207,7 +207,7 @@ export function AnimatedTimetable() {
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            'radial-gradient(ellipse 70% 60% at 55% 50%, rgba(42,157,143,0.14) 0%, transparent 70%)',
+            'radial-gradient(ellipse 70% 60% at 55% 50%, rgba(26,115,232,0.14) 0%, transparent 70%)',
           borderRadius: '24px',
         }}
       />
@@ -217,9 +217,9 @@ export function AnimatedTimetable() {
         style={{
           background:  'white',
           borderRadius: '20px',
-          border:       '1px solid rgba(27,58,92,0.10)',
+          border:       '1px solid rgba(21,88,214,0.10)',
           boxShadow:
-            '0 4px 6px rgba(27,58,92,0.04), 0 16px 48px rgba(27,58,92,0.10)',
+            '0 4px 6px rgba(21,88,214,0.04), 0 16px 48px rgba(21,88,214,0.10)',
           overflow:  'hidden',
           opacity:   gridVisible ? (gridFading ? 0 : 1) : 0,
           transition: 'opacity 600ms ease-out',
@@ -228,7 +228,7 @@ export function AnimatedTimetable() {
         {/* Card header */}
         <div
           style={{
-            background: 'linear-gradient(135deg, #1B3A5C 0%, #2A9D8F 100%)',
+            background: '#1A73E8',
             padding:    '14px 20px',
             display:    'flex',
             alignItems: 'center',
@@ -329,7 +329,7 @@ export function AnimatedTimetable() {
                 const isEmpty = courseIdx === 7
                 
                 let bg     = cell?.visible ? (isEmpty ? 'rgba(148,163,184,0.06)' : course.bg)   : 'rgba(241,245,249,0.6)'
-                let border = '1px solid rgba(27,58,92,0.06)'
+                let border = '1px solid rgba(21,88,214,0.06)'
                 let textC  = cell?.visible ? (isEmpty ? '#94a3b8' : course.color) : 'transparent'
 
                 if (cell?.conflict) {
@@ -337,8 +337,8 @@ export function AnimatedTimetable() {
                   border = '1px solid rgba(239,68,68,0.5)'
                 }
                 if (cell?.resolved) {
-                  bg     = 'rgba(42,157,143,0.12)'
-                  border = '1px solid rgba(42,157,143,0.45)'
+                  bg     = 'rgba(26,115,232,0.12)'
+                  border = '1px solid rgba(26,115,232,0.45)'
                   textC  = course.color
                 }
 
@@ -370,7 +370,7 @@ export function AnimatedTimetable() {
                     )}
                     {/* Resolved checkmark */}
                     {cell?.resolved && (
-                      <CheckCircle2 size={10} color="#2A9D8F" style={{ position: 'absolute', top: '3px', right: '3px' }} />
+                      <CheckCircle2 size={10} color="#1A73E8" style={{ position: 'absolute', top: '3px', right: '3px' }} />
                     )}
                     <span
                       style={{
@@ -394,7 +394,7 @@ export function AnimatedTimetable() {
         {/* Footer stats */}
         <div
           style={{
-            borderTop:   '1px solid rgba(27,58,92,0.07)',
+            borderTop:   '1px solid rgba(21,88,214,0.07)',
             padding:     '10px 16px',
             display:     'flex',
             alignItems:  'center',
@@ -411,12 +411,12 @@ export function AnimatedTimetable() {
                 6 / 6
               </div>
             </div>
-            <div style={{ width: '1px', height: '24px', background: 'rgba(27,58,92,0.10)' }} />
+            <div style={{ width: '1px', height: '24px', background: 'rgba(21,88,214,0.10)' }} />
             <div>
               <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '10px', color: 'var(--cadence-slate)' }}>
                 Conflicts
               </span>
-              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: '12px', fontWeight: 600, color: phase === 'conflict' ? '#ef4444' : '#2A9D8F' }}>
+              <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: '12px', fontWeight: 600, color: phase === 'conflict' ? '#ef4444' : '#1A73E8' }}>
                 {phase === 'conflict' ? '1' : '0'}
               </div>
             </div>
@@ -428,7 +428,7 @@ export function AnimatedTimetable() {
               opacity:   scoreVisible ? 1 : 0,
               transform: scoreVisible ? 'translateY(0)' : 'translateY(6px)',
               transition: 'opacity 400ms, transform 400ms',
-              background: 'linear-gradient(135deg, #1B3A5C, #2A9D8F)',
+              background: '#1A73E8',
               borderRadius: '8px',
               padding:   '4px 10px',
               display:   'flex',
@@ -454,13 +454,13 @@ export function AnimatedTimetable() {
             top:        '-12px',
             right:      '12px',
             background: 'white',
-            border:     '1px solid rgba(42,157,143,0.3)',
+            border:     '1px solid rgba(26,115,232,0.3)',
             borderRadius: '9999px',
             padding:    '5px 12px',
             display:    'flex',
             alignItems: 'center',
             gap:        '6px',
-            boxShadow:  '0 4px 12px rgba(42,157,143,0.15)',
+            boxShadow:  '0 4px 12px rgba(26,115,232,0.15)',
             animation:  'mk-counter-slide 300ms ease-out forwards',
           }}
         >
@@ -469,12 +469,12 @@ export function AnimatedTimetable() {
               width:      '6px',
               height:     '6px',
               borderRadius: '50%',
-              background: '#2A9D8F',
+              background: '#1A73E8',
               display:    'inline-block',
               animation:  'progress-fill-breathe 1.2s ease-in-out infinite',
             }}
           />
-          <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', fontWeight: 600, color: '#2A9D8F' }}>
+          <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', fontWeight: 600, color: '#1A73E8' }}>
             Optimizing schedule…
           </span>
         </div>

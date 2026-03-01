@@ -28,6 +28,7 @@ export default function AdminDashboard() {
   const _cached = getCachedStats()
 
   const [isLoading, setIsLoading] = useState(false)
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false)
   const [stats, setStats] = useState(
     _cached?.data ?? { totalUsers: 0, activeCourses: 0, pendingApprovals: 0, systemHealth: 98 }
   )
@@ -88,106 +89,48 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleStrategicAction = async (action: string) => {
-    setIsLoading(true)
-
-    try {
-      switch (action) {
-        case 'addUser':
-          router.push('/admin/users')
-          break
-        case 'roles':
-          showToast('info', 'Role management feature coming soon')
-          break
-        case 'audit':
-          router.push('/admin/logs')
-          break
-        case 'config':
-          router.push('/admin/settings')
-          break
-        case 'backup':
-          await simulateBackup()
-          break
-        case 'reports':
-          await generateReports()
-          break
-        default:
-          showToast('warning', 'Feature not implemented yet')
-      }
-    } catch (error) {
-      showToast('error', 'Action failed. Please try again.')
-    } finally {
-      setIsLoading(false)
+  const handleStrategicAction = (action: string) => {
+    switch (action) {
+      case 'addUser':
+        router.push('/admin/users')
+        break
+      case 'roles':
+        showToast('info', 'Role management coming soon')
+        break
+      case 'audit':
+        router.push('/admin/logs')
+        break
+      case 'config':
+        router.push('/admin/settings')
+        break
+      case 'backup':
+        showToast('info', 'Database backup is under development')
+        break
+      case 'reports':
+        router.push('/admin/logs')
+        break
+      default:
+        showToast('warning', 'Feature not implemented yet')
     }
   }
 
-  const simulateBackup = async () => {
-    showToast('info', 'Starting database backup...')
-
-    // Simulate backup process
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    showToast('success', 'Database backup completed successfully!')
-  }
-
-  const generateReports = async () => {
-    showToast('info', 'Generating system reports...')
-
-    // Simulate report generation
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    showToast('success', 'Reports generated and ready for download!')
-  }
-
-  const handleDataAction = async (action: string) => {
-    setIsLoading(true)
-
-    try {
-      switch (action) {
-        case 'import':
-          await simulateImport()
-          break
-        case 'export':
-          await simulateExport()
-          break
-        case 'backup':
-          await simulateBackup()
-          break
-        case 'restore':
-          await simulateRestore()
-          break
-        default:
-          showToast('warning', 'Action not implemented')
-      }
-    } catch (error) {
-      showToast('error', 'Data operation failed')
-    } finally {
-      setIsLoading(false)
+  const handleDataAction = (action: string) => {
+    switch (action) {
+      case 'import':
+        showToast('info', 'CSV import is under development')
+        break
+      case 'export':
+        router.push('/admin/timetables')
+        break
+      case 'backup':
+        showToast('info', 'Database backup is under development')
+        break
+      case 'restore':
+        setShowRestoreConfirm(true)
+        break
+      default:
+        showToast('warning', 'Action not implemented')
     }
-  }
-
-  const simulateImport = async () => {
-    showToast('info', 'Processing CSV import...')
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    showToast('success', 'CSV data imported successfully!')
-  }
-
-  const simulateExport = async () => {
-    showToast('info', 'Generating PDF export...')
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    showToast('success', 'PDF exported successfully!')
-  }
-
-  const simulateRestore = async () => {
-    if (
-      !confirm('Are you sure you want to restore from backup? This will overwrite current data.')
-    ) {
-      setIsLoading(false)
-      return
-    }
-    showToast('info', 'Restoring from backup...')
-    await new Promise(resolve => setTimeout(resolve, 3000))
-    showToast('success', 'Database restored successfully!')
   }
 
   return (
@@ -214,15 +157,11 @@ export default function AdminDashboard() {
                 : <p className="text-2xl lg:text-3xl font-semibold truncate mt-1" style={{ color: 'var(--color-text-primary)' }}>{stats.totalUsers.toLocaleString()}</p>
               }
             </div>
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-primary)' }}>
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-primary-subtle)' }}>
+              <svg className="w-5 h-5" style={{ color: 'var(--color-primary)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className="font-medium" style={{ color: 'var(--color-success-text)' }}>↗ 12%</span>
-            <span className="ml-2" style={{ color: 'var(--color-text-muted)' }}>vs last month</span>
           </div>
         </div>
 
@@ -236,15 +175,11 @@ export default function AdminDashboard() {
                 : <p className="text-2xl lg:text-3xl font-semibold truncate mt-1" style={{ color: 'var(--color-text-primary)' }}>{stats.activeCourses.toLocaleString()}</p>
               }
             </div>
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-success)' }}>
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-success-subtle)' }}>
+              <svg className="w-5 h-5" style={{ color: 'var(--color-success-text)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
             </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className="font-medium" style={{ color: 'var(--color-success-text)' }}>↗ 8%</span>
-            <span className="ml-2" style={{ color: 'var(--color-text-muted)' }}>vs last month</span>
           </div>
         </div>
 
@@ -261,8 +196,8 @@ export default function AdminDashboard() {
                 : <p className="text-2xl lg:text-3xl font-semibold truncate mt-1" style={{ color: 'var(--color-text-primary)' }}>{stats.pendingApprovals.toLocaleString()}</p>
               }
             </div>
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-warning)' }}>
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-warning-subtle)' }}>
+              <svg className="w-5 h-5" style={{ color: 'var(--color-warning-text)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -282,8 +217,8 @@ export default function AdminDashboard() {
                 : <p className="text-2xl lg:text-3xl font-semibold truncate mt-1" style={{ color: 'var(--color-text-primary)' }}>{stats.systemHealth}%</p>
               }
             </div>
-            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-success)' }}>
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ml-3" style={{ background: 'var(--color-success-subtle)' }}>
+              <svg className="w-5 h-5" style={{ color: 'var(--color-success-text)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 016.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
               </svg>
             </div>
@@ -723,6 +658,36 @@ export default function AdminDashboard() {
           </button>
         </div>
       </div>
+
+      {/* ── Restore Confirmation Dialog ──────────────────────────────────── */}
+      {showRestoreConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.32)' }}>
+          <div className="card max-w-sm w-full shadow-xl">
+            <h3 className="text-base font-semibold mb-2" style={{ color: 'var(--color-text-primary)' }}>Restore from backup?</h3>
+            <p className="text-sm mb-6" style={{ color: 'var(--color-text-muted)' }}>
+              This will overwrite all current data with the latest backup. This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowRestoreConfirm(false)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowRestoreConfirm(false)
+                  showToast('info', 'Database restore is under development')
+                }}
+                className="btn-primary"
+                style={{ background: 'var(--color-error)', borderColor: 'var(--color-error)' }}
+              >
+                Restore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

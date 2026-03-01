@@ -213,7 +213,7 @@ export function NavigationProgress() {
           top:            0,
           left:           0,
           right:          0,
-          height:         '3px',
+          height:         '4px',
           zIndex:         9999,
           opacity:        0,
           pointerEvents:  'none',
@@ -227,12 +227,10 @@ export function NavigationProgress() {
           style={{
             height:          '100%',
             width:           '0%',
-            background:      'linear-gradient(90deg, #1a73e8 0%, #4a9eff 100%)',
-            boxShadow:       '0 0 8px 1px rgba(26, 115, 232, 0.6)',
-            borderRadius:    '0 2px 2px 0',
+            background:      '#4285f4',
+            borderRadius:    '0 3px 3px 0',
             willChange:      'width',
-            // Slightly rounded right tip (Google's "head")
-            clipPath:        'inset(0 0 0 0 round 0 3px 3px 0)',
+            clipPath:        'inset(0 0 0 0 round 0 4px 4px 0)',
           }}
         />
 

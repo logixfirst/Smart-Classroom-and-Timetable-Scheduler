@@ -44,10 +44,10 @@ export function SocialProof() {
   const marqueeItems = [...INSTITUTIONS, ...INSTITUTIONS]
 
   return (
-    <section style={{ background: 'white', borderTop: '1px solid rgba(27,58,92,0.08)', borderBottom: '1px solid rgba(27,58,92,0.08)' }}>
+    <section style={{ background: 'white', borderTop: '1px solid rgba(21,88,214,0.08)', borderBottom: '1px solid rgba(21,88,214,0.08)' }}>
       {/* Trusted by header */}
       <div style={{ textAlign: 'center', padding: '28px 24px 16px' }}>
-        <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 600, letterSpacing: '0.08em', color: 'rgba(100,116,139,0.6)', textTransform: 'uppercase' }}>
+        <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 600, letterSpacing: '0.08em', color: '#5f6368', textTransform: 'uppercase' }}>
           Trusted by institutions across India
         </p>
       </div>
@@ -71,7 +71,7 @@ export function SocialProof() {
                 letterSpacing: '0.02em',
               }}
             >
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'rgba(42,157,143,0.3)' }} />
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'rgba(26,115,232,0.35)' }} />
               {name}
             </div>
           ))}
@@ -81,7 +81,7 @@ export function SocialProof() {
       {/* Stats bar */}
       <div
         ref={statsRef as React.RefObject<HTMLDivElement>}
-        style={{ borderTop: '1px solid rgba(27,58,92,0.06)', padding: '28px 24px' }}
+        style={{ borderTop: '1px solid rgba(21,88,214,0.06)', padding: '28px 24px' }}
       >
         <div className="max-w-[1200px] mx-auto">
           {/* Mobile: 2×2 grid */}
@@ -95,7 +95,7 @@ export function SocialProof() {
             {STATS.map((s, i) => (
               <div key={s.label} className="flex items-center">
                 {i > 0 && (
-                  <div style={{ width: '1px', height: '48px', background: 'rgba(27,58,92,0.12)', margin: '0 4px' }} />
+                  <div style={{ width: '1px', height: '48px', background: 'rgba(21,88,214,0.12)', margin: '0 4px' }} />
                 )}
                 <StatItem {...s} trigger={visible} />
               </div>

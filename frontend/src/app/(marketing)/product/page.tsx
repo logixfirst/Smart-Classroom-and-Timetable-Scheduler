@@ -94,7 +94,7 @@ export default function ProductPage() {
     <div style={{ background: 'var(--cadence-off-white)' }}>
 
       {/* Hero */}
-      <section style={{ background: 'white', borderBottom: '1px solid rgba(27,58,92,0.08)', textAlign: 'center', padding: '72px 24px 56px' }}>
+      <section style={{ background: 'white', borderBottom: '1px solid rgba(21,88,214,0.08)', textAlign: 'center', padding: '72px 24px 56px' }}>
         <span className="mk-eyebrow">Platform Overview</span>
         <h1 className="mk-h1" style={{ marginBottom: '16px' }}>
           The complete academic{' '}
@@ -119,7 +119,7 @@ export default function ProductPage() {
         >
           <div className="mk-section">
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(42,157,143,0.10)', border: '1px solid rgba(42,157,143,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: 'rgba(26,115,232,0.10)', border: '1px solid rgba(26,115,232,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {feature.icon}
               </div>
               <h2 className="mk-h2" style={{ fontSize: '28px' }}>{feature.title}</h2>
@@ -142,29 +142,29 @@ export default function ProductPage() {
       ))}
 
       {/* Algorithm pipeline visual */}
-      <section style={{ background: 'linear-gradient(135deg, #0F1C2E 0%, #1B3A5C 100%)', padding: '72px 24px' }}>
+      <section style={{ background: '#e8f0fe', padding: '72px 24px' }}>
         <div className="mk-section" style={{ maxWidth: '900px' }}>
-          <h2 className="mk-h2-white" style={{ textAlign: 'center', marginBottom: '12px' }}>The three-stage AI pipeline</h2>
-          <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px', color: 'rgba(255,255,255,0.65)', textAlign: 'center', marginBottom: '48px' }}>
+          <h2 className="mk-h2" style={{ textAlign: 'center', marginBottom: '12px', color: '#1558D6' }}>The three-stage AI pipeline</h2>
+          <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '16px', color: '#5F6368', textAlign: 'center', marginBottom: '48px' }}>
             Each stage builds on the last. Speed and quality, not a trade-off.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { icon: <GitBranch size={22} color="#2A9D8F" />, stage: 'Stage 1', name: 'Louvain Clustering', desc: 'Partitions the scheduling graph into smaller sub-problems. Reduces solver complexity from exponential to manageable.' },
-              { icon: <Cpu size={22} color="#2A9D8F" />, stage: 'Stage 2', name: 'CP-SAT Solving', desc: 'Google OR-Tools resolves all hard constraints. Guaranteed zero faculty conflicts, room conflicts, and batch overlaps.' },
-              { icon: <BarChart2 size={22} color="#2A9D8F" />, stage: 'Stage 3', name: 'Q-Learning Polish', desc: 'A RL agent maximises soft constraint satisfaction — faculty preference scores — within the feasible solution space.' },
+              { icon: <GitBranch size={22} color="#1A73E8" />, stage: 'Stage 1', name: 'Louvain Clustering', desc: 'Partitions the scheduling graph into smaller sub-problems. Reduces solver complexity from exponential to manageable.' },
+              { icon: <Cpu size={22} color="#1A73E8" />, stage: 'Stage 2', name: 'CP-SAT Solving', desc: 'Google OR-Tools resolves all hard constraints. Guaranteed zero faculty conflicts, room conflicts, and batch overlaps.' },
+              { icon: <BarChart2 size={22} color="#1A73E8" />, stage: 'Stage 3', name: 'Q-Learning Polish', desc: 'A RL agent maximises soft constraint satisfaction — faculty preference scores — within the feasible solution space.' },
             ].map((s, i) => (
-              <div key={i} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px', padding: '28px' }}>
+              <div key={i} style={{ background: 'white', border: '1px solid rgba(26,115,232,0.14)', borderRadius: '16px', padding: '28px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(42,157,143,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(26,115,232,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {s.icon}
                   </div>
-                  <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', fontWeight: 600, color: 'rgba(42,157,143,0.8)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '12px', fontWeight: 600, color: '#1A73E8', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                     {s.stage}
                   </span>
                 </div>
-                <h4 style={{ fontFamily: 'Poppins, sans-serif', fontSize: '16px', fontWeight: 600, color: 'white', marginBottom: '10px' }}>{s.name}</h4>
-                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', color: 'rgba(255,255,255,0.60)', lineHeight: 1.65 }}>{s.desc}</p>
+                <h4 style={{ fontFamily: 'Poppins, sans-serif', fontSize: '16px', fontWeight: 600, color: '#202124', marginBottom: '10px' }}>{s.name}</h4>
+                <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', color: '#5F6368', lineHeight: 1.65 }}>{s.desc}</p>
               </div>
             ))}
           </div>
@@ -175,14 +175,14 @@ export default function ProductPage() {
       <section id="api" style={{ background: 'white' }}>
         <div className="mk-section" style={{ maxWidth: '760px' }}>
           <h2 className="mk-h2" style={{ textAlign: 'center', marginBottom: '40px' }}>Technical specifications</h2>
-          <div style={{ border: '1px solid rgba(27,58,92,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
+          <div style={{ border: '1px solid rgba(21,88,214,0.08)', borderRadius: '16px', overflow: 'hidden' }}>
             {TECH_SPECS.map((spec, i) => (
               <div
                 key={spec.label}
                 style={{
                   display:    'flex',
                   padding:    '16px 24px',
-                  borderBottom: i < TECH_SPECS.length - 1 ? '1px solid rgba(27,58,92,0.06)' : 'none',
+                  borderBottom: i < TECH_SPECS.length - 1 ? '1px solid rgba(21,88,214,0.06)' : 'none',
                   background: i % 2 === 0 ? 'white' : 'rgba(244,246,248,0.5)',
                   gap:        '16px',
                   flexWrap:   'wrap',

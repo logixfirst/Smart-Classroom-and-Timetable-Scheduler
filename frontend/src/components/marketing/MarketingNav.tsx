@@ -44,10 +44,10 @@ export function MarketingNav() {
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           borderBottom: scrolled
-            ? '1px solid rgba(27,58,92,0.12)'
+            ? '1px solid rgba(21,88,214,0.12)'
             : '1px solid transparent',
           boxShadow: scrolled
-            ? '0 1px 12px rgba(27,58,92,0.08)'
+            ? '0 1px 12px rgba(21,88,214,0.08)'
             : 'none',
         }}
       >
@@ -87,7 +87,7 @@ export function MarketingNav() {
               style={{
                 border: '1px solid var(--cadence-navy)',
                 color: 'var(--cadence-navy)',
-                borderRadius: '8px',
+                borderRadius: '9999px',
                 padding: '8px 20px',
                 fontSize: '14px',
                 fontWeight: 500,
@@ -103,9 +103,9 @@ export function MarketingNav() {
             <Link
               href="/contact"
               style={{
-                background: 'linear-gradient(135deg, #1B3A5C, #2A9D8F)',
+                background: '#1A73E8',
                 color: 'white',
-                borderRadius: '8px',
+                borderRadius: '9999px',
                 padding: '8px 20px',
                 fontSize: '14px',
                 fontWeight: 600,
@@ -138,7 +138,7 @@ export function MarketingNav() {
       {menuOpen && (
         <div
           className="fixed inset-0 z-[100] flex flex-col p-8"
-          style={{ background: '#0F1C2E' }}
+          style={{ background: '#0D2137' }}
         >
           {/* Close button */}
           <div className="flex items-center justify-between mb-12">

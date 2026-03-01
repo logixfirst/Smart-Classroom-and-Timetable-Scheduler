@@ -96,12 +96,21 @@ class GeneticAlgorithmOptimizer:
                 best_solution = copy.deepcopy(population[max_idx])
                 logger.info(f"[GA] Gen {generation+1}: fitness={best_fitness:.2f}")
             
-            # Emit per-generation progress tick (feeds SSE stream)
+            # Emit per-generation progress tick (feeds SSE stream).
+            # CRITICAL: CancellationError MUST propagate — it is the per-generation
+            # fast-cancel mechanism.  Generic exceptions are still swallowed so
+            # a bad callback never aborts a legitimate GA run.
             if self.progress_callback is not None:
                 try:
                     self.progress_callback(generation + 1, self.generations, best_fitness)
-                except Exception:
-                    pass  # Never let callback failure abort GA
+                except Exception as _cb_exc:
+                    # Re-raise CancellationError — it is a cooperative stop signal,
+                    # not a callback programming error.
+                    from core.cancellation import CancellationError as _CancelError
+                    if isinstance(_cb_exc, _CancelError):
+                        raise
+                    # All other exceptions: absorb so GA always finishes
+                    pass
             
             # Build next generation
             population = self._evolve_generation(population, fitness_scores)

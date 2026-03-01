@@ -57,14 +57,14 @@ function TierCard({ name, price, priceNote, tagline, features, cta, ctaHref, fea
       style={{
         background:   'white',
         borderRadius: '20px',
-        border:       featured ? '2px solid var(--cadence-teal)' : '1px solid rgba(27,58,92,0.10)',
+        border:       featured ? '2px solid var(--cadence-teal)' : '1px solid rgba(21,88,214,0.10)',
         padding:      '32px',
         display:      'flex',
         flexDirection: 'column',
         position:     'relative',
         boxShadow:    featured
-          ? '0 0 0 4px rgba(42,157,143,0.08), 0 16px 48px rgba(42,157,143,0.12)'
-          : '0 2px 12px rgba(27,58,92,0.05)',
+          ? '0 0 0 4px rgba(26,115,232,0.08), 0 16px 48px rgba(26,115,232,0.12)'
+          : '0 2px 12px rgba(21,88,214,0.05)',
         transform:    featured ? 'scale(1.02)' : 'none',
         zIndex:       featured ? 1 : 0,
       }}
@@ -136,7 +136,7 @@ function TierCard({ name, price, priceNote, tagline, features, cta, ctaHref, fea
           textDecoration: 'none',
           transition:     'all 150ms',
           background:     featured
-            ? 'linear-gradient(135deg, #1B3A5C, #2A9D8F)'
+            ? '#1A73E8'
             : 'transparent',
           color:   featured ? 'white' : 'var(--cadence-navy)',
           border:  featured ? 'none' : '1.5px solid var(--cadence-navy)',
@@ -181,7 +181,7 @@ export function PricingTable({ preview = false }: { preview?: boolean }) {
             width:        '52px',
             height:       '28px',
             borderRadius: '9999px',
-            background:   annual ? 'var(--cadence-teal)' : 'rgba(27,58,92,0.15)',
+            background:   annual ? 'var(--cadence-teal)' : 'rgba(26,115,232,0.10)',
             border:       'none',
             cursor:       'pointer',
             position:     'relative',
@@ -205,7 +205,7 @@ export function PricingTable({ preview = false }: { preview?: boolean }) {
         </button>
         <span style={{ fontFamily: 'Inter, sans-serif', fontSize: '15px', fontWeight: annual ? 600 : 400, color: annual ? 'var(--cadence-ink)' : 'var(--cadence-slate)', display: 'flex', alignItems: 'center', gap: '6px' }}>
           Annual
-          <span style={{ background: 'rgba(42,157,143,0.12)', color: 'var(--cadence-teal)', borderRadius: '9999px', padding: '2px 8px', fontSize: '12px', fontWeight: 700 }}>
+          <span style={{ background: 'rgba(26,115,232,0.12)', color: 'var(--cadence-teal)', borderRadius: '9999px', padding: '2px 8px', fontSize: '12px', fontWeight: 700 }}>
             Save 20%
           </span>
         </span>

@@ -7,7 +7,6 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import {
   Search,
-  Mic,
   Bell,
   LogOut,
   Sun,
@@ -64,9 +63,10 @@ const ADMIN_NAV: NavItem[] = [
 ]
 
 const FACULTY_NAV: NavItem[] = [
-  { label: 'Dashboard',   href: '/faculty/dashboard',   icon: LayoutDashboard },
-  { label: 'My Schedule', href: '/faculty/schedule',    icon: Calendar },
-  { label: 'Preferences', href: '/faculty/preferences', icon: SlidersHorizontal },
+  { label: 'Dashboard',     href: '/faculty/dashboard',      icon: LayoutDashboard },
+  { label: 'My Schedule',   href: '/faculty/schedule',       icon: Calendar },
+  { label: 'Preferences',   href: '/faculty/preferences',    icon: SlidersHorizontal },
+  { label: 'Notifications', href: '/faculty/notifications',  icon: Bell },
 ]
 
 const STUDENT_NAV: NavItem[] = [
@@ -156,7 +156,7 @@ function NavItemRow({
           : 'gap-3 px-4 mx-2 rounded-[24px]',
         active
           ? 'bg-[#E8F0FE] dark:bg-[#1C2B4A] font-semibold text-[#1A73E8] dark:text-[#8AB4F8]'
-          : 'text-[#444746] dark:text-[#bdc1c6] hover:bg-[#EEF3FD] dark:hover:bg-[#1a2640]',
+          : 'text-[#444746] dark:text-[#bdc1c6] hover:bg-[#e8f0fe] dark:hover:bg-[#1a2640]',
       ].join(' ')}
     >
       <span className="relative shrink-0">
@@ -366,9 +366,7 @@ export default function AppShell({ children }: DashboardLayoutProps) {
                 'transition-[background-color,box-shadow,border-color] duration-150',
               ].join(' ')}
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[#5f6368] dark:text-[#9aa0a6]">
-              <Mic size={18} />
-            </span>
+
           </div>
         </div>
 

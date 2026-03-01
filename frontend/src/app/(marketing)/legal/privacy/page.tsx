@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <div style={{ background: 'white' }}>
-      <section style={{ background: 'var(--cadence-off-white)', borderBottom: '1px solid rgba(27,58,92,0.08)', padding: '56px 24px 48px', textAlign: 'center' }}>
+      <section style={{ background: 'var(--cadence-off-white)', borderBottom: '1px solid rgba(21,88,214,0.08)', padding: '56px 24px 48px', textAlign: 'center' }}>
         <span className="mk-eyebrow">Legal</span>
         <h1 className="mk-h1" style={{ marginTop: '8px' }}>Privacy Policy</h1>
         <p style={{ fontFamily: 'Inter, sans-serif', fontSize: '14px', color: 'var(--cadence-slate)', marginTop: '12px' }}>

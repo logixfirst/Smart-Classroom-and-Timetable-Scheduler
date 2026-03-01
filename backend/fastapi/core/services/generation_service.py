@@ -164,10 +164,47 @@ class GenerationService:
             logger.warning(f"[JOB {job_id}] Could not update DB on timeout: {db_err}")
     
     async def _handle_cancellation(self, job_id: str):
-        """Handle job cancellation"""
+        """Handle asyncio.CancelledError path (external/forced task cancellation).
+
+        This is distinct from the cooperative ``CancellationError`` path that
+        saga.execute() handles internally (which calls ``tracker.mark_cancelled()``
+        itself).  This method fires when the asyncio Task is cancelled externally
+        — e.g. a server restart while a job is in-flight.  Without writing a
+        terminal state here the progress key would stay ``'running'`` for 2 hours
+        (its TTL), causing the frontend SSE loop to keep reconnecting.
+        """
         if self.redis:
-            self.redis.delete(f"cancel:job:{job_id}")
-            self.redis.delete(f"start_time:job:{job_id}")
+            try:
+                import json as _json, time as _time
+                now = int(_time.time())
+                existing_raw = self.redis.get(f"progress:job:{job_id}")
+                existing = _json.loads(existing_raw) if existing_raw else {}
+                cancelled_data = {
+                    'job_id':           job_id,
+                    'stage':            'cancelled',
+                    'stage_progress':   0.0,
+                    'overall_progress': 0.0,
+                    'status':           'cancelled',
+                    'eta_seconds':      None,
+                    'started_at':       existing.get('started_at', now),
+                    'last_updated':     now,
+                    'cancelled_at':     now,
+                    'metadata':         {'error': 'Job cancelled externally (server shutdown?)'},
+                }
+                self.redis.setex(
+                    f"progress:job:{job_id}", 7200, _json.dumps(cancelled_data)
+                )
+            except Exception:
+                pass
+            # Clean all ephemeral keys in one pipeline
+            try:
+                pipe = self.redis.pipeline(transaction=False)
+                pipe.delete(f"cancel:job:{job_id}")
+                pipe.delete(f"start_time:job:{job_id}")
+                pipe.delete(f"state:job:{job_id}")
+                pipe.execute()
+            except Exception:
+                pass
     
     async def _handle_error(self, job_id: str, error: Exception):
         """Handle job error — fallback DB write in case _compensate in saga.py failed."""
@@ -201,18 +238,40 @@ class GenerationService:
             logger.warning(f"[JOB {job_id}] Fallback DB write failed: {db_err}")
     
     async def _cleanup(self, job_id: str):
-        """Cleanup resources after generation"""
+        """Clean up ephemeral Redis keys and process memory after any terminal state.
+
+        Always called from the ``finally`` block in ``generate_timetable`` —
+        runs whether the job succeeded, failed, or was cancelled.
+
+        Keys intentionally KEPT (read by other consumers):
+            ``progress:job:{job_id}``  — frontend SSE reads terminal status; TTL=7200s
+            ``result:job:{job_id}``   — variants API reads scores/metrics; TTL=86400s
+
+        Keys explicitly DELETED (ephemeral control-plane signals):
+            ``cancel:job:{job_id}``   — cancellation flag
+            ``start_time:job:{job_id}``— job wall-clock start (used for admin elapsed-time)
+            ``state:job:{job_id}``    — CancellationToken state-machine key
+
+        Previously only ``cancel:job:`` was deleted here, causing ``start_time``
+        and ``state`` to linger for up to 1 hour and pollute admin dashboards.
+        """
         try:
-            # Cleanup Redis flags
             if self.redis:
-                self.redis.delete(f"cancel:job:{job_id}")
-            
-            # Force garbage collection
+                # Single pipeline round-trip for all ephemeral key deletes
+                pipe = self.redis.pipeline(transaction=False)
+                pipe.delete(f"cancel:job:{job_id}")
+                pipe.delete(f"start_time:job:{job_id}")
+                pipe.delete(f"state:job:{job_id}")
+                pipe.execute()
+        except Exception as e:
+            logger.warning(f"[JOB {job_id}] Redis cleanup error (non-fatal): {e}")
+
+        # Force GC to reclaim large in-memory structures (courses, students,
+        # solution dicts) that the saga held during execution.
+        try:
             import gc
             gc.collect()
-            gc.collect()  # Double collect for thorough cleanup
-            
-            logger.debug(f"[JOB {job_id}] Cleanup complete")
-            
-        except Exception as e:
-            logger.error(f"[JOB {job_id}] Cleanup error: {e}")
+        except Exception:
+            pass
+
+        logger.debug(f"[JOB {job_id}] Cleanup complete")
