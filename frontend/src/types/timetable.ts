@@ -184,13 +184,13 @@ export interface TimetableSlot {
 export interface TimetableListItem {
   id: string
   year: number
-  batch: string
+  batch: string | null
   department: string
   semester: number
-  status: 'approved' | 'pending' | 'draft' | 'rejected'
+  status: 'approved' | 'pending' | 'pending_review' | 'draft' | 'rejected' | 'running' | 'completed' | 'failed'
   lastUpdated: string
   conflicts: number
-  score?: number
+  score?: number | null
   academic_year: string
   variant_id?: string
   job_id?: string

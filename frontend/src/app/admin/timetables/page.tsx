@@ -5,196 +5,36 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { TimetableListSkeleton } from '@/components/LoadingSkeletons'
-import { useProgress } from '@/hooks/useProgress'
 import type { TimetableListItem } from '@/types/timetable'
-
-interface RunningJob {
-  job_id: string
-  progress: number
-  status: string
-  message: string
-  time_remaining_seconds?: number | null
-  department?: string
-  academic_year?: string
-  semester?: number
-}
-
-// ── Running job row — subscribes to SSE for real-time progress + ETA ─────────
-const STAGE_LABELS: Record<string, string> = {
-  loading:        'Reading data',
-  clustering:     'Organising courses',
-  cpsat_solving:  'Building schedule',
-  ga_optimization:'Refining timetable',
-  rl_refinement:  'Final polish',
-}
-
-function formatETA(seconds: number | null): string {
-  if (seconds === null || seconds < 5) return 'Almost done…'
-  if (seconds < 60) return `~${Math.round(seconds)}s left`
-  return `~${Math.ceil(seconds / 60)}m left`
-}
-
-function RunningJobRow({ job, onNavigate, onJobFailed }: { job: RunningJob; onNavigate: () => void; onJobFailed: (jobId: string) => void }) {
-  const { progress, isConnected } = useProgress(
-    job.job_id,
-    undefined,
-    () => { onJobFailed(job.job_id) },  // called when SSE reports failed / cancelled
-  )
-
-  const isFailed    = progress?.status === 'failed' || progress?.status === 'cancelled'
-  const pct         = progress?.overall_progress ?? 0
-  const stage       = isFailed
-    ? (progress?.status === 'cancelled' ? 'Cancelled' : 'Generation failed')
-    : (progress?.stage ? (STAGE_LABELS[progress.stage] ?? progress.stage) : 'Connecting…')
-  const eta         = progress?.eta_seconds ?? null
-  const hasProgress = pct > 0
-
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 14px',
-      background: isFailed ? 'var(--color-danger-subtle, #fff5f5)' : 'var(--color-bg-page)',
-      border: `1px solid ${isFailed ? 'var(--color-danger)' : 'var(--color-border)'}`,
-      borderRadius: 'var(--radius-md)',
-    }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Identity row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {job.department ?? 'All Departments'}
-          </span>
-          {job.academic_year && job.semester && (
-            <span style={{
-              fontSize: 11, color: 'var(--color-text-muted)',
-              background: 'var(--color-bg-surface-2)',
-              padding: '1px 7px', borderRadius: 4,
-              flexShrink: 0, fontWeight: 500,
-            }}>
-              {job.academic_year} · Sem {job.semester}
-            </span>
-          )}
-          {isFailed && (
-            <span style={{
-              fontSize: 11, fontWeight: 600,
-              color: 'var(--color-danger-text, #c53030)',
-              background: 'var(--color-danger-subtle, #fff5f5)',
-              border: '1px solid var(--color-danger)',
-              padding: '1px 7px', borderRadius: 4, flexShrink: 0,
-            }}>
-              {progress?.status === 'cancelled' ? 'Cancelled' : 'Failed'}
-            </span>
-          )}
-        </div>
-
-        {/* Stage + ETA row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
-          <span style={{ fontSize: 12, color: isFailed ? 'var(--color-danger-text, #c53030)' : 'var(--color-text-secondary)' }}>
-            {stage}
-          </span>
-          {!isFailed && (
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)', flexShrink: 0, marginLeft: 8 }}>
-              {hasProgress
-                ? <>{Math.round(pct)}% &nbsp;<span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>{formatETA(eta)}</span></>
-                : <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>{isConnected ? formatETA(eta) : 'Connecting…'}</span>
-              }
-            </span>
-          )}
-        </div>
-
-        {/* Progress bar — red on failure, blue otherwise */}
-        <div style={{ position: 'relative', height: 4, background: 'var(--color-bg-surface-3)', borderRadius: 2, overflow: 'hidden' }}>
-          {/* Fill — always visible, min 8% so it shows from the moment the job appears */}
-          <div style={{
-            position: 'absolute', top: 0, left: 0, height: '100%',
-            width: isFailed ? '100%' : `${Math.max(pct, 8)}%`,
-            background: isFailed ? 'var(--color-danger)' : 'var(--color-primary)',
-            borderRadius: 2,
-            transition: 'width 600ms ease',
-            animation: isFailed ? 'none' : 'progress-fill-breathe 2s ease-in-out infinite',
-          }} />
-          {/* White shine beam clipped to fill width — only when running */}
-          {!isFailed && (
-            <div style={{
-              position: 'absolute', top: 0, left: 0, height: '100%',
-              width: `${Math.max(pct, 8)}%`,
-              overflow: 'hidden', borderRadius: 2,
-            }}>
-              <span style={{
-                position: 'absolute', inset: 0, width: '50%',
-                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 50%, transparent 100%)',
-                animation: 'progress-shine 1.8s linear infinite',
-              }} />
-            </div>
-          )}
-        </div>
-      </div>
-
-      <button
-        onClick={onNavigate}
-        className={isFailed ? 'btn-secondary' : 'btn-primary'}
-        style={{ fontSize: 12, height: 32, padding: '0 14px', flexShrink: 0 }}
-      >
-        {isFailed ? 'View Details' : 'View Progress'}
-      </button>
-    </div>
-  )
-}
-
-const STATUS_CONFIG: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  approved:  { bg: 'var(--color-success-subtle)', text: 'var(--color-success-text)', dot: 'var(--color-success)', label: 'Approved'  },
-  completed: { bg: 'var(--color-success-subtle)', text: 'var(--color-success-text)', dot: 'var(--color-success)', label: 'Completed' },
-  pending:   { bg: 'var(--color-warning-subtle)', text: 'var(--color-warning-text)', dot: 'var(--color-warning)', label: 'Pending'   },
-  running:   { bg: 'var(--color-info-subtle)',    text: 'var(--color-info)',          dot: 'var(--color-primary)', label: 'Running'  },
-  draft:     { bg: 'var(--color-bg-surface-2)',   text: 'var(--color-text-secondary)', dot: 'var(--color-text-muted)', label: 'Draft' },
-  rejected:  { bg: 'var(--color-danger-subtle)',  text: 'var(--color-danger-text)',   dot: 'var(--color-danger)', label: 'Rejected'  },
-  failed:    { bg: 'var(--color-danger-subtle)',  text: 'var(--color-danger-text)',   dot: 'var(--color-danger)', label: 'Failed'    },
-}
-
-function StatusChip({ status, isRunning }: { status: string; isRunning?: boolean }) {
-  const key   = isRunning ? 'running' : status
-  const cfg   = STATUS_CONFIG[key] ?? STATUS_CONFIG['draft']
-  return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 5,
-      padding: '2px 8px', borderRadius: 12, flexShrink: 0,
-      background: cfg.bg, color: cfg.text, fontSize: 12, fontWeight: 500,
-    }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
-      {cfg.label}
-    </span>
-  )
-}
-
-// ── Metric tile — top-of-page summary cards ───────────────────────────────────
-function MetricTile({ value, label, color }: { value: number; label: string; color: string }) {
-  return (
-    <div style={{
-      background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-lg)', padding: '16px 20px', textAlign: 'center',
-    }}>
-      <div style={{ fontSize: 26, fontWeight: 700, color, lineHeight: 1, fontFamily: "'Poppins', sans-serif" }}>
-        {value}
-      </div>
-      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 4, fontWeight: 500 }}>
-        {label}
-      </div>
-    </div>
-  )
-}
+import { RunningJobRow } from './components/RunningJobRow'
+import { StatusChip } from './components/StatusChip'
+import type { RunningJob } from './components/RunningJobRow'
 
 const CACHE_KEY = 'admin_timetables_cache'
-const CACHE_TTL_MS = 60_000 // 60 s stale-while-revalidate window
+const CACHE_TTL_MS = 60_000
 
-function transformJobs(jobs: any[]): TimetableListItem[] {
-  return jobs.map((job: any) => ({
-    id: job.job_id || job.id,
+function transformJobs(jobs: {
+  job_id?: string
+  id?: string
+  academic_year?: string
+  organization_name?: string
+  batch?: { batch_name?: string }
+  semester?: number
+  status?: string
+  updated_at?: string
+  created_at?: string
+  conflicts_count?: number
+  quality_score?: number
+}[]): TimetableListItem[] {
+  return jobs.map(job => ({
+    id: job.job_id || job.id || '',
     year: parseInt((job.academic_year || '2024').split('-')[0]) || new Date().getFullYear(),
     department: job.organization_name || 'All Departments',
     batch: job.batch?.batch_name || null,
     semester: job.semester || 1,
     academic_year: job.academic_year || '2024-25',
     status: (job.status || 'draft') as TimetableListItem['status'],
-    lastUpdated: new Date(job.updated_at || job.created_at).toLocaleDateString(),
+    lastUpdated: new Date(job.updated_at || job.created_at || Date.now()).toLocaleDateString(),
     conflicts: job.conflicts_count || 0,
     score: job.quality_score || null,
   }))
@@ -204,7 +44,6 @@ export default function AdminTimetablesPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [activeTab, setActiveTab] = useState<string>('all')
   const [timetables, setTimetables] = useState<TimetableListItem[]>(() => {
-    // ── Stale-while-revalidate: seed state from sessionStorage immediately ──
     try {
       const raw = sessionStorage.getItem(CACHE_KEY)
       if (raw) {
@@ -218,20 +57,14 @@ export default function AdminTimetablesPage() {
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
-  // Running-job poll: derive from main timetables list (no separate fetch)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const emptyPollCount = useRef(0)
-  // Jobs that have transitioned to a terminal state via SSE but whose DB status
-  // may not have propagated to the timetables list yet.  Excluding them here
-  // prevents the failed card from lingering in the running banner between the
-  // SSE signal and the next loadTimetableData() response.
   const [terminatedJobIds, setTerminatedJobIds] = useState<Set<string>>(() => new Set())
 
   const { user } = useAuth()
   const router = useRouter()
   const API_BASE = process.env.NEXT_PUBLIC_DJANGO_API_URL || 'http://localhost:8000/api'
 
-  // ── Derive running jobs from the main list (no extra API round-trip) ─────
   const runningJobs = useMemo<RunningJob[]>(
     () =>
       timetables
@@ -243,7 +76,7 @@ export default function AdminTimetablesPage() {
           job_id: t.id,
           progress: 0,
           status: t.status,
-          message: t.status === 'pending' ? 'Queued — waiting to start' : 'Generating schedule…',
+          message: t.status === 'pending' ? 'Queued \u2014 waiting to start' : 'Generating schedule\u2026',
           time_remaining_seconds: null,
           department: t.department,
           academic_year: t.academic_year,
@@ -255,58 +88,38 @@ export default function AdminTimetablesPage() {
   const loadTimetableData = useCallback(async () => {
     try {
       setError(null)
-
       const response = await fetch(
         `${API_BASE}/generation-jobs/?page=${currentPage}&page_size=20`,
         { credentials: 'include' }
       )
-
       if (!response.ok) {
-        setTimetables(prev => prev) // keep stale data visible
+        setTimetables(prev => prev)
         setLoading(false)
         return
       }
-
       const data = await response.json()
       const jobs = data.results || []
       setTotalCount(data.count || 0)
-
       const listItems = transformJobs(jobs)
-      // Prune terminatedJobIds: only remove IDs that the API now confirms are
-      // no longer running/pending. IDs where the DB is stuck at 'running' stay
-      // in the set so the running banner never re-shows a job the SSE already
-      // reported as failed/cancelled — preventing the infinite reconnect loop.
       setTerminatedJobIds(prev => {
         if (prev.size === 0) return prev
         const next = new Set(prev)
         listItems.forEach((t: TimetableListItem) => {
           const s = t.status as string
-          if (s !== 'running' && s !== 'pending') {
-            next.delete(t.id)
-          }
+          if (s !== 'running' && s !== 'pending') next.delete(t.id)
         })
         return next
       })
       setTimetables(listItems)
-
-      // Background-prefetch variants for the 3 most-recent completed/failed jobs.
-      // This warms the Redis cache so clicking any of those timetables is instant,
-      // even if Redis has evicted the keys since the initial cache-warm on completion.
       const toPrewarm = listItems
         .filter((t: TimetableListItem) => (t.status as string) === 'completed' || (t.status as string) === 'failed')
         .slice(0, 3)
       toPrewarm.forEach((job: TimetableListItem) => {
-        fetch(`${API_BASE}/timetable/variants/?job_id=${job.id}`, {
-          credentials: 'include',
-        } as RequestInit).catch(() => {}) // fire-and-forget: warms Redis silently
+        fetch(`${API_BASE}/timetable/variants/?job_id=${job.id}`, { credentials: 'include' } as RequestInit).catch(() => {})
       })
-
-      // Persist to sessionStorage so next navigation is instant
       try {
         sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: listItems, ts: Date.now() }))
-      } catch { /* quota exceeded – ignore */ }
-
-      // Stop background polling once no running jobs remain
+      } catch { /* quota exceeded */ }
       const hasActive = listItems.some(t => (t.status as string) === 'running' || t.status === 'pending')
       if (!hasActive) {
         emptyPollCount.current += 1
@@ -324,40 +137,25 @@ export default function AdminTimetablesPage() {
     }
   }, [currentPage, API_BASE])
 
+  useEffect(() => { loadTimetableData() }, [loadTimetableData])
+
   useEffect(() => {
-    loadTimetableData()
+    pollingRef.current = setInterval(() => { loadTimetableData() }, 8_000)
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current) }
   }, [loadTimetableData])
 
-  // Background poll – only keep going while there are active jobs
-  useEffect(() => {
-    pollingRef.current = setInterval(() => {
-      loadTimetableData()
-    }, 8_000) // 8 s is plenty for status updates
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current)
-    }
-  }, [loadTimetableData])
-
-  // ── Pure helper – memoised so it doesn't recompute on every render ────────
   const getGroupedBySemester = useMemo(() => () => {
     const grouped: { [key: string]: TimetableListItem[] } = {}
-
-    // Exclude running/pending jobs — they are shown in the active-jobs banner above,
-    // not in the timetables grid (they have no reviewable schedule yet).
     timetables
       .filter(t => (t.status as string) !== 'running' && t.status !== 'pending')
       .forEach(timetable => {
         const key = `${timetable.academic_year}-${timetable.semester}`
-        if (!grouped[key]) {
-          grouped[key] = []
-        }
+        if (!grouped[key]) grouped[key] = []
         grouped[key].push(timetable)
       })
-
     return grouped
   }, [timetables])
 
-  // ── Derived counts for filter tabs ─────────────────────────────────────
   const counts = useMemo(() => ({
     total:          timetables.filter(t => (t.status as string) !== 'running' && t.status !== 'pending').length,
     approved:       timetables.filter(t => t.status === 'approved').length,
@@ -368,7 +166,6 @@ export default function AdminTimetablesPage() {
 
   const groupedTimetables = getGroupedBySemester()
 
-  // ── Skeleton: first load only (no stale data) ────────────────────────────
   if (loading && timetables.length === 0) {
     return (
       <div className="space-y-6">
@@ -378,7 +175,6 @@ export default function AdminTimetablesPage() {
     )
   }
 
-  // ── Error state ──────────────────────────────────────────────────────────
   if (error) {
     return (
       <div className="card" style={{ borderColor: 'var(--color-danger)' }}>
@@ -398,8 +194,7 @@ export default function AdminTimetablesPage() {
 
   return (
     <div className="space-y-5">
-
-      {/* ── 1. Sub-header: count + generate button ────────────────────────── */}
+      {/* Sub-header */}
       <div className="flex items-center justify-between">
         <span className="text-sm tabular-nums [color:var(--color-text-muted)]">
           {!loading && counts.total > 0 ? `${counts.total.toLocaleString()} timetable${counts.total === 1 ? '' : 's'}` : ''}
@@ -413,7 +208,7 @@ export default function AdminTimetablesPage() {
         </Link>
       </div>
 
-      {/* ── 2. Status filter tabs ─────────────────────────────────────────── */}
+      {/* Filter tabs */}
       <div className="flex items-center gap-1 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
         {([
           { id: 'all',            label: 'All',            count: counts.total },
@@ -447,10 +242,9 @@ export default function AdminTimetablesPage() {
         ))}
       </div>
 
-      {/* ── 3. Active-jobs banner ────────────────────────────────────────── */}
+      {/* Active-jobs banner */}
       {runningJobs.length > 0 && (
         <div className="card" style={{ borderLeft: '3px solid var(--color-success)' }}>
-          {/* Header */}
           <div className="card-header" style={{ paddingBottom: 12, marginBottom: 16 }}>
             <div className="flex items-center gap-2">
               <span
@@ -465,12 +259,8 @@ export default function AdminTimetablesPage() {
                 {runningJobs.length === 1 ? 'Generation in Progress' : `${runningJobs.length} Jobs Running`}
               </h3>
             </div>
-            <p className="card-description">
-              AI engine is building your timetable
-            </p>
+            <p className="card-description">AI engine is building your timetable</p>
           </div>
-
-          {/* Job rows — each subscribes to its own SSE stream */}
           <div className="space-y-3">
             {runningJobs.map(job => (
               <RunningJobRow
@@ -478,9 +268,7 @@ export default function AdminTimetablesPage() {
                 job={job}
                 onNavigate={() => router.push(`/admin/timetables/status/${job.job_id}`)}
                 onJobFailed={(jobId) => {
-                  // 1. Immediately drop from the running banner
                   setTerminatedJobIds(prev => new Set(prev).add(jobId))
-                  // 2. Refresh list so it appears in the grid with failed status
                   loadTimetableData()
                 }}
               />
@@ -489,13 +277,10 @@ export default function AdminTimetablesPage() {
         </div>
       )}
 
-      {/* ── 4. Timetables content ────────────────────────────────────────── */}
+      {/* Timetables grid/list */}
       <div>
-        {/* Section header + view toggle */}
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-semibold [color:var(--color-text-primary)]">
-            Department Timetables
-          </span>
+          <span className="text-sm font-semibold [color:var(--color-text-primary)]">Department Timetables</span>
           <div className="flex gap-1">
             {(['grid', 'list'] as const).map(mode => (
               <button
@@ -514,7 +299,6 @@ export default function AdminTimetablesPage() {
           </div>
         </div>
 
-        {/* Groups */}
         {Object.keys(groupedTimetables).length === 0 ? (
           <div className="card text-center py-12">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-3 [color:var(--color-text-muted)]">
@@ -529,18 +313,16 @@ export default function AdminTimetablesPage() {
             {Object.entries(groupedTimetables)
               .sort(([a], [b]) => b.localeCompare(a))
               .map(([semesterKey, items]) => {
-                const filteredItems = activeTab === 'all'
-                  ? items
-                  : items.filter(t => t.status === activeTab)
+                const filteredItems = activeTab === 'all' ? items : items.filter(t => t.status === activeTab)
                 if (filteredItems.length === 0) return null
                 const [academicYear, semester] = semesterKey.split('-')
                 return (
                   <div key={semesterKey} className="card">
                     <div className="card-header pb-3">
                       <div>
-                        <h3 className="card-title">{academicYear} · Semester {semester}</h3>
+                        <h3 className="card-title">{academicYear} &middot; Semester {semester}</h3>
                         <p className="card-description">
-                          {filteredItems.length} course{filteredItems.length !== 1 ? 's' : ''} &nbsp;·&nbsp;
+                          {filteredItems.length} course{filteredItems.length !== 1 ? 's' : ''} &nbsp;&middot;&nbsp;
                           {filteredItems.filter(t => t.status === 'approved').length} approved
                         </p>
                       </div>
@@ -561,12 +343,8 @@ export default function AdminTimetablesPage() {
                               >
                                 <div className="flex items-start justify-between gap-2 mb-2.5">
                                   <div className="min-w-0">
-                                    <p className="text-sm font-semibold truncate [color:var(--color-text-primary)] m-0">
-                                      {t.department}
-                                    </p>
-                                    <p className="text-xs [color:var(--color-text-secondary)] mt-0.5 m-0">
-                                      {t.batch ?? 'All Students'}
-                                    </p>
+                                    <p className="text-sm font-semibold truncate [color:var(--color-text-primary)] m-0">{t.department}</p>
+                                    <p className="text-xs [color:var(--color-text-secondary)] mt-0.5 m-0">{t.batch ?? 'All Students'}</p>
                                   </div>
                                   <StatusChip status={t.status} isRunning={isRunning} />
                                 </div>
@@ -618,7 +396,7 @@ export default function AdminTimetablesPage() {
                                   <td className="table-cell">
                                     {t.score != null ? (
                                       <span className="text-xs font-semibold [color:var(--color-success-text)]">{t.score}/10</span>
-                                    ) : '—'}
+                                    ) : '\u2014'}
                                   </td>
                                   <td className="table-cell">
                                     <span className={`text-xs font-semibold ${t.conflicts > 0 ? '[color:var(--color-danger-text)]' : '[color:var(--color-success-text)]'}`}>
@@ -639,7 +417,7 @@ export default function AdminTimetablesPage() {
         )}
       </div>
 
-      {/* ── 5. Pagination ───────────────────────────────────────────────── */}
+      {/* Pagination */}
       {totalCount > 20 && (
         <div className="flex items-center justify-center gap-2">
           <button
@@ -647,7 +425,7 @@ export default function AdminTimetablesPage() {
             disabled={currentPage === 1 || loading}
             className="btn-secondary h-8 px-3 text-sm"
           >
-            ← Prev
+            &larr; Prev
           </button>
           <span className="text-sm [color:var(--color-text-secondary)] px-1">
             Page {currentPage} of {Math.ceil(totalCount / 20)}
@@ -657,7 +435,7 @@ export default function AdminTimetablesPage() {
             disabled={currentPage >= Math.ceil(totalCount / 20) || loading}
             className="btn-secondary h-8 px-3 text-sm"
           >
-            Next →
+            Next &rarr;
           </button>
         </div>
       )}
