@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-react'
 
 type ToastType = 'success' | 'error' | 'warning' | 'info'
@@ -26,6 +26,12 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined)
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
+  // ToastContainer must only render on the client — it uses the DOM (fixed
+  // positioning, portals, event listeners). Rendering it on the server produces
+  // HTML that React cannot reconcile during hydration, especially when browser
+  // extensions mutate the DOM before React's first paint.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
   const showToast = useCallback((type: ToastType, message: string, duration = 5000) => {
     const id = Math.random().toString(36).substring(7)
@@ -85,7 +91,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      {mounted && <ToastContainer toasts={toasts} removeToast={removeToast} />}
     </ToastContext.Provider>
   )
 }
