@@ -1,6 +1,7 @@
 'use client'
 
 import { Activity, AlertTriangle, AlertOctagon, CheckCircle } from 'lucide-react'
+import PageHeader from '@/components/shared/PageHeader'
 
 const LOGS = [
   {
@@ -61,24 +62,28 @@ export default function LogsPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
 
-      {/* Top controls row — filter + export aligned right (mirrors Approvals' Refresh row) */}
-      <div className="flex items-center justify-end gap-2">
-        <label htmlFor="level-filter" className="sr-only">Filter by log level</label>
-        <select id="level-filter" className="input-primary w-32 text-sm">
-          <option>All Levels</option>
-          <option>INFO</option>
-          <option>SUCCESS</option>
-          <option>WARNING</option>
-          <option>ERROR</option>
-        </select>
-        <button className="btn-secondary flex items-center gap-2 text-sm">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0L8 12m4 4V4" />
-          </svg>
-          Export
-        </button>
-      </div>
+      <PageHeader
+        title="Logs"
+        secondaryActions={
+          <div className="flex items-center gap-2">
+            <label htmlFor="level-filter" className="sr-only">Filter by log level</label>
+            <select id="level-filter" className="input-primary w-32 text-sm">
+              <option>All Levels</option>
+              <option>INFO</option>
+              <option>SUCCESS</option>
+              <option>WARNING</option>
+              <option>ERROR</option>
+            </select>
+            <button className="btn-secondary flex items-center gap-2 text-sm">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0L8 12m4 4V4" />
+              </svg>
+              Export
+            </button>
+          </div>
+        }
+      />
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

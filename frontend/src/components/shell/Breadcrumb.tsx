@@ -138,6 +138,7 @@ const SUPPRESS_ROUTES: RegExp[] = [
   /^\/admin\/faculty/,
   /^\/admin\/students/,
   /^\/admin\/approvals/,
+  /^\/admin\/logs/,
   // Timetable pages — all render their own PageHeader or are full-screen overlays
   /^\/admin\/timetables/,
 ]
