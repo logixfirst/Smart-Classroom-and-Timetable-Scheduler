@@ -296,7 +296,9 @@ export default function AdminTimetablesPage() {
           </div>
         </div>
 
-        {Object.keys(groupedTimetables).length === 0 ? (
+        {loading && timetables.length === 0 ? (
+          <TimetableListSkeleton cards={6} />
+        ) : Object.keys(groupedTimetables).length === 0 ? (
           <div className="card text-center py-16">
             <Calendar size={40} className="mx-auto mb-3 text-[var(--color-text-muted)] opacity-50" />
             <p className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">No timetables yet</p>
