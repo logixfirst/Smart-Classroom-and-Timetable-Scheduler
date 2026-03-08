@@ -229,7 +229,7 @@ def add_student_constraints(
         students_of_course = student_course_index if student_course_index is not None else (students_of_course or {})
 
         if student_priority == "NONE":
-            logger.warning("[Constraints] Student constraints DISABLED (NONE mode)")
+            logger.debug("[Constraints] Student constraints DISABLED (NONE mode)")
             return 0
 
         # Determine which students to constrain

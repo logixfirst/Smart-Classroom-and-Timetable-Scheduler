@@ -481,7 +481,7 @@ class AdaptiveCPSATSolver:
         This method now correctly uses room.features for feature matching.
         """
         valid_domains = {}
-        MAX_ROOMS_PER_COURSE = 20  # was 10 — more candidates = larger domain = fewer INFEASIBLE
+        MAX_ROOMS_PER_COURSE = 30  # was 20 — BHU fix: wider domain reduces conflict density
 
         # Track how many courses fell to each fallback stage (for summary log)
         _stage_tally = {1: 0, 2: 0, 3: 0, 4: 0}
@@ -507,8 +507,8 @@ class AdaptiveCPSATSolver:
             candidate_rooms = [
                 room for room in self.rooms
                 if (
-                    room.capacity >= enrolled * 0.6   # was 0.7
-                    and room.capacity <= enrolled * 5.0  # was 4.0
+                    room.capacity >= enrolled * 0.5   # was 0.6 — BHU: many small courses, large halls
+                    and room.capacity <= enrolled * 6.0  # was 5.0 — allow large lecture halls
                     and room.room_type.upper() == required_type.upper()
                     and all(
                         f in (getattr(room, 'features', []) or [])

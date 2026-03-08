@@ -624,7 +624,12 @@ class TimetableGenerationSaga:
     ) -> None:
         """
         Best-effort Redis progress push for partition-solve phase milestones.
-        Maps 0-100 pct into the 55%-72% overall window (clustering→GA).
+        Maps 0-100 pct into the cpsat_solving stage range (15%→75%) so that
+        every push aligns with ProgressTracker.STAGE_WEIGHTS and the frontend
+        sees a monotonically increasing value from stage-start to stage-end.
+
+        Old formula (55 + pct*0.17) mapped into 55-72% — misaligned with the
+        start_stage('cpsat_solving') write of 15%, causing a 40% instant jump.
         Non-fatal: if Redis is unavailable, the progress bar skips this tick.
         """
         if not redis_client:
@@ -635,7 +640,8 @@ class TimetableGenerationSaga:
             key = f"progress:job:{job_id}"
             raw = redis_client.get(key)
             existing = json.loads(raw) if raw else {}
-            mapped = 55.0 + (pct / 100.0) * 17.0
+            # cpsat_solving: start=15, end=75 → range=60
+            mapped = 15.0 + (pct / 100.0) * 60.0
             if mapped > existing.get("overall_progress", 0.0):
                 existing.update({
                     "stage": "cpsat_solving",
