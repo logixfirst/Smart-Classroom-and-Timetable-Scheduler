@@ -160,6 +160,7 @@ else:
             "PORT": os.getenv("DB_PORT", "5432"),
             "ATOMIC_REQUESTS": True,
             "CONN_MAX_AGE": 600,  # PERFORMANCE: Connection pooling
+            "CONN_HEALTH_CHECKS": True,  # Re-validate stale connections before use
             "OPTIONS": {
                 "sslmode": "require",
                 "connect_timeout": 5,  # PERFORMANCE: Faster timeout

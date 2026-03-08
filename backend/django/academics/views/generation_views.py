@@ -7,6 +7,7 @@ import logging
 import requests
 from django.conf import settings
 from django.core.cache import cache
+from django.db import OperationalError
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -95,9 +96,19 @@ class GenerationJobViewSet(viewsets.ModelViewSet):
             return resp
 
         # get_object() is called once here and reused — avoids double DB hit
-        instance = self.get_object()
-        serializer = self.get_serializer(instance)
-        data = serializer.data
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            data = serializer.data
+        except OperationalError as db_err:
+            logger.error(
+                "[JOB RETRIEVE] Database error — returning 503",
+                extra={"job_id": pk, "error": str(db_err)},
+            )
+            return Response(
+                {"error": "Database temporarily unavailable, please retry.", "detail": str(db_err)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         # Only cache immutable terminal states
         if instance.status in ('completed', 'failed', 'cancelled'):
             try:

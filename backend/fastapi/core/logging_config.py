@@ -97,11 +97,19 @@ def setup_logging():
     file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
     file_handler.setFormatter(ExtraFieldsFormatter(log_format))
     
-    # Configure root logger
+    # Configure root logger.
+    # CRITICAL: force=True is required because uvicorn calls
+    # logging.config.dictConfig() on startup, which adds its own handlers to
+    # the root logger BEFORE (or concurrent with) this function.  Without
+    # force=True, basicConfig() is a no-op whenever root already has handlers,
+    # so our console_handler/file_handler are silently never attached.
+    # Result without fix: all INFO logs from engine/saga/clustering are dropped;
+    # only WARNING+ leaks through uvicorn's bare %(message)s formatter.
     logging.basicConfig(
         level=getattr(logging, log_level),
         format=log_format,
-        handlers=[console_handler, file_handler]
+        handlers=[console_handler, file_handler],
+        force=True,  # Remove any pre-existing root handlers (uvicorn, etc.)
     )
     
     # Set specific loggers to appropriate levels

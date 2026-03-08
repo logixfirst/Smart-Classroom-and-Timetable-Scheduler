@@ -52,7 +52,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useProgress, useSmoothProgress, useSmoothedETA } from '@/hooks/useProgress'
 import { fetchGenerationJobStatus } from '@/lib/api/timetable'
 import type { GenerationJob } from '@/types/timetable'
-import { useEffect, useRef, useState, ReactNode } from 'react'
+import { useEffect, useRef, useState, ReactNode, useCallback } from 'react'
 import { JetBrains_Mono } from 'next/font/google'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import { ArrowLeft, XCircle, AlertTriangle } from 'lucide-react'
@@ -147,10 +147,15 @@ export default function TimetableStatusPage() {
   const router = useRouter()
   const jobId = params.id as string
 
+  const [sseError, setSseError] = useState<string | null>(null)
+
   const { progress, isConnected, error, reconnectAttempt } = useProgress(
     jobId,
     () => { /* completion handled via useEffect on progress.status */ },
-    (err) => { console.error('[Status] generation error:', err) }
+    (err) => {
+      console.error('[Status] generation error:', err)
+      setSseError(err)
+    }
   )
 
   const smoothOverallProgress = useSmoothProgress(
@@ -171,10 +176,11 @@ export default function TimetableStatusPage() {
   const [isCancelling, setIsCancelling] = useState(false)
   const [countdown, setCountdown] = useState(3)
 
-  // ── REST polling fallback (functional — hidden from UI) ──────────────────────
+  // ── REST polling fallback (kicks in when SSE produces no data for 30 s) ──────
   const [sseTimedOut, setSseTimedOut] = useState(false)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [polledJob, setPolledJob] = useState<GenerationJob | null>(null)
+  const [pollError, setPollError] = useState<string | null>(null)
+  const pollFailCount = useRef(0)
 
   useEffect(() => {
     if (progress) { setSseTimedOut(false); return }
@@ -182,19 +188,31 @@ export default function TimetableStatusPage() {
     return () => clearTimeout(timer)
   }, [progress])
 
+  const pollOnce = useCallback(async (cancelled: { v: boolean }) => {
+    try {
+      const job = await fetchGenerationJobStatus(jobId)
+      if (!cancelled.v) {
+        setPolledJob(job)
+        pollFailCount.current = 0
+        setPollError(null)
+      }
+    } catch (err) {
+      if (!cancelled.v) {
+        pollFailCount.current += 1
+        if (pollFailCount.current >= 3) {
+          setPollError(err instanceof Error ? err.message : 'Unable to load job status')
+        }
+      }
+    }
+  }, [jobId])
+
   useEffect(() => {
     if (!sseTimedOut || progress) return
-    let cancelled = false
-    const poll = async () => {
-      try {
-        const job = await fetchGenerationJobStatus(jobId)
-        if (!cancelled) setPolledJob(job)
-      } catch { /* swallow — next tick retries */ }
-    }
-    poll()
-    const id = setInterval(poll, 5_000)
-    return () => { cancelled = true; clearInterval(id) }
-  }, [sseTimedOut, progress, jobId])
+    const cancelled = { v: false }
+    pollOnce(cancelled)
+    const id = setInterval(() => pollOnce(cancelled), 5_000)
+    return () => { cancelled.v = true; clearInterval(id) }
+  }, [sseTimedOut, progress, pollOnce])
 
   // ── Success: warm caches, then redirect ────────────────────────────────────
   //
@@ -313,6 +331,113 @@ export default function TimetableStatusPage() {
             <button onClick={() => router.push('/admin/timetables')} className="btn-secondary">
               Back to Timetables
             </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── SSE fatal error (fired onError after all reconnect attempts) ────────────
+  if (sseError && reconnectAttempt > 3 && !progress) {
+    return (
+      <div className="status-page-bg">
+        <div className="max-w-[680px] w-full text-center status-modal-card status-modal-card--in">
+          <button onClick={() => router.push('/admin/timetables')} className="btn-text flex items-center gap-1.5 mb-6">
+            <ArrowLeft size={15} />
+            Back to Timetables
+          </button>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 bg-[var(--color-danger-subtle)]">
+            <XCircle size={32} className="text-[var(--color-danger)]" />
+          </div>
+          <h2 className="text-[22px] font-bold mb-3 text-[var(--color-text-primary)]">
+            Generation Failed
+          </h2>
+          <p className="text-[15px] mb-8 max-w-sm mx-auto text-[var(--color-text-secondary)]">{sseError}</p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => router.push('/admin/timetables/new')} className="btn-primary">
+              Try Again
+            </button>
+            <button onClick={() => router.push('/admin/timetables')} className="btn-secondary">
+              Back to Timetables
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── REST polling reached terminal state while SSE is down ───────────────────
+  if (!progress && polledJob) {
+    if (polledJob.status === 'failed') {
+      return (
+        <div className="status-page-bg">
+          <div className="max-w-[680px] w-full text-center status-modal-card status-modal-card--in">
+            <button onClick={() => router.push('/admin/timetables')} className="btn-text flex items-center gap-1.5 mb-6">
+              <ArrowLeft size={15} />
+              Back to Timetables
+            </button>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 bg-[var(--color-danger-subtle)]">
+              <XCircle size={32} className="text-[var(--color-danger)]" />
+            </div>
+            <h2 className="text-[26px] font-bold mb-3 text-[var(--color-text-primary)]">
+              Generation Failed
+            </h2>
+            <p className="text-[15px] mb-8 max-w-sm mx-auto text-[var(--color-text-secondary)]">
+              {polledJob.error_message ?? 'Something went wrong while building the timetable. Please try again.'}
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => router.push('/admin/timetables/new')} className="btn-primary">Try Again</button>
+              <button onClick={() => router.push('/admin/timetables')} className="btn-secondary">Back to Timetables</button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+    if (polledJob.status === 'cancelled') {
+      return (
+        <div className="status-page-bg">
+          <div className="max-w-[680px] w-full text-center status-modal-card status-modal-card--in">
+            <button onClick={() => router.push('/admin/timetables')} className="btn-text flex items-center gap-1.5 mb-6">
+              <ArrowLeft size={15} />
+              Back to Timetables
+            </button>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 bg-[var(--color-warning-subtle)]">
+              <AlertTriangle size={32} className="text-[var(--color-warning)]" />
+            </div>
+            <h2 className="text-[26px] font-bold mb-3 text-[var(--color-text-primary)]">
+              Generation Cancelled
+            </h2>
+            <p className="text-[15px] mb-8 text-[var(--color-text-secondary)]">The timetable generation was stopped.</p>
+            <button onClick={() => router.push('/admin/timetables')} className="btn-primary">Back to Timetables</button>
+          </div>
+        </div>
+      )
+    }
+    if (polledJob.status === 'completed') {
+      router.push(`/admin/timetables/${jobId}/review`)
+      return null
+    }
+  }
+
+  // ── REST polling consistently failed (≥ 3 errors, SSE also has no data) ────
+  if (pollError && !progress) {
+    return (
+      <div className="status-page-bg">
+        <div className="max-w-[680px] w-full text-center status-modal-card status-modal-card--in">
+          <button onClick={() => router.push('/admin/timetables')} className="btn-text flex items-center gap-1.5 mb-6">
+            <ArrowLeft size={15} />
+            Back to Timetables
+          </button>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 bg-[var(--color-danger-subtle)]">
+            <XCircle size={32} className="text-[var(--color-danger)]" />
+          </div>
+          <h2 className="text-[22px] font-bold mb-3 text-[var(--color-text-primary)]">
+            Unable to Load Status
+          </h2>
+          <p className="text-[15px] mb-8 max-w-xs mx-auto text-[var(--color-text-secondary)]">{pollError}</p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => window.location.reload()} className="btn-primary">Try Again</button>
+            <button onClick={() => router.push('/admin/timetables')} className="btn-secondary">Back to Timetables</button>
           </div>
         </div>
       </div>
