@@ -110,7 +110,7 @@ async def lifespan(app: FastAPI):
         app = FastAPI(lifespan=lifespan)
     """
     # ==================== STARTUP ====================
-    logger.info("🚀 Starting FastAPI Timetable Generation Service")
+    logger.info(" Starting FastAPI Timetable Generation Service")
     
     try:
         # 1. Initialize Redis connection
@@ -135,9 +135,9 @@ async def lifespan(app: FastAPI):
                 redis_kwargs["ssl_cert_reqs"] = "none"
             app.state.redis_client = redis.from_url(redis_url, **redis_kwargs)
             app.state.redis_client.ping()
-            logger.info("✅ Redis connection established")
+            logger.info(" Redis connection established")
         except Exception as e:
-            logger.warning(f"⚠️  Redis connection failed: {e}")
+            logger.warning(f" Redis connection failed: {e}")
             logger.warning("Service will run without Redis (limited functionality)")
             app.state.redis_client = None
         
@@ -151,12 +151,12 @@ async def lifespan(app: FastAPI):
         # 3. Initialize adaptive executor
         from engine.adaptive_executor import get_adaptive_executor
         app.state.adaptive_executor = get_adaptive_executor()
-        logger.info("✅ Adaptive executor initialized")
+        logger.info(" Adaptive executor initialized")
         
         # 4. Initialize resource isolation
         from core.patterns.bulkhead import ResourceIsolation
         app.state.resource_isolation = ResourceIsolation()
-        logger.info("✅ Resource isolation configured")
+        logger.info(" Resource isolation configured")
         
         # 5. Initialize cache manager
         from utils.cache_manager import CacheManager
@@ -182,19 +182,19 @@ async def lifespan(app: FastAPI):
         # If Redis is unavailable, _warm_all_orgs logs a warning and exits.
         if app.state.redis_client:
             asyncio.ensure_future(_warm_all_orgs(app.state.redis_client))
-            logger.info("✅ Cache warming scheduled (background)")
+            logger.info(" Cache warming scheduled (background)")
         
-        logger.info("✅ FastAPI Timetable Service ready")
+        logger.info(" FastAPI Timetable Service ready")
         
     except Exception as e:
-        logger.error(f"❌ Startup failed: {e}")
+        logger.error(f" Startup failed: {e}")
         raise
     
     # Yield control to FastAPI
     yield
     
     # ==================== SHUTDOWN ====================
-    logger.info("🛑 Shutting down FastAPI Timetable Generation Service")
+    logger.info(" Shutting down FastAPI Timetable Generation Service")
 
     try:
         if hasattr(app.state, "memory_monitor"):

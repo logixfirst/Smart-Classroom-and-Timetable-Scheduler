@@ -650,7 +650,7 @@ class AdaptiveCPSATSolver:
             student_priority: "ALL" | "CRITICAL" | "NONE"
         """
         if student_priority == "NONE":
-            logger.warning("[Constraints] Student constraints DISABLED (NONE mode)")
+            logger.info("[Constraints] Student constraints skipped (student_priority=NONE)")
             return
 
         critical_set = self._critical_students if student_priority == "CRITICAL" else None

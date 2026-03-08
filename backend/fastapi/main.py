@@ -14,7 +14,6 @@ from fastapi.middleware.gzip import GZipMiddleware
 import uvicorn
 
 # Core setup
-import multiprocessing
 from core.logging_config import setup_logging
 from core.lifespan import lifespan
 
@@ -32,14 +31,26 @@ from api.routers import (
     websocket_router
 )
 
-# Initialize logging — ONLY in the main process.
-# On Windows, ProcessPoolExecutor uses the 'spawn' start method, which
-# re-imports __main__ (this file) in every worker subprocess.  Without
-# this guard, setup_logging() would fire 6 extra times (once per
-# PARALLEL_CLUSTERS worker), truncating the log file ('w' mode) and
-# wasting ~80 MB RAM per worker importing the full FastAPI app.
-if multiprocessing.current_process().name == 'MainProcess':
-    setup_logging()
+# Initialize logging unconditionally.
+#
+# Previous guard: `if multiprocessing.current_process().name == 'MainProcess'`
+# was BROKEN in uvicorn --reload (WatchFiles) mode:
+#   • The WatchFiles reloader runs as 'MainProcess' — it sets up logging …
+#     but never handles HTTP requests.
+#   • The spawned uvicorn server child runs as 'Process-1' — it DOES handle
+#     requests but the guard prevented setup_logging() from running there,
+#     so every INFO-level engine log was silently dropped.
+#
+# The subprocess-safety concerns that motivated the guard are addressed
+# inside setup_logging() itself:
+#   • File handler uses mode='a' — no truncation across processes.
+#   • stdout guard → NullHandler when sys.stdout is a closed pipe.
+#   • force=True makes repeated calls idempotent.
+#
+# ProcessPoolExecutor workers (saga.py _solve_cluster_worker) do NOT
+# re-import this file (their pickled target lives in core.patterns.saga,
+# not __main__), so there is no duplicate-call risk from pool workers.
+setup_logging()
 
 # Create FastAPI application
 app = FastAPI(

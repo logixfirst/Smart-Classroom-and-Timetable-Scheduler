@@ -140,6 +140,13 @@ def _solve_cluster_worker(
     Returns (cluster_id, solution_or_None, error_msg_or_None).
     """
     import logging as _logging
+    # Bootstrap logging inside the ProcessPoolExecutor subprocess.
+    # main.py is NOT re-imported here (this function lives in core.patterns.saga,
+    # not __main__), so setup_logging() has not run in this process.
+    # Without this call every INFO-level CP-SAT log from the subprocess is lost.
+    if not _logging.root.handlers:
+        from core.logging_config import setup_logging
+        setup_logging()
     _logger = _logging.getLogger(__name__)
     try:
         from engine.cpsat.solver import AdaptiveCPSATSolver

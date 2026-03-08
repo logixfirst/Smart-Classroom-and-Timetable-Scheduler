@@ -134,6 +134,7 @@ def setup_logging():
         "engine.stage1_clustering",
         "engine.ga",
         "engine.rl",
+        "core.lifespan",
         "core.patterns.saga",
         "core.services.generation_service",
         "core.services.course_partitioner",
