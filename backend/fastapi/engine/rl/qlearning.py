@@ -87,7 +87,7 @@ class SimpleTabularQLearning:
         # Audit logging
         self.decision_log: List[Dict] = []
         
-        logger.debug(f"[RL] Q-learning init: LR={learning_rate}, γ={gamma}, frozen={frozen}")
+        logger.info("[RL] Q-learning init: LR=%.3f, gamma=%.3f, epsilon=%.3f, frozen=%s", learning_rate, gamma, epsilon, frozen)
     
     def choose_best_swap(
         self,
@@ -269,7 +269,7 @@ class SimpleTabularQLearning:
         
         self.semester_version = semester_id
         
-        logger.info(f"[RL-Policy] Saved policy for semester {semester_id} (Q-table: {len(self.q_table)} entries, \u03b5={self.epsilon:.4f})")
+        logger.info("[RL-Policy] Saved policy for semester %s  q_table_size=%d  epsilon=%.4f", semester_id, len(self.q_table), self.epsilon)
     
     def load_policy(self, semester_id: str, freeze_on_load: bool = True):
         """
@@ -303,7 +303,7 @@ class SimpleTabularQLearning:
             if freeze_on_load:
                 self.freeze_policy()
             
-            logger.info(f"[RL-Policy] Loaded policy for semester {semester_id} (Q-table: {len(self.q_table)} entries, \u03b5={self.epsilon:.4f})")
+            logger.info("[RL-Policy] Loaded policy for semester %s  q_table_size=%d  epsilon=%.4f", semester_id, len(self.q_table), self.epsilon)
             
         except Exception as e:
             logger.error(f"[RL-Policy] Failed to load policy: {e}")

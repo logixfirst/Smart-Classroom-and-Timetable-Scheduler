@@ -11,7 +11,7 @@ export function Skeleton({ className = '', style, ...props }: React.HTMLAttribut
         background:
           'linear-gradient(90deg, var(--color-bg-surface-2) 25%, var(--color-bg-surface-3) 50%, var(--color-bg-surface-2) 75%)',
         backgroundSize: '800px 100%',
-        animation: 'shimmer 1.6s infinite linear',
+        animation: 'shimmer 3.5s infinite linear',
         borderRadius: 'var(--radius-sm)',
         ...style,
       }}

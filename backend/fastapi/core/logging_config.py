@@ -8,6 +8,36 @@ import sys
 from pathlib import Path
 
 
+class ExtraFieldsFormatter(logging.Formatter):
+    """Append caller-supplied ``extra={}`` dict fields to the formatted message.
+
+    The default Formatter writes only %(message)s; any key=value pairs passed
+    via ``extra=`` are attached to the LogRecord but never rendered.  This
+    subclass appends them as  key=value  pairs so every call-site that passes
+    structured data (counts, IDs, elapsed times) shows that data in both the
+    console and the log file without changing a single call site.
+    """
+
+    # Standard LogRecord attributes — NOT from caller-supplied extra= dicts.
+    _STANDARD = frozenset({
+        'name', 'msg', 'args', 'levelname', 'levelno', 'pathname',
+        'filename', 'module', 'exc_info', 'exc_text', 'stack_info',
+        'lineno', 'funcName', 'created', 'msecs', 'relativeCreated',
+        'thread', 'threadName', 'processName', 'process', 'message',
+        'asctime', 'taskName',
+    })
+
+    def format(self, record: logging.LogRecord) -> str:
+        base = super().format(record)
+        extras = {
+            k: v for k, v in record.__dict__.items()
+            if k not in self._STANDARD and not k.startswith('_')
+        }
+        if extras:
+            base = base + '  ||  ' + '  '.join(f'{k}={v}' for k, v in extras.items())
+        return base
+
+
 def setup_logging():
     """
     Configure application logging.
@@ -23,8 +53,8 @@ def setup_logging():
     # always contains only the current session, making debugging easy.
     log_file = log_dir / "fastapi.log"
     
-    # Configure logging format
-    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    # Configure logging format - includes file and line number for debugging
+    log_format = '%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(name)s - %(message)s'
     
     # Get log level from environment (default to INFO)
     log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
@@ -59,13 +89,13 @@ def setup_logging():
         # Worker subprocess with no usable stdout — use a NullHandler so
         # logging calls succeed silently instead of raising errors.
         console_handler = logging.NullHandler()
-    console_handler.setFormatter(logging.Formatter(log_format))
+    console_handler.setFormatter(ExtraFieldsFormatter(log_format))
     
     # Create file handler — mode='a' appends so that worker-subprocess
     # re-entries (Windows ProcessPoolExecutor spawn) never truncate the log.
     # The file is cleared explicitly by clear.py / on manual restart only.
     file_handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
-    file_handler.setFormatter(logging.Formatter(log_format))
+    file_handler.setFormatter(ExtraFieldsFormatter(log_format))
     
     # Configure root logger
     logging.basicConfig(
@@ -90,12 +120,18 @@ def setup_logging():
         "engine.cpsat.solver",
         "engine.cpsat.dept_solver",
         "engine.cpsat.cross_dept_solver",
+        "engine.cpsat.progress",
+        "engine.cpsat.constraints",
+        "engine.cpsat.strategies",
         "engine.stage1_clustering",
         "engine.ga",
         "engine.rl",
         "core.patterns.saga",
         "core.services.generation_service",
+        "core.services.course_partitioner",
         "utils.django_client",
+        "utils.cache_manager",
+        "utils.progress_tracker",
     ):
         _log = logging.getLogger(_engine_logger)
         _log.setLevel(getattr(logging, log_level))

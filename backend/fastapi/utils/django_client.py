@@ -627,9 +627,9 @@ class DjangoAPIClient:
                             extra={"org_id": org_id, "available": available},
                         )
                         return []
-                    logger.debug(
-                        "[COURSE LOAD] org resolved",
-                        extra={"org_name": org_row['org_name'], "org_id": org_id},
+                    logger.info(
+                        "[COURSE LOAD] org resolved: org_name=%s org_id=%s",
+                        org_row['org_name'], org_id,
                     )
 
                     # ----------------------------------------------------------
@@ -681,14 +681,9 @@ class DjangoAPIClient:
                     cursor.execute(query, params)
                     rows = cursor.fetchall()
                     elapsed = time.monotonic() - t0
-                    logger.debug(
-                        "[COURSE LOAD] query complete",
-                        extra={
-                            "rows": len(rows),
-                            "query_seconds": round(elapsed, 3),
-                            "org_id": org_id,
-                            "semester_type": semester_type,
-                        },
+                    logger.info(
+                        "[COURSE LOAD] query done | rows=%d elapsed=%.3fs org_id=%s semester=%s",
+                        len(rows), elapsed, org_id, semester_type,
                     )
 
                     # Summary count query (cheap aggregate, runs with pooled conn)
@@ -863,7 +858,12 @@ class DjangoAPIClient:
             return courses
 
         except Exception as exc:
-            logger.error("[COURSE LOAD] fetch failed", extra={"org_id": org_id, "error": str(exc)})
+            logger.error(
+                "[COURSE LOAD] fetch failed | org_id=%s error=%s",
+                org_id, exc,
+            )
+            import traceback as _tb
+            logger.error(_tb.format_exc())
             return []
 
 
@@ -919,9 +919,9 @@ class DjangoAPIClient:
             except Exception as exc:
                 logger.warning("[FACULTY] skip row: %s", exc)
 
-        logger.debug(
-            "[FACULTY] fetched from DB",
-            extra={"count": len(faculty_dict), "org_id": org_id},
+        logger.info(
+            "[FACULTY] fetched from DB | count=%d org_id=%s",
+            len(faculty_dict), org_id,
         )
         faculty_cache = {fid: fac.dict() for fid, fac in faculty_dict.items()}
         await self.cache_manager.set('faculty', org_id, faculty_cache, ttl=3600)
@@ -1001,9 +1001,9 @@ class DjangoAPIClient:
             except Exception as exc:
                 logger.warning("[ROOM] skip row: %s", exc)
 
-        logger.debug(
-            "[ROOM] fetched from DB",
-            extra={"count": len(rooms), "org_id": org_id},
+        logger.info(
+            "[ROOM] fetched from DB | count=%d org_id=%s",
+            len(rooms), org_id,
         )
         rooms_cache = [r.dict() for r in rooms]
         await self.cache_manager.set('rooms', org_id, rooms_cache, ttl=3600)
@@ -1219,9 +1219,9 @@ class DjangoAPIClient:
             except Exception as exc:
                 logger.warning("[STUDENT] skip row: %s", exc)
 
-        logger.debug(
-            "[STUDENT] fetched from DB",
-            extra={"count": len(students_dict), "org_id": org_id},
+        logger.info(
+            "[STUDENT] fetched from DB | count=%d org_id=%s",
+            len(students_dict), org_id,
         )
         students_cache = {sid: stud.dict() for sid, stud in students_dict.items()}
         await self.cache_manager.set('students', org_id, students_cache, ttl=1800)
@@ -1279,8 +1279,8 @@ class DjangoAPIClient:
             rows = await asyncio.to_thread(_sync_query)
         except Exception as exc:
             logger.warning(
-                "[ENROLLMENT] fetch failed — conflict graph will be empty",
-                extra={"org_id": org_id, "error": str(exc)},
+                "[ENROLLMENT] fetch failed — conflict graph will be empty | org_id=%s error=%s",
+                org_id, exc,
             )
             return []
 
@@ -1299,8 +1299,8 @@ class DjangoAPIClient:
                 logger.warning("[ENROLLMENT] skip row: %s", exc)
 
         logger.info(
-            "[ENROLLMENT] Fetched",
-            extra={"count": len(enrollments), "org_id": org_id, "semester_type": semester_type},
+            "[ENROLLMENT] fetched | count=%d org_id=%s semester=%s",
+            len(enrollments), org_id, semester_type,
         )
         return enrollments
 

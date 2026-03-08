@@ -58,6 +58,11 @@ def solve_cross_dept_timetable(
     """
     t0 = time.perf_counter()
 
+    logger.info(
+        "[CrossDeptSolver] START shared_pool=%d  rooms=%d  slots=%d  job_id=%s",
+        len(shared_pool), len(rooms), len(time_slots), job_id,
+    )
+
     if not shared_pool:
         logger.info(
             "[CrossDeptSolver] No shared-pool courses — Phase 3 skipped",

@@ -91,10 +91,20 @@ class GeneticAlgorithmOptimizer:
             
             # Track best
             max_idx = max(range(len(fitness_scores)), key=lambda i: fitness_scores[i])
-            if fitness_scores[max_idx] > best_fitness:
-                best_fitness = fitness_scores[max_idx]
+            gen_best = fitness_scores[max_idx]
+            gen_mean = sum(fitness_scores) / max(len(fitness_scores), 1)
+            if gen_best > best_fitness:
+                best_fitness = gen_best
                 best_solution = copy.deepcopy(population[max_idx])
-                logger.info(f"[GA] Gen {generation+1}: fitness={best_fitness:.2f}")
+                logger.info(
+                    "[GA] Gen %d/%d  NEW BEST fitness=%.2f  mean=%.2f  pop=%d",
+                    generation + 1, self.generations, best_fitness, gen_mean, len(population),
+                )
+            elif (generation + 1) % 5 == 0 or generation == 0:
+                logger.info(
+                    "[GA] Gen %d/%d  fitness_best=%.2f  fitness_mean=%.2f  pop=%d",
+                    generation + 1, self.generations, best_fitness, gen_mean, len(population),
+                )
             
             # Emit per-generation progress tick (feeds SSE stream).
             # CRITICAL: CancellationError MUST propagate — it is the per-generation

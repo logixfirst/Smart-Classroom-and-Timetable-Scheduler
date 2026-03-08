@@ -158,9 +158,14 @@ def solve_department_timetable(
     """
     t0 = time.perf_counter()
 
+    logger.info(
+        "[DeptSolver] START dept_id=%s  courses=%d  rooms=%d  slots=%d  job_id=%s",
+        dept_id, len(courses), len(rooms), len(time_slots), job_id,
+    )
+
     if not courses:
         logger.info(
-            "[DeptSolver] No courses for dept — skipping",
+            "[DeptSolver] No courses for dept -- skipping",
             extra={"dept_id": dept_id, "job_id": job_id},
         )
         return DeptTimetableResult(

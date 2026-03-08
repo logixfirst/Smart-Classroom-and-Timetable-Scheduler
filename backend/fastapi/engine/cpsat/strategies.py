@@ -8,38 +8,45 @@ from typing import List, Dict
 
 # BHU-scale optimised strategy ladder (2320 courses, 19072 students).
 #
-# Previous 4-strategy ladder (Full→Relaxed→Faculty+Room→Minimal) wasted
-# 30s+45s per cluster BEFORE reaching the only feasible strategy, costing
-# ~2.9 hours on BHU data where student-conflict density is too high for
-# Full/Relaxed strategies to ever succeed.
-#
-# NEW: 2-strategy ladder — start directly at Faculty+Room Only:
+# 3-strategy ladder — direct start at Faculty+Room Only:
 #   Strategy 0: Faculty + Room Only     (15s)  — covers ~85% of clusters
-#   Strategy 1: Minimal Hard Constraints (20s)  — emergency fallback
+#   Strategy 1: Faculty Only            (20s)  — room constraints too tight
+#   Strategy 2: No Constraints          (10s)  — nuclear option; greedy handles rooms
 #
-# Worst-case per cluster: 15s + 20s = 35s  (was 225s — 6.4× faster)
-# For 232 clusters with 20% fail rate: 46 × 35s ≈ 27 min  (was 2.9 hours)
+# Worst-case per cluster: 15s + 20s + 10s = 45s  (was 225s — 5× faster)
+# After all 3 fail: _greedy_fallback() guarantees every course is assigned.
 STRATEGIES: List[Dict] = [
     {
         "name": "Faculty + Room Only",
         "student_priority": "NONE",         # HC4: skip — too costly at BHU scale
         "faculty_conflicts": True,           # HC1
         "room_capacity": True,               # HC2
-        "workload_constraints": False,       # Relax — not the binding constraint
-        "max_sessions_per_day": False,       # Relax
-        "timeout": 15,                       # Fail fast — if not found in 15s, won't be found
+        "workload_constraints": False,
+        "max_sessions_per_day": False,
+        "timeout": 15,
         "max_constraints": 5000,
         "student_limit": 0
     },
     {
-        "name": "Minimal Hard Constraints Only",
+        "name": "Faculty Only",
         "student_priority": "NONE",
-        "faculty_conflicts": True,           # HC1 always enforced
-        "room_capacity": False,              # Relax room — greedy handles it
+        "faculty_conflicts": True,           # HC1 only
+        "room_capacity": False,              # Room constraint removed — too tight
         "workload_constraints": False,
         "max_sessions_per_day": False,
-        "timeout": 20,                       # Emergency fallback budget
+        "timeout": 20,
         "max_constraints": 1000,
+        "student_limit": 0
+    },
+    {
+        "name": "No Constraints",
+        "student_priority": "NONE",
+        "faculty_conflicts": False,          # Nuclear option — just get an assignment
+        "room_capacity": False,
+        "workload_constraints": False,
+        "max_sessions_per_day": False,
+        "timeout": 10,
+        "max_constraints": 500,
         "student_limit": 0
     }
 ]

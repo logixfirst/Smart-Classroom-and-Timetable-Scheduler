@@ -172,8 +172,8 @@ class TimetableGenerationSaga:
     4. Stage 2B: GA optimization (CPU-only, optional)
     5. Stage 3: RL refinement (frozen policy, optional)
     
-    ✅ COMPLIANT: CPU-only, no GPU, no runtime learning, deterministic
-    ❌ DISABLED: GPU acceleration, runtime RL training, distributed execution
+    COMPLIANT: CPU-only, no GPU, no runtime learning, deterministic
+    DISABLED: GPU acceleration, runtime RL training, distributed execution
     """
     
     def __init__(self, redis_client=None):
@@ -204,71 +204,168 @@ class TimetableGenerationSaga:
         Returns:
             Dict with generated timetable and metadata
         """
-        logger.info(f"[SAGA] Starting workflow for job {job_id}")
-        
+        import time as _time
+        _workflow_start = _time.perf_counter()
+        logger.info(
+            "[SAGA] ============================================================"
+        )
+        logger.info(
+            "[SAGA] WORKFLOW START  job_id=%s  org=%s  semester=%s",
+            job_id,
+            request_data.get('organization_id', '?'),
+            request_data.get('semester', '?'),
+        )
+        logger.info(
+            "[SAGA] ============================================================"
+        )
+
         # Create cancellation token (SOFT mode by default)
         token = CancellationToken(job_id, self.redis_client, CancellationMode.SOFT)
-        
+
         # Create progress tracker (Enterprise pattern: worker owns progress)
         tracker = ProgressTracker(job_id, self.redis_client) if self.redis_client else None
-        
+
         try:
+            # ------------------------------------------------------------------
             # STEP 1: Load data (CANCELABLE)
+            # ------------------------------------------------------------------
+            _t0 = _time.perf_counter()
+            logger.info("[SAGA] STEP 1/6 START  stage=data_loading")
             with SafePoint(token, "data_loading"):
-                logger.info("[SAGA] Step 1/5: Loading data...")
                 if tracker:
                     tracker.start_stage('loading')
                 data = await self._load_data(job_id, request_data, tracker)
                 self.stage_completed['data_load'] = True
                 if tracker:
                     tracker.complete_stage()
-            
+            _t1 = _time.perf_counter()
+            logger.info(
+                "[SAGA] STEP 1/6 DONE   stage=data_loading  elapsed=%.2fs"
+                "  courses=%d  faculty=%d  rooms=%d  time_slots=%d"
+                "  students=%d  enrollments=%d",
+                _t1 - _t0,
+                len(data.get('courses', [])),
+                len(data.get('faculty', {})),
+                len(data.get('rooms', [])),
+                len(data.get('time_slots', [])),
+                len(data.get('students', [])),
+                len(data.get('enrollments', [])),
+            )
+
+            # ------------------------------------------------------------------
             # STEP 2: Clustering (CANCELABLE)
+            # ------------------------------------------------------------------
+            _t0 = _time.perf_counter()
+            logger.info(
+                "[SAGA] STEP 2/6 START  stage=clustering  courses=%d",
+                len(data['courses']),
+            )
             with SafePoint(token, "clustering"):
-                logger.info("[SAGA] Step 2/5: Clustering courses...")
                 if tracker:
                     tracker.start_stage('clustering', total_items=len(data['courses']))
                 clusters = await self._stage1_clustering(job_id, data, token, tracker)
                 self.stage_completed['clustering'] = True
                 if tracker:
                     tracker.complete_stage()
-            
+            _t1 = _time.perf_counter()
+            logger.info(
+                "[SAGA] STEP 2/6 DONE   stage=clustering  elapsed=%.2fs"
+                "  clusters=%d  avg_cluster_size=%.1f",
+                _t1 - _t0,
+                len(clusters),
+                sum(len(c) for c in clusters) / max(len(clusters), 1),
+            )
+
+            # ------------------------------------------------------------------
             # STEP 3: CP-SAT solving (CANCELABLE between clusters only)
+            # ------------------------------------------------------------------
+            _t0 = _time.perf_counter()
+            logger.info(
+                "[SAGA] STEP 3/6 START  stage=cpsat_solving  clusters=%d",
+                len(clusters),
+            )
             with SafePoint(token, "cpsat_solving"):
-                logger.info("[SAGA] Step 3/5: CP-SAT solving...")
                 if tracker:
                     tracker.start_stage('cpsat_solving', total_items=len(clusters))
-                initial_solution = await self._stage2_partitioned_solve(job_id, data, clusters, token, tracker)
+                initial_solution = await self._stage2_partitioned_solve(
+                    job_id, data, clusters, token, tracker
+                )
                 self.stage_completed['cpsat'] = True
                 if tracker:
                     tracker.complete_stage()
-            
+            _t1 = _time.perf_counter()
+            logger.info(
+                "[SAGA] STEP 3/6 DONE   stage=cpsat_solving  elapsed=%.2fs"
+                "  assignments=%d",
+                _t1 - _t0,
+                len(initial_solution),
+            )
+
+            # ------------------------------------------------------------------
             # STEP 4: GA optimization (CANCELABLE between generations)
+            # ------------------------------------------------------------------
+            _t0 = _time.perf_counter()
+            logger.info(
+                "[SAGA] STEP 4/6 START  stage=ga_optimization  initial_assignments=%d",
+                len(initial_solution),
+            )
             with SafePoint(token, "ga_optimization"):
-                logger.info("[SAGA] Step 4/5: GA optimization...")
                 if tracker:
                     tracker.start_stage('ga_optimization')
-                optimized_solution = await self._stage2b_ga(job_id, data, initial_solution, token, tracker)
+                optimized_solution = await self._stage2b_ga(
+                    job_id, data, initial_solution, token, tracker
+                )
                 self.stage_completed['ga'] = True
                 if tracker:
                     tracker.complete_stage()
-            
+            _t1 = _time.perf_counter()
+            logger.info(
+                "[SAGA] STEP 4/6 DONE   stage=ga_optimization  elapsed=%.2fs"
+                "  variants=%d  assignments=%d",
+                _t1 - _t0,
+                len(self.job_data.get('variants', [])),
+                len(optimized_solution),
+            )
+
+            # ------------------------------------------------------------------
             # STEP 5: RL refinement (CANCELABLE)
+            # ------------------------------------------------------------------
+            _t0 = _time.perf_counter()
+            logger.info(
+                "[SAGA] STEP 5/6 START  stage=rl_refinement  assignments=%d",
+                len(optimized_solution),
+            )
             with SafePoint(token, "rl_refinement"):
-                logger.info("[SAGA] Step 5/5: RL refinement...")
                 if tracker:
                     tracker.start_stage('rl_refinement')
-                final_solution = await self._stage3_rl(job_id, data, optimized_solution, token, tracker)
+                final_solution = await self._stage3_rl(
+                    job_id, data, optimized_solution, token, tracker
+                )
                 self.stage_completed['rl'] = True
                 if tracker:
                     tracker.complete_stage()
-            
+            _t1 = _time.perf_counter()
+            logger.info(
+                "[SAGA] STEP 5/6 DONE   stage=rl_refinement  elapsed=%.2fs"
+                "  assignments=%d",
+                _t1 - _t0,
+                len(final_solution),
+            )
+
+            # ------------------------------------------------------------------
             # STEP 6: Persistence (NON-CANCELABLE atomic section)
             # ISS 5 FIX: Previously this was a TODO/pass — timetable was never saved.
             # Now writes the final timetable to Django's GenerationJob record and
             # stores all variants in Redis for the variants API endpoint.
+            # ------------------------------------------------------------------
+            _t0 = _time.perf_counter()
+            logger.info(
+                "[SAGA] STEP 6/6 START  stage=persistence  assignments=%d"
+                "  variants=%d  (atomic - non-cancelable)",
+                len(final_solution),
+                len(self.job_data.get('variants', [])),
+            )
             with AtomicSection(token, "persistence"):
-                logger.info("[SAGA] Persisting results (atomic - non-cancelable)...")
                 await self._persist_results(
                     job_id,
                     final_solution,
@@ -276,15 +373,30 @@ class TimetableGenerationSaga:
                     self.job_data.get('variants', [])
                 )
                 self.stage_completed['persistence'] = True
-            
+            _t1 = _time.perf_counter()
+            logger.info(
+                "[SAGA] STEP 6/6 DONE   stage=persistence  elapsed=%.2fs",
+                _t1 - _t0,
+            )
+
             # Mark as completed
             if tracker:
                 tracker.mark_completed()
-            
+
             # Clear cancellation flag on success
             clear_cancellation(job_id, self.redis_client)
-            
-            logger.info(f"[SAGA] ✅ Workflow complete for job {job_id}")
+
+            _total = _time.perf_counter() - _workflow_start
+            logger.info(
+                "[SAGA] ============================================================"
+            )
+            logger.info(
+                "[SAGA] WORKFLOW COMPLETE  job_id=%s  total_elapsed=%.2fs",
+                job_id, _total,
+            )
+            logger.info(
+                "[SAGA] ============================================================"
+            )
             
             return {
                 'success': True,
@@ -298,7 +410,7 @@ class TimetableGenerationSaga:
             }
             
         except CancellationError as e:
-            logger.warning(f"[SAGA] ⚠️  Job {job_id} cancelled: {e}")
+            logger.warning(f"[SAGA] Job {job_id} cancelled: {e}")
             
             # Mark as cancelled
             if tracker:
@@ -309,7 +421,7 @@ class TimetableGenerationSaga:
             is_partial_success = self.stage_completed['cpsat']
             
             if is_partial_success:
-                logger.info(f"[SAGA] ✅ PARTIAL_SUCCESS: CP-SAT completed, refinement cancelled")
+                logger.info(f"[SAGA] PARTIAL_SUCCESS: CP-SAT completed, refinement cancelled")
                 # Keep the CP-SAT solution (feasible but not optimized)
                 await self._compensate(job_id, is_cancelled=True)
                 return {
@@ -323,7 +435,7 @@ class TimetableGenerationSaga:
                     'message': 'Basic solution generated, optimization cancelled'
                 }
             else:
-                logger.warning(f"[SAGA] ❌ CANCELLED: No usable solution (cancelled before CP-SAT)")
+                logger.warning(f"[SAGA] CANCELLED: No usable solution (cancelled before CP-SAT)")
                 await self._compensate(job_id, is_cancelled=True)
                 return {
                     'success': False,
@@ -334,7 +446,7 @@ class TimetableGenerationSaga:
                 }
             
         except Exception as e:
-            logger.error(f"[SAGA] ❌ Workflow failed: {e}")
+            logger.error(f"[SAGA] Workflow failed: {e}")
             if tracker:
                 tracker.mark_failed(str(e))
             await self._compensate(job_id)
@@ -358,21 +470,37 @@ class TimetableGenerationSaga:
         semester = request_data.get('semester', 1)
         time_config = request_data.get('time_config')
 
+        import time as _t
         logger.info(
-            "[SAGA] Loading data",
-            extra={"job_id": job_id, "org_id": org_id, "semester": semester},
+            "[SAGA-DATA] Loading data  job_id=%s  org_id=%s  semester=%s"
+            "  time_config=%s",
+            job_id, org_id, semester,
+            "custom" if time_config else "default",
         )
 
         django_client = DjangoAPIClient(redis_client=self.redis_client)
         try:
-            # Resolve org name → UUID (sync, uses primary connection, fast)
+            # Resolve org name -> UUID (sync, uses primary connection, fast)
+            logger.info(
+                "[SAGA-DATA] Resolving org identifier  raw_value=%s", org_id
+            )
+            _t0 = _t.perf_counter()
             org_id = django_client.resolve_org_id(org_id)
+            logger.info(
+                "[SAGA-DATA] Org resolved  org_uuid=%s  elapsed=%.3fs",
+                org_id, _t.perf_counter() - _t0,
+            )
 
             # Fetch all data in parallel.
             # Each fetch_* method uses asyncio.to_thread internally, so these
             # coroutines truly run concurrently on the thread pool.
             # Wall-clock time = max(individual fetch times), not their sum.
             import asyncio
+            logger.info(
+                "[SAGA-DATA] Launching 6 parallel DB fetches"
+                "  (courses / faculty / rooms / time_slots / students / enrollments)"
+            )
+            _t0 = _t.perf_counter()
             courses, faculty, rooms, time_slots, students, enrollments = await asyncio.gather(
                 django_client.fetch_courses(org_id, semester),
                 django_client.fetch_faculty(org_id),
@@ -381,18 +509,19 @@ class TimetableGenerationSaga:
                 django_client.fetch_students(org_id),
                 django_client.fetch_enrollments(org_id, semester),
             )
+            _elapsed = _t.perf_counter() - _t0
 
             logger.info(
-                "[SAGA] Data loaded",
-                extra={
-                    "job_id": job_id,
-                    "courses": len(courses),
-                    "faculty": len(faculty),
-                    "rooms": len(rooms),
-                    "time_slots": len(time_slots),
-                    "students": len(students),
-                    "enrollments": len(enrollments),
-                },
+                "[SAGA-DATA] All fetches complete  elapsed=%.2fs"
+                "  courses=%d  faculty=%d  rooms=%d  time_slots=%d"
+                "  students=%d  enrollments=%d",
+                _elapsed,
+                len(courses),
+                len(faculty) if isinstance(faculty, (list, dict)) else 0,
+                len(rooms),
+                len(time_slots),
+                len(students),
+                len(enrollments),
             )
 
             return {
@@ -422,29 +551,65 @@ class TimetableGenerationSaga:
     async def _stage1_clustering(self, job_id: str, data: Dict, token: CancellationToken, tracker=None) -> List[List]:
         """
         Stage 1: Louvain clustering with cancellation support
-        ✅ DESIGN FREEZE: CPU-only, deterministic clustering
+        DESIGN FREEZE: CPU-only, deterministic clustering
         """
         from engine.stage1_clustering import LouvainClusterer
-        
+        import time as _t
+
         if not data['courses']:
-            logger.warning("[SAGA] No courses to cluster - returning empty clusters")
+            logger.warning("[SAGA-CLUSTER] No courses to cluster - returning empty clusters")
             return []
-        
+
+        n_courses = len(data['courses'])
+        logger.info(
+            "[SAGA-CLUSTER] Initializing Louvain clusterer  courses=%d"
+            "  target_cluster_size=10",
+            n_courses,
+        )
+
         try:
+            _t0 = _t.perf_counter()
             clusterer = LouvainClusterer(target_cluster_size=10)
             # Pass Redis and job_id for progress tracking (not cancellation)
             clusterer.redis_client = self.redis_client
             clusterer.job_id = job_id
-            
+
+            logger.info(
+                "[SAGA-CLUSTER] Running cluster_courses  courses=%d"
+                "  edge_threshold=%.2f",
+                n_courses, clusterer.EDGE_THRESHOLD,
+            )
             clusters_dict = clusterer.cluster_courses(data['courses'])
             clusters = list(clusters_dict.values())
-            logger.info(f"[SAGA] Created {len(clusters)} clusters")
+            _elapsed = _t.perf_counter() - _t0
+
+            sizes = sorted(len(c) for c in clusters)
+            logger.info(
+                "[SAGA-CLUSTER] Clustering complete  elapsed=%.2fs"
+                "  clusters=%d  min_size=%d  max_size=%d  avg_size=%.1f",
+                _elapsed,
+                len(clusters),
+                sizes[0] if sizes else 0,
+                sizes[-1] if sizes else 0,
+                sum(sizes) / max(len(sizes), 1),
+            )
             return clusters
         except Exception as e:
-            logger.error(f"[SAGA] Clustering failed: {e} - using greedy fallback")
+            logger.error(
+                "[SAGA-CLUSTER] Louvain clustering failed: %s -- using greedy fallback"
+                "  courses=%d",
+                e, n_courses,
+            )
+            import traceback
+            logger.error(traceback.format_exc())
             courses = data['courses']
             chunk_size = 10
-            return [courses[i:i+chunk_size] for i in range(0, len(courses), chunk_size)]
+            fallback = [courses[i:i+chunk_size] for i in range(0, len(courses), chunk_size)]
+            logger.warning(
+                "[SAGA-CLUSTER] Greedy fallback: %d clusters of size ~%d",
+                len(fallback), chunk_size,
+            )
+            return fallback
     
     @staticmethod
     def _push_phase_progress(
@@ -509,6 +674,10 @@ class TimetableGenerationSaga:
         n_depts = len(dept_buckets)
         for i, (dept_id, dept_courses) in enumerate(dept_buckets.items()):
             token.check_or_raise(f"dept_phase_{dept_id}")
+            logger.info(
+                "[SAGA-DEPT] Solving dept %d/%d  dept_id=%s  courses=%d  job_id=%s",
+                i + 1, n_depts, dept_id, len(dept_courses), job_id,
+            )
             # Run blocking CP-SAT solver in a thread-pool worker so the event
             # loop stays free for progress updates and cancellation checks.
             result = await asyncio.to_thread(
@@ -529,8 +698,13 @@ class TimetableGenerationSaga:
                 self.redis_client, job_id, "dept_solving", pct, registry.report_stats()
             )
             logger.info(
-                "[SAGA] Dept phase progress",
-                extra={"job_id": job_id, "dept_id": dept_id, "dept_n": i + 1, "of": n_depts},
+                "[SAGA-DEPT] Dept %d/%d done  dept_id=%s"
+                "  solved=%d  failed=%d  elapsed=%.2fs  progress=%d%%",
+                i + 1, n_depts, dept_id,
+                getattr(result, 'solved_count', '?'),
+                getattr(result, 'failed_count', '?'),
+                getattr(result, 'elapsed_seconds', 0.0),
+                pct,
             )
         return dept_results
 
@@ -557,37 +731,63 @@ class TimetableGenerationSaga:
         from engine.cpsat.cross_dept_solver import solve_cross_dept_timetable
         from engine.cpsat.timetable_merger import merge_timetables
         from core.services.course_partitioner import CoursePartitioner
+        import time as _t
 
         courses = data.get("courses", [])
         if not courses:
             logger.warning(
-                "[SAGA] No courses — empty solution",
-                extra={"job_id": job_id},
+                "[SAGA-CPSAT] No courses -- empty solution  job_id=%s", job_id
             )
             return {}
 
+        logger.info(
+            "[SAGA-CPSAT] PHASE 1: CoursePartitioner partitioning %d courses"
+            "  job_id=%s",
+            len(courses), job_id,
+        )
         try:
             registry = CommittedResourceRegistry()
+            _tp1 = _t.perf_counter()
             partition = CoursePartitioner().partition(courses)
+            logger.info(
+                "[SAGA-CPSAT] PHASE 1 done  elapsed=%.2fs  depts=%d"
+                "  shared_pool=%d  stats=%s",
+                _t.perf_counter() - _tp1,
+                len(partition.dept_buckets),
+                len(partition.shared_pool),
+                partition.stats,
+            )
             self._push_phase_progress(
                 self.redis_client, job_id, "phase_1_partition", 5, partition.stats
             )
-            logger.info(
-                "[SAGA] Partition complete",
-                extra={"job_id": job_id, **partition.stats},
-            )
 
             # --- Phase 2: dept solvers (sequential) ---
+            logger.info(
+                "[SAGA-CPSAT] PHASE 2: dept solvers  depts=%d  job_id=%s",
+                len(partition.dept_buckets), job_id,
+            )
             token.check_or_raise("before_dept_phase")
+            _tp2 = _t.perf_counter()
             dept_results = await self._run_dept_phase(
                 job_id, data, partition.dept_buckets, registry, token
+            )
+            logger.info(
+                "[SAGA-CPSAT] PHASE 2 done  elapsed=%.2fs  dept_results=%d"
+                "  registry=%s",
+                _t.perf_counter() - _tp2, len(dept_results),
+                registry.report_stats(),
             )
             self._push_phase_progress(
                 self.redis_client, job_id, "phase_2_complete", 68, registry.report_stats()
             )
 
             # --- Phase 3: cross-dept solver ---
+            logger.info(
+                "[SAGA-CPSAT] PHASE 3: cross-dept solver  shared_pool=%d  job_id=%s",
+                len(partition.shared_pool), job_id,
+            )
             token.check_or_raise("before_cross_dept")
+            _tp3 = _t.perf_counter()
             # Run blocking solver in thread-pool worker (same rationale as Phase 2).
             cross_solution = await asyncio.to_thread(
                 solve_cross_dept_timetable,
@@ -599,21 +799,32 @@ class TimetableGenerationSaga:
                 job_id=job_id,
                 redis_client=self.redis_client,
             )
+            logger.info(
+                "[SAGA-CPSAT] PHASE 3 done  elapsed=%.2fs  cross_assignments=%d",
+                _t.perf_counter() - _tp3, len(cross_solution),
+            )
             registry.commit_solution(cross_solution, partition.shared_pool)
             self._push_phase_progress(
                 self.redis_client, job_id, "phase_3_cross_dept", 90, registry.report_stats()
             )
 
             # --- Phase 4: merge ---
+            logger.info("[SAGA-CPSAT] PHASE 4: merging dept + cross-dept results")
+            _tp4 = _t.perf_counter()
             merged = merge_timetables(dept_results, cross_solution, courses)
             self.job_data["registry"] = registry
+            logger.info(
+                "[SAGA-CPSAT] PHASE 4 done  elapsed=%.2fs  merged_assignments=%d",
+                _t.perf_counter() - _tp4, len(merged),
+            )
             self._push_phase_progress(
                 self.redis_client, job_id, "phase_4_merged", 100,
                 {"assignments": len(merged)},
             )
             logger.info(
-                "[SAGA] Partitioned solve complete",
-                extra={"job_id": job_id, "assignments": len(merged)},
+                "[SAGA-CPSAT] Partitioned solve complete  job_id=%s"
+                "  total_assignments=%d",
+                job_id, len(merged),
             )
             return merged
 
@@ -621,8 +832,9 @@ class TimetableGenerationSaga:
             raise  # propagate to saga.execute() cancellation handler
         except Exception as exc:
             logger.error(
-                "[SAGA] Partitioned solve failed — falling back to legacy CP-SAT",
-                extra={"job_id": job_id, "error": str(exc)},
+                "[SAGA-CPSAT] Partitioned solve FAILED -- falling back to legacy CP-SAT"
+                "  job_id=%s  error=%s",
+                job_id, exc,
             )
             import traceback
             logger.error(traceback.format_exc())
@@ -632,7 +844,7 @@ class TimetableGenerationSaga:
         """
         Stage 2 (legacy): monolithic CP-SAT solving with cancellation between clusters.
         Kept as fallback — called by _stage2_partitioned_solve on exception.
-        ✅ DESIGN FREEZE: Deterministic, provably correct
+        DESIGN FREEZE: Deterministic, provably correct
         """
         from engine.cpsat.solver import AdaptiveCPSATSolver
         from engine.cpsat.constraints import build_student_course_index
@@ -848,14 +1060,15 @@ class TimetableGenerationSaga:
 
         MISS 1 FIX: Runs GA 3× with different seeds to generate multiple
         timetable variants the admin can choose from.
-        ✅ DESIGN FREEZE: CPU-only, single population, deterministic per seed.
+        DESIGN FREEZE: CPU-only, single population, deterministic per seed.
         """
         from engine.ga.optimizer import GeneticAlgorithmOptimizer
         import copy
         import random
+        import time as _t
 
         if not initial_solution:
-            logger.warning("[SAGA] No initial solution - skipping GA")
+            logger.warning("[SAGA-GA] No initial solution -- skipping GA  job_id=%s", job_id)
             return initial_solution
 
         NUM_VARIANTS = 3  # SIH requirement: multiple options to choose from
@@ -887,7 +1100,13 @@ class TimetableGenerationSaga:
         _ga_pop = _ga_settings.GA_POPULATION_SIZE
         _ga_gens = _ga_settings.GA_GENERATIONS
         _ga_total_ticks = NUM_VARIANTS * _ga_gens  # total generation ticks across all variants
-        _ga_ticks_done = 0  # running counter for smooth progress 75%→90%
+        _ga_ticks_done = 0  # running counter for smooth progress 75%->90%
+
+        logger.info(
+            "[SAGA-GA] Starting GA  job_id=%s  variants=%d  pop=%d  gens=%d"
+            "  initial_assignments=%d",
+            job_id, NUM_VARIANTS, _ga_pop, _ga_gens, len(initial_solution),
+        )
 
         for variant_idx in range(NUM_VARIANTS):
             # ----------------------------------------------------------------
@@ -904,6 +1123,13 @@ class TimetableGenerationSaga:
                 config = VARIANT_CONFIGS[variant_idx]
                 variant_seed = config['seed']
                 random.seed(variant_seed)
+
+                logger.info(
+                    "[SAGA-GA] Variant %d/%d START  seed=%d  label=%s"
+                    "  weights=%s  job_id=%s",
+                    variant_idx + 1, NUM_VARIANTS, variant_seed,
+                    config['label'], config['weights'], job_id,
+                )
 
                 # Closure captures counter AND the cancellation token so the
                 # callback can raise CancellationError every 5 generations,
@@ -980,8 +1206,10 @@ class TimetableGenerationSaga:
                 _ga_ticks_done = _ticks_ref[0]
 
                 logger.info(
-                    f"[SAGA] GA variant {variant_idx + 1}/{NUM_VARIANTS} "
-                    f"fitness={fitness:.4f} (seed={variant_seed})"
+                    "[SAGA-GA] Variant %d/%d DONE  fitness=%.4f  seed=%d"
+                    "  label=%s  new_best=%s  job_id=%s",
+                    variant_idx + 1, NUM_VARIANTS, fitness, variant_seed,
+                    config['label'], fitness >= best_fitness, job_id,
                 )
 
             except CancellationError:
@@ -1000,45 +1228,71 @@ class TimetableGenerationSaga:
         self.job_data['ga_solution'] = best_solution
 
         logger.info(
-            f"[SAGA] GA complete: {len(variants)} variants generated, "
-            f"best fitness={best_fitness:.4f}"
+            "[SAGA-GA] GA complete  job_id=%s  variants=%d  best_fitness=%.4f",
+            job_id, len(variants), best_fitness,
         )
         return best_solution
     
     async def _stage3_rl(self, job_id: str, data: Dict, solution: Dict, token: CancellationToken, tracker=None) -> Dict:
         """
         Stage 3: RL conflict refinement (frozen policy, optional)
-        ✅ DESIGN FREEZE: Tabular Q-learning, no runtime learning, local swaps only
+        DESIGN FREEZE: Tabular Q-learning, no runtime learning, local swaps only
         """
         from engine.rl.qlearning import SimpleTabularQLearning
-        
+        import time as _t
+
         if not solution:
-            logger.warning("[SAGA] No solution - skipping RL")
+            logger.warning("[SAGA-RL] No solution to refine - skipping RL stage")
             return solution
-        
+
+        logger.info(
+            "[SAGA-RL] Initializing Q-learning resolver  assignments=%d"
+            "  courses=%d  frozen=True",
+            len(solution), len(data.get('courses', [])),
+        )
+
         try:
+            _t0 = _t.perf_counter()
             # RL with FROZEN policy (no learning during runtime)
             rl = SimpleTabularQLearning(
                 courses=data['courses'],
                 faculty=data['faculty'],
                 rooms=data['rooms'],
                 time_slots=data['time_slots'],
-                frozen=True  # ❌ NO runtime learning (DESIGN FREEZE)
+                frozen=True  # NO runtime learning (DESIGN FREEZE)
             )
-            
+
             # Try to load pre-trained policy for this semester
             semester = data.get('semester')
             if semester:
-                rl.load_policy(semester_id=f"sem_{semester}", freeze_on_load=True)
-                logger.info(f"[SAGA] Attempted to load pre-trained policy for semester {semester}")
-            
+                policy_key = f"sem_{semester}"
+                logger.info(
+                    "[SAGA-RL] Attempting to load pre-trained policy  key=%s",
+                    policy_key,
+                )
+                rl.load_policy(semester_id=policy_key, freeze_on_load=True)
+                logger.info(
+                    "[SAGA-RL] Policy load attempt done"
+                    "  q_table_size=%d  epsilon=%.4f",
+                    len(rl.q_table), rl.epsilon,
+                )
+
             # Apply RL refinement (local swaps only, no global repair)
+            # NOTE: refine_solution is not yet implemented; RL stage is a pass-through.
             refined = solution  # TODO: Implement rl.refine_solution(solution)
-            logger.info("[SAGA] RL refinement complete")
+            logger.info(
+                "[SAGA-RL] RL refinement complete  elapsed=%.2fs"
+                "  assignments_in=%d  assignments_out=%d  note=pass-through",
+                _t.perf_counter() - _t0,
+                len(solution),
+                len(refined),
+            )
             return refined
-            
+
         except Exception as e:
-            logger.error(f"[SAGA] RL failed: {e} - using GA solution")
+            logger.error("[SAGA-RL] RL stage failed: %s - using GA solution", e)
+            import traceback
+            logger.error(traceback.format_exc())
             return solution
     
     async def _persist_results(
@@ -1364,7 +1618,7 @@ class TimetableGenerationSaga:
                 )
             else:
                 logger.info(
-                    f"[SAGA-PERSIST] ✅ Job {job_id} updated: "
+                    f"[SAGA-PERSIST] Job {job_id} updated: "
                     f"{len(timetable_entries)} entries, status=completed"
                 )
                 # ── Step 4: Trigger Django cache warm-up ─────────────────────

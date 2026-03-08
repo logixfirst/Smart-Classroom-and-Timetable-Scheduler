@@ -100,7 +100,7 @@ export function RunningJobRow({ job, onNavigate, onJobFailed }: RunningJobRowPro
               className="absolute top-0 left-0 h-full overflow-hidden rounded"
               style={{ width: `${Math.max(pct, 8)}%` }}
             >
-              <span className="status-shimmer-overlay absolute inset-0 w-1/2" />
+              <span className="status-shimmer-overlay absolute inset-0" />
             </div>
           )}
         </div>

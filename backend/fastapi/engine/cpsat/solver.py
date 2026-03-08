@@ -216,8 +216,9 @@ class AdaptiveCPSATSolver:
             if strategy_idx < _start_idx:
                 continue
             logger.info(
-                f"[CP-SAT] Attempting strategy {strategy_idx + 1}/{len(STRATEGIES)}: "
-                f"{strategy['name']}"
+                "[CP-SAT] Strategy %d/%d: %s | cluster=%s | courses=%d | timeout=%ss",
+                strategy_idx + 1, len(STRATEGIES), strategy['name'],
+                self.cluster_id, len(cluster), strategy['timeout'],
             )
             solution = self._solve_with_strategy(cluster, strategy)
 
@@ -229,8 +230,67 @@ class AdaptiveCPSATSolver:
                 )
                 return solution
 
-        logger.warning("[CP-SAT] All strategies failed - will use greedy fallback")
-        return None
+        logger.warning("[CP-SAT] All strategies failed - using smart greedy fallback")
+        return self._greedy_fallback(cluster)
+
+    def _greedy_fallback(self, cluster: List[Course]) -> Dict:
+        """
+        Smart greedy assignment: iterate courses and assign each session to the
+        first (slot, room) pair that does not double-book the faculty or room.
+        Much better than returning None — guarantees every course gets SOME
+        assignment so downstream stages (GA, RL, merger) always have a base
+        solution to refine, even for mathematically infeasible clusters.
+        """
+        solution: Dict = {}
+        used_faculty_slots: Dict[str, set] = {}  # faculty_id → set of slot_ids
+        used_room_slots: Dict[str, set] = {}      # room_id    → set of slot_ids
+
+        for course in cluster:
+            faculty_id = getattr(course, 'faculty_id', None)
+
+            for session in range(course.duration):
+                domain_key = (course.course_id, session)
+                pairs = self.valid_domains.get(domain_key, [])
+
+                best_pair = None
+                for (slot_id, room_id) in pairs:
+                    s = str(slot_id)
+                    # Skip faculty double-booking
+                    if faculty_id and s in used_faculty_slots.get(faculty_id, set()):
+                        continue
+                    # Skip room double-booking
+                    if s in used_room_slots.get(str(room_id), set()):
+                        continue
+                    best_pair = (slot_id, room_id)
+                    break
+
+                if best_pair is None:
+                    # Conflict unavoidable — take first pair (faculty/room clash
+                    # is better than no assignment; merger will flag it)
+                    if pairs:
+                        best_pair = pairs[0]
+                    else:
+                        # Domain is empty — sentinel so merger skips this entry
+                        best_pair = (
+                            self.time_slots[0].slot_id if self.time_slots else '__UNSCHEDULED__',
+                            self.rooms[0].room_id if self.rooms else None,
+                        )
+                        logger.warning(
+                            "[Greedy] %s session %d: empty domain, using sentinel",
+                            course.course_id, session,
+                        )
+
+                solution[(course.course_id, session)] = best_pair
+
+                # Mark resources as used
+                slot_id, room_id = best_pair
+                s = str(slot_id)
+                if faculty_id:
+                    used_faculty_slots.setdefault(faculty_id, set()).add(s)
+                if room_id:
+                    used_room_slots.setdefault(str(room_id), set()).add(s)
+
+        return solution
 
     def _solve_with_strategy(self, cluster: List[Course], strategy: Dict) -> Optional[Dict]:
         """Solve cluster using a specific strategy config."""
@@ -337,8 +397,14 @@ class AdaptiveCPSATSolver:
                     )
 
             # Solve
-            logger.info(f"[CP-SAT] Starting solver with timeout {strategy['timeout']}s...")
+            n_vars = len(variables)
+            logger.info(
+                "[CP-SAT] Solving | cluster=%s | strategy=%s | vars=%d | timeout=%ss",
+                self.cluster_id, strategy['name'], n_vars, strategy['timeout'],
+            )
             status = solver.Solve(model)
+            _wall_time = solver.WallTime()
+            _status_name = solver.StatusName(status)
 
             if status in [cp_model.OPTIMAL, cp_model.FEASIBLE]:
                 solution = {}
@@ -356,10 +422,29 @@ class AdaptiveCPSATSolver:
                 del variables
                 gc.collect()
 
-                logger.info(f"[CP-SAT] Solution found: {n_assignments} assignments")
+                logger.info(
+                    "[CP-SAT] Solution found | cluster=%s | strategy=%s | "
+                    "assignments=%d | status=%s | wall_time=%.2fs",
+                    self.cluster_id, strategy['name'],
+                    n_assignments, _status_name, _wall_time,
+                )
                 return solution
 
-            logger.warning(f"[CP-SAT] No solution with strategy: {strategy['name']}")
+            # ------------------------------------------------------------------
+            # FAILURE — log WHY so the operator can distinguish:
+            #   INFEASIBLE  = mathematically no solution exists for this domain
+            #                 (constraints are contradictory, e.g. more courses
+            #                  than available slots for a faculty member)
+            #   UNKNOWN     = solver ran out of time (hit the timeout limit);
+            #                 a solution might exist but was not found in time
+            #   MODEL_INVALID = bug in constraint building
+            # ------------------------------------------------------------------
+            logger.warning(
+                "[CP-SAT] No solution | cluster=%s | strategy=%s | "
+                "status=%s | vars=%d | wall_time=%.2fs | timeout=%ss",
+                self.cluster_id, strategy['name'],
+                _status_name, n_vars, _wall_time, strategy['timeout'],
+            )
 
             # Release on failure too — accumulation across failed strategies wastes RAM
             del solver
@@ -370,7 +455,11 @@ class AdaptiveCPSATSolver:
             return None
 
         except Exception as e:
-            logger.error(f"[CP-SAT] Strategy failed: {e}")
+            import traceback as _tb
+            logger.error(
+                "[CP-SAT] Strategy raised exception | cluster=%s | strategy=%s | error=%s\n%s",
+                self.cluster_id, strategy.get('name', '?'), e, _tb.format_exc(),
+            )
             # Best-effort cleanup on exception path
             try:
                 del solver
@@ -392,12 +481,19 @@ class AdaptiveCPSATSolver:
         This method now correctly uses room.features for feature matching.
         """
         valid_domains = {}
-        MAX_ROOMS_PER_COURSE = 10
+        MAX_ROOMS_PER_COURSE = 20  # was 10 — more candidates = larger domain = fewer INFEASIBLE
+
+        # Track how many courses fell to each fallback stage (for summary log)
+        _stage_tally = {1: 0, 2: 0, 3: 0, 4: 0}
+        _zero_pair_sessions = []
 
         for course in cluster:
             enrolled = getattr(course, 'enrolled_students', 0) or len(
                 getattr(course, 'student_ids', [])
             )
+            if not enrolled:
+                enrolled = 30  # safe default — prevents 0-capacity filter matching nothing
+
             required_type = getattr(course, 'room_type_required', 'CLASSROOM') or 'CLASSROOM'
             required_features = getattr(course, 'required_features', []) or []
             # Strip fixed_slot markers from required_features for room matching
@@ -407,64 +503,63 @@ class AdaptiveCPSATSolver:
             ]
             dept_id = getattr(course, 'department_id', None)
 
-            # Primary filter: capacity + type + department + features
-            # BHU-scale fix: relax to 0.7×–4.0× enrolled (was 0.9×–1.5×).
-            # Tight band produced empty domains for many courses → instant
-            # INFEASIBLE before CP-SAT even starts → stuck-at-57% symptom.
+            # Stage 1: ideal match — type + features + lenient capacity band
             candidate_rooms = [
                 room for room in self.rooms
                 if (
-                    room.capacity >= enrolled * 0.7   # was 0.9
-                    and room.capacity <= enrolled * 4.0  # was 1.5
+                    room.capacity >= enrolled * 0.6   # was 0.7
+                    and room.capacity <= enrolled * 5.0  # was 4.0
                     and room.room_type.upper() == required_type.upper()
-                    and (
-                        getattr(room, 'department_id', None) == dept_id
-                        or getattr(room, 'allow_cross_department_usage', True)
-                    )
                     and all(
                         f in (getattr(room, 'features', []) or [])
                         for f in non_fixed_features
                     )
                 )
             ]
-
-            # Sort by best capacity fit
             candidate_rooms.sort(key=lambda r: abs(r.capacity - enrolled))
             candidate_rooms = candidate_rooms[:MAX_ROOMS_PER_COURSE]
+            _room_stage = 1
 
-            # Fallback 1: relax features, keep type + lenient capacity
-            if not candidate_rooms:
+            # Stage 2: relax features, keep type + capacity
+            if len(candidate_rooms) < 3:
                 candidate_rooms = [
                     room for room in self.rooms
                     if (
-                        room.capacity >= enrolled * 0.5  # was 0.9
+                        room.capacity >= enrolled * 0.5
                         and room.room_type.upper() == required_type.upper()
                     )
                 ][:MAX_ROOMS_PER_COURSE]
+                _room_stage = 2
 
-            # Fallback 2: relax type, keep absolute minimum capacity
-            if not candidate_rooms:
+            # Stage 3: relax type, any room with >=40% capacity
+            if len(candidate_rooms) < 3:
                 candidate_rooms = [
                     room for room in self.rooms
-                    if room.capacity >= enrolled * 0.3  # was 0.9
+                    if room.capacity >= enrolled * 0.4
                 ][:MAX_ROOMS_PER_COURSE]
+                _room_stage = 3
 
-            # Fallback 3: last resort — any room, best-fit by capacity
+            # Stage 4: absolute last resort — any room, best-fit
             if not candidate_rooms:
                 candidate_rooms = sorted(
                     self.rooms,
                     key=lambda r: abs(r.capacity - enrolled)
                 )[:MAX_ROOMS_PER_COURSE]
+                _room_stage = 4
                 logger.warning(
-                    "[Domain] Course %s: no matching room found, using best-fit fallback",
-                    course.course_id,
+                    "[Domain] Course %s: STAGE-4 fallback (all rooms) | "
+                    "enrolled=%d type=%s rooms_total=%d rooms_returned=%d",
+                    course.course_id, enrolled, required_type,
+                    len(self.rooms), len(candidate_rooms),
                 )
 
-            # Filter time slots: skip lunch breaks
-            valid_slots = [
-                ts for ts in self.time_slots
-                if not getattr(ts, 'is_lunch', False)
-            ]
+            _stage_tally[_room_stage] += 1
+
+            # Include ALL time slots — lunch slots are handled by constraint
+            # layer, not domain pruning.  Removing them here shrinks the domain
+            # so aggressively that CP-SAT sees too few variables to satisfy
+            # even Faculty+Room constraints.
+            valid_slots = self.time_slots
 
             for session in range(course.duration):
                 valid_pairs = [
@@ -472,7 +567,28 @@ class AdaptiveCPSATSolver:
                     for ts in valid_slots
                     for room in candidate_rooms
                 ]
+                if not valid_pairs:
+                    _zero_pair_sessions.append(f"{course.course_id}:s{session}")
+                    logger.error(
+                        "[Domain] ZERO valid pairs for %s session %d "
+                        "— CP-SAT will immediately declare INFEASIBLE",
+                        course.course_id, session,
+                    )
                 valid_domains[(course.course_id, session)] = valid_pairs
+
+        # Summary log — printed once per cluster, gives a full picture of room matching
+        total_pairs = sum(len(v) for v in valid_domains.values())
+        logger.info(
+            "[Domain] Cluster %s domain summary | courses=%d | total_pairs=%d | "
+            "rooms_avail=%d | slots=%d | stage1=%d stage2=%d stage3=%d stage4=%d | "
+            "zero_pair_sessions=%d%s",
+            self.cluster_id, len(cluster), total_pairs,
+            len(self.rooms), len(self.time_slots),
+            _stage_tally[1], _stage_tally[2], _stage_tally[3], _stage_tally[4],
+            len(_zero_pair_sessions),
+            (f" ZERO-PAIR={_zero_pair_sessions[:5]}{'...' if len(_zero_pair_sessions) > 5 else ''}"
+             if _zero_pair_sessions else ""),
+        )
 
         return valid_domains
 

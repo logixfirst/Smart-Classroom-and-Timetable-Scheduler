@@ -32,7 +32,10 @@ class LouvainClusterer:
                 self.EDGE_THRESHOLD = 0.3  # Medium
             else:
                 self.EDGE_THRESHOLD = 0.1  # Dense
-            logger.info(f"Adaptive edge threshold: {self.EDGE_THRESHOLD} (RAM: {available_gb:.1f}GB)")
+            logger.info(
+                "[CLUSTER] Adaptive edge threshold=%.2f  available_ram=%.1f GB",
+                self.EDGE_THRESHOLD, available_gb,
+            )
         else:
             self.EDGE_THRESHOLD = edge_threshold
     
@@ -44,19 +47,51 @@ class LouvainClusterer:
         NOTE: Cancellation handled by CancellationToken in saga (Google/Meta pattern)
         This method focuses on clustering logic only
         """
+        import time as _t
+
+        logger.info(
+            "[CLUSTER] cluster_courses START  courses=%d  target_size=%d"
+            "  edge_threshold=%.2f",
+            len(courses), self.target_cluster_size, self.EDGE_THRESHOLD,
+        )
+
         # Build constraint graph
-        logger.debug(f"Building constraint graph for {len(courses)} courses...")
+        _t0 = _t.perf_counter()
+        logger.info(
+            "[CLUSTER] Building constraint graph  courses=%d", len(courses)
+        )
         G = self._build_constraint_graph(courses)
-        
+        logger.info(
+            "[CLUSTER] Constraint graph built  nodes=%d  edges=%d  elapsed=%.2fs",
+            len(G.nodes), len(G.edges), _t.perf_counter() - _t0,
+        )
+
         # Run Louvain clustering
-        logger.debug(f"Running Louvain community detection...")
+        _t0 = _t.perf_counter()
+        logger.info("[CLUSTER] Running Louvain community detection")
         partition = self._run_louvain(G)
-        
+        n_raw_communities = len(set(partition.values())) if partition else 0
+        logger.info(
+            "[CLUSTER] Louvain done  raw_communities=%d  elapsed=%.2fs",
+            n_raw_communities, _t.perf_counter() - _t0,
+        )
+
         # Optimize cluster sizes
-        logger.debug(f"Optimizing cluster sizes...")
+        _t0 = _t.perf_counter()
+        logger.info(
+            "[CLUSTER] Optimizing cluster sizes  raw_communities=%d",
+            n_raw_communities,
+        )
         final_clusters = self._optimize_cluster_sizes(partition, courses)
-        
-        logger.info(f"Created {len(final_clusters)} clusters from {len(courses)} courses")
+        logger.info(
+            "[CLUSTER] Cluster optimization done  final_clusters=%d  elapsed=%.2fs",
+            len(final_clusters), _t.perf_counter() - _t0,
+        )
+
+        logger.info(
+            "[CLUSTER] cluster_courses DONE  clusters=%d  total_courses=%d",
+            len(final_clusters), len(courses),
+        )
         return final_clusters
     
     def _build_constraint_graph(self, courses: List[Course]) -> nx.Graph:
@@ -72,7 +107,10 @@ class LouvainClusterer:
         
         # Parallel edge computation (ThreadPoolExecutor to avoid pickle issues)
         num_workers = min(multiprocessing.cpu_count(), 8)
-        logger.debug(f"Building constraint graph for {len(courses)} courses with {num_workers} workers...")
+        logger.info(
+            "[CLUSTER-GRAPH] Building constraint graph  courses=%d  workers=%d",
+            len(courses), num_workers,
+        )
         
         # Split courses into chunks for parallel processing
         chunk_size = max(1, len(courses) // num_workers)
@@ -90,8 +128,11 @@ class LouvainClusterer:
                 edges = future.result()
                 G.add_weighted_edges_from(edges)
                 edges_added += len(edges)
-        
-        logger.debug(f"Built graph: {len(G.nodes)} nodes, {edges_added} edges")
+
+        logger.info(
+            "[CLUSTER-GRAPH] Graph complete  nodes=%d  edges_added=%d",
+            len(G.nodes), edges_added,
+        )
         return G
     
     def _compute_edges_for_chunk(self, courses: List[Course], start: int, end: int) -> List[Tuple]:
