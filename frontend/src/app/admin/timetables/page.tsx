@@ -322,16 +322,6 @@ export default function AdminTimetablesPage() {
                 const [academicYear, semester] = semesterKey.split('-')
                 return (
                   <div key={semesterKey} className="card">
-                    <div className="card-header pb-3">
-                      <div>
-                        <h3 className="card-title">{academicYear} &middot; Semester {semester}</h3>
-                        <p className="card-description">
-                          {filteredItems.length} course{filteredItems.length !== 1 ? 's' : ''} &nbsp;&middot;&nbsp;
-                          {filteredItems.filter(t => t.status === 'approved').length} approved
-                        </p>
-                      </div>
-                    </div>
-
                     {viewMode === 'grid' ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {filteredItems

@@ -148,7 +148,7 @@ export default function CreateTimetablePage() {
   }, [formData.lunch_break_enabled, formData.lunch_break_start, formData.lunch_break_end])
 
   return (
-    <div className="space-y-5 max-w-4xl mx-auto">
+    <div className="space-y-5">
       <PageHeader
         title="Generate Timetable"
         parentLabel="Timetables"

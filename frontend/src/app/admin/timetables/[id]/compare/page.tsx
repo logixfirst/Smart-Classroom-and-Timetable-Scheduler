@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, CheckCircle } from 'lucide-react'
+import PageHeader from '@/components/shared/PageHeader'
 
 import { VariantGrid }   from '@/components/timetables/VariantGrid'
 import { CompareGrid }   from '@/components/timetables/CompareGrid'
@@ -159,41 +160,30 @@ export default function CompareVariantsPage() {
   const inCompareMode = !!compareIds
 
   return (
-    <div className="px-6 pb-20 mx-auto max-w-[1400px]">
+    <div className="space-y-5 pb-10">
       {/* Page header */}
-      <div className="flex items-center gap-3 mb-5">
-        <button
-          type="button"
-          aria-label="Go back"
-          title="Go back"
-          onClick={() => {
-            if (inCompareMode && !enteredWithParams) {
-              setCompareIds(null)
-              setDiffResult(null)
-            } else {
-              router.back()
-            }
-          }}
-          className="flex items-center border-0 bg-transparent cursor-pointer [color:var(--color-text-secondary)]"
-        >
-          <ArrowLeft size={18} />
-        </button>
-        <div>
-          <h1 className="text-2xl font-normal tracking-tight [color:var(--color-text-primary)]">
-            {inCompareMode
-              ? `${labelFor(compareIds![0])} vs ${labelFor(compareIds![1])}`
-              : 'Timetable Variants'}
-          </h1>
-          <p className="text-xs mt-[2px] [color:var(--color-text-muted)]">
-            {inCompareMode
-              ? 'Differences highlighted in yellow · Conflicts in red · Identical in blue'
-              : 'Select 2 variants to compare side-by-side'}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title={inCompareMode
+          ? `${labelFor(compareIds![0])} vs ${labelFor(compareIds![1])}`
+          : 'Compare Variants'}
+        parentLabel="Timetables"
+        parentHref="/admin/timetables"
+        secondaryActions={
+          inCompareMode && !enteredWithParams ? (
+            <button
+              type="button"
+              onClick={() => { setCompareIds(null); setDiffResult(null) }}
+              className="btn-secondary flex items-center gap-1.5 text-sm"
+            >
+              <ArrowLeft size={15} />
+              Back to variants
+            </button>
+          ) : undefined
+        }
+      />
 
       {error && (
-        <div className="px-[14px] py-[10px] rounded-lg border text-[13px] mb-4 [border-color:var(--color-danger)] [background:var(--color-danger-subtle)] [color:var(--color-danger-text)]">
+        <div className="px-[14px] py-[10px] rounded-lg border text-[13px] [border-color:var(--color-danger)] [background:var(--color-danger-subtle)] [color:var(--color-danger-text)]">
           {error}
         </div>
       )}

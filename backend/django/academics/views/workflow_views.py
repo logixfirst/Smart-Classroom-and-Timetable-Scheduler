@@ -83,6 +83,58 @@ class TimetableWorkflowViewSet(viewsets.ViewSet):
                 'academic_year', 'semester',
             ).get(id=pk)
 
+            TERMINAL = ('completed', 'failed', 'cancelled', 'approved', 'rejected')
+
+            # ── Self-healing: if DB says non-terminal, cross-check Redis ─────────
+            # FastAPI writes status=completed to Redis before updating the DB.
+            # If the DB write failed (e.g. Neon connection pool exhausted), the
+            # DB will permanently say 'running' while Redis correctly says
+            # 'completed'.  This causes an infinite review ↔ status redirect loop.
+            # Fix: read the Redis progress key and, if it says completed/failed,
+            # update the DB now and return the correct status.
+            if job.status not in TERMINAL:
+                try:
+                    import json as _json
+                    import redis as _redis
+                    import ssl as _ssl
+                    from django.conf import settings as _settings
+                    _url = _settings.REDIS_URL
+                    if _url.startswith('rediss://'):
+                        _r = _redis.from_url(
+                            _url, decode_responses=True,
+                            ssl_cert_reqs=_ssl.CERT_NONE, socket_timeout=3,
+                        )
+                    else:
+                        _r = _redis.from_url(_url, decode_responses=True, socket_timeout=3)
+                    _raw = _r.get(f'progress:job:{pk}')
+                    if _raw:
+                        _prog = _json.loads(_raw)
+                        _redis_status = _prog.get('status')
+                        if _redis_status in ('completed', 'failed', 'cancelled'):
+                            # Heal the DB — the FastAPI psycopg2 write must have failed.
+                            logger.info(
+                                '[WORKFLOW] DB says %s but Redis says %s for job %s — healing DB',
+                                job.status, _redis_status, pk,
+                            )
+                            job.status = _redis_status
+                            if _redis_status == 'completed':
+                                job.progress = 100
+                            job.save(update_fields=['status', 'progress', 'updated_at'])
+                            # Enqueue Celery task to also warm variant/workflow caches.
+                            try:
+                                from academics.celery_tasks import fastapi_callback_task
+                                fastapi_callback_task.delay(
+                                    str(pk), _redis_status,
+                                    variants=None, error=None,
+                                )
+                            except Exception as _ce:
+                                logger.warning(
+                                    '[WORKFLOW] Could not enqueue cache-warm task: %s', _ce
+                                )
+                except Exception as _redis_err:
+                    # Redis unavailable — fall back to DB status as-is
+                    logger.debug('[WORKFLOW] Redis cross-check failed: %s', _redis_err)
+
             data = {
                 'id': str(job.id),
                 'job_id': str(job.id),
@@ -95,10 +147,10 @@ class TimetableWorkflowViewSet(viewsets.ViewSet):
             }
             # Only cache immutable terminal states to prevent stale 'running'
             # cache entries from causing infinite review ↔ status redirects.
-            if job.status in ('completed', 'failed', 'cancelled', 'approved', 'rejected'):
+            if job.status in TERMINAL:
                 cache.set(cache_key, data, 3600)
             response = Response(data)
-            ttl = 3600 if job.status in ('completed', 'failed', 'cancelled', 'approved', 'rejected') else 5
+            ttl = 3600 if job.status in TERMINAL else 5
             response['Cache-Control'] = f'private, max-age={ttl}'
             return response
         except GenerationJob.DoesNotExist:

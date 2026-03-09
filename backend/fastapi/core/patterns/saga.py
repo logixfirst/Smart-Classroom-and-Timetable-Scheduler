@@ -1634,11 +1634,19 @@ class TimetableGenerationSaga:
                     f"[SAGA-PERSIST] Job {job_id} updated: "
                     f"{len(timetable_entries)} entries, status=completed"
                 )
-                # ── Step 4: Trigger Django cache warm-up ─────────────────────
-                # Warm Redis caches NOW (before tracker.mark_completed() fires
-                # the SSE 'completed' event).  This gives the Celery worker the
-                # maximum lead time before the browser lands on the review page.
-                _enqueue_cache_warm_task(job_id)
+
+            # ── Step 4: Trigger Django cache warm-up ─────────────────────────
+            # CRITICAL: Always enqueue the cache-warm task regardless of whether
+            # rows_updated == 0.  Two reasons:
+            # 1) rows_updated==0 means our psycopg2 UPDATE failed to touch any
+            #    row (e.g. Neon pooled-connection delay).  The Celery task uses
+            #    Django ORM with its own connection pool and will succeed where
+            #    psycopg2 failed, updating status to 'completed' in the DB.
+            # 2) If the UPDATE succeeded but the job is then cached by Django
+            #    at status='running', the Celery task busts that cache key.
+            # Without this call the DB stays at 'running' forever, causing the
+            # review → status → review infinite redirect loop on the frontend.
+            _enqueue_cache_warm_task(job_id)
 
         except Exception as db_err:
             logger.error(f"[SAGA-PERSIST] DB write failed: {db_err}")
@@ -1647,11 +1655,19 @@ class TimetableGenerationSaga:
                     db_conn.rollback()
                 except Exception:
                     pass
-            # Non-fatal: result is still in Redis — Django can read from there
+            # Non-fatal: result is still in Redis — Django can read from there.
+            # Enqueue the Celery task anyway so it can heal the DB using its
+            # own separate connection pool.
             logger.warning(
                 "[SAGA-PERSIST] Falling back to Redis-only result. "
-                "Django must poll Redis for this job."
+                "Enqueueing cache-warm task to heal DB via Celery worker."
             )
+            try:
+                _enqueue_cache_warm_task(job_id)
+            except Exception as enqueue_err:
+                logger.error(
+                    f"[SAGA-PERSIST] Failed to enqueue cache-warm task: {enqueue_err}"
+                )
         finally:
             if db_conn:
                 if borrowed_from_pool:

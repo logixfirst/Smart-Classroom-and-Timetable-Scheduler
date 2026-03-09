@@ -1110,8 +1110,8 @@
     position: fixed;
     top: calc(var(--header-height-md) + 2px);
     right: 11px;
-    width: 420px;
-    background: var(--color-dropdown-bg);
+    width: 418px;
+    background: #e9eef6;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-extra-large);
     box-shadow: var(--shadow-modal);

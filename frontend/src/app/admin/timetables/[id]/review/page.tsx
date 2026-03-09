@@ -364,17 +364,31 @@ export default function TimetableReviewPage() {
         throw new Error(`Failed to load workflow (${workflowRes.status})`)
       }
 
-      const [workflowData, variantsData] = await Promise.all([
+      const [workflowData, variantsRaw] = await Promise.all([
         workflowRes.json(),
         variantsRes.ok ? variantsRes.json() : Promise.resolve([]),
       ])
+      // Handle both plain array `[...]` and paginated `{results: [...], count: N}` responses
+      const variantsData: TimetableVariant[] = Array.isArray(variantsRaw)
+        ? variantsRaw
+        : (variantsRaw?.results ?? [])
 
       // Re-route if job is still running (status field is in the workflow response)
       if (workflowData.status === 'running' || workflowData.status === 'queued') {
-        // Guard against the stale-cache race condition: the Celery cache-warm
-        // task may not have run yet even though the DB already has status=completed.
-        // Retry up to MAX_RUNNING_RETRIES times (1.5 s apart) before redirecting,
-        // giving the backend time to flush the correct status.
+        // Guard against the stale-DB race condition: FastAPI may have written
+        // status=completed to Redis and triggered the SSE done event (causing the
+        // status page to navigate here), but the FastAPI→DB write may have failed
+        // silently (e.g. Neon connection pool exhausted).  The backend Redis
+        // cross-check in workflow_views.py will heal the DB on the NEXT request.
+        //
+        // Retry strategy:
+        // - Attempts 1-3 (1.5 s apart): re-fetch — backend self-heals via Redis
+        //   cross-check, so attempt 2 or 3 should return 'completed'.
+        // - Attempt 4+: the DB is definitively stuck.  Do NOT redirect back to the
+        //   status page (that causes the infinite loop).  Instead, override the
+        //   status to 'completed' and try to render the review page with whatever
+        //   variants are already available — variants are written to DB separately
+        //   and are likely intact even when the job status row is stuck.
         if (runningRetryRef.current < MAX_RUNNING_RETRIES) {
           runningRetryRef.current += 1
           setLoadingMeta(false)
@@ -383,9 +397,10 @@ export default function TimetableReviewPage() {
           await loadWorkflowData()
           return
         }
+        // Retries exhausted: treat as completed to break the redirect loop.
+        // The backend Redis cross-check will update the DB on the next normal visit.
         runningRetryRef.current = 0
-        router.push(`/admin/timetables/${workflowId}/status`)
-        return
+        workflowData.status = 'completed'
       }
       runningRetryRef.current = 0
 
@@ -879,12 +894,13 @@ export default function TimetableReviewPage() {
   // Entries for the grid load in the background and show an inline skeleton.
   if (loadingMeta) {
     return (
-      <div className="space-y-6 py-2">
-        {/* Page title skeleton */}
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-56" />
-          <Skeleton className="h-3.5 w-80" />
-        </div>
+      <div className="space-y-6">
+        {/* Title shows instantly — identical to loading.tsx so no visual flash */}
+        <PageHeader
+          title="Review Timetable"
+          parentLabel="Timetables"
+          parentHref="/admin/timetables"
+        />
         {/* Variant cards skeleton */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <VariantCardSkeleton />
