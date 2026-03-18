@@ -24,7 +24,8 @@ import type { VariantSummary } from '@/types/timetable'
 interface VariantCardProps {
   variant: VariantSummary
   jobStatus?: string
-  isSelected?: boolean
+  isActive?: boolean
+  isCompareSelected?: boolean
   onSelect?: (id: string, checked: boolean) => void
   onViewDetails?: (id: string) => void
   onCompare?: (id: string) => void
@@ -86,7 +87,8 @@ function ConflictIndicator({ count }: { count: number }) {
 export function VariantCard({
   variant,
   jobStatus = 'completed',
-  isSelected = false,
+  isActive = false,
+  isCompareSelected = false,
   onSelect,
   onViewDetails,
   onCompare,
@@ -105,12 +107,12 @@ export function VariantCard({
   useEffect(() => {
     const el = cardRef.current
     if (!el) return
-    const elevated = hovered || isSelected
+    const elevated = hovered || isActive || isCompareSelected
     el.style.setProperty('--card-shadow',
       elevated ? '0 4px 16px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.06)')
     el.style.setProperty('--card-translate', hovered ? 'translateY(-1px)' : 'none')
-    el.style.setProperty('--card-outline', isSelected ? '2px solid #1a73e8' : 'none')
-  }, [hovered, isSelected])
+    el.style.setProperty('--card-outline', isActive ? '2px solid #1a73e8' : 'none')
+  }, [hovered, isActive, isCompareSelected])
 
   return (
     <div
@@ -128,26 +130,26 @@ export function VariantCard({
         '[outline:var(--card-outline)]',
         'transition-[box-shadow,transform] duration-150',
       ].join(' ')}
-      onClick={() => onSelect?.(variant.id, !isSelected)}
+      onClick={() => onViewDetails?.(variant.id)}
     >
       {/* Hover checkbox (multi-select) */}
-      {(hovered || isSelected) && onSelect && (
+      {(hovered || isCompareSelected) && onSelect && (
         <button
           type="button"
-          aria-label={isSelected ? 'Deselect variant' : 'Select variant'}
+          aria-label={isCompareSelected ? 'Deselect variant' : 'Select variant'}
           onClick={(e) => {
             e.stopPropagation()
-            onSelect(variant.id, !isSelected)
+            onSelect(variant.id, !isCompareSelected)
           }}
           className={[
             'absolute top-2.5 left-2.5 w-[18px] h-[18px] rounded-[4px] cursor-pointer',
             'flex items-center justify-center border-2 transition-colors',
-            isSelected
+            isCompareSelected
               ? 'bg-[#1a73e8] border-[#1a73e8]'
               : 'border-[var(--color-border)] bg-[var(--color-bg-surface)]',
           ].join(' ')}
         >
-          {isSelected && (
+          {isCompareSelected && (
             <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
               <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>

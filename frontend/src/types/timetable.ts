@@ -91,6 +91,8 @@ export interface TimetableEntry {
  */
 export interface BackendTimetableEntry {
   day: number          // 0 = Monday … 5 = Saturday
+  course_id?: string
+  offering_id?: string
   time_slot: string
   start_time?: string
   end_time?: string
@@ -100,11 +102,15 @@ export interface BackendTimetableEntry {
   faculty_id?: string
   faculty_name?: string
   batch_id?: string
+  batch_ids?: string[]
   batch_name?: string
+  student_ids?: string[]
   classroom_id?: string
   room_number?: string
   duration_minutes?: number
   department_id?: string
+  department_name?: string
+  department_code?: string
 }
 
 export interface TimetableReview {

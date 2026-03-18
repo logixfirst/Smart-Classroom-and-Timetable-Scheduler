@@ -1431,6 +1431,13 @@ class TimetableGenerationSaga:
         _max_fitness = max((v['fitness'] for v in variants), default=1.0) or 1.0
         _total_rooms = max(len(rooms_by_id), 1)
 
+        def _extract_offering_id_from_course_id(compound_course_id: str) -> str:
+            """Extract offering UUID from IDs shaped like <course>_off_<offering>[_secN]."""
+            if not isinstance(compound_course_id, str) or '_off_' not in compound_course_id:
+                return ''
+            tail = compound_course_id.split('_off_', 1)[1]
+            return tail.split('_sec', 1)[0]
+
         def _build_variant_payload(v: dict) -> dict:
             """Convert one GA variant → DB-ready dict with correct field names."""
             sol = v.get('solution', {})
@@ -1474,8 +1481,11 @@ class TimetableGenerationSaga:
                 _fac_id = getattr(course, 'faculty_id', '')
                 _fac    = data.get('faculty', {}).get(_fac_id)
                 v_entries.append({
+                    'course_id':    c_id,
+                    'offering_id':  _extract_offering_id_from_course_id(c_id),
                     'course_code':  getattr(course, 'course_code', ''),
                     'subject_name': getattr(course, 'course_name', ''),
+                    'department_id': getattr(course, 'department_id', ''),
                     'faculty_id':   _fac_id,
                     'faculty_name': getattr(_fac, 'faculty_name', '') if _fac else '',
                     'room_id':      r_id,
@@ -1484,6 +1494,8 @@ class TimetableGenerationSaga:
                     'day':          slot.day,
                     'start_time':   slot.start_time,
                     'end_time':     slot.end_time,
+                    'student_ids':  list(getattr(course, 'student_ids', [])),
+                    'batch_ids':    list(getattr(course, 'batch_ids', [])),
                 })
 
             # Normalise fitness to 0–100 relative to best variant in this run

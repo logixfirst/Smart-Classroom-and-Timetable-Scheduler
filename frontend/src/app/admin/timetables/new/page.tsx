@@ -148,7 +148,7 @@ export default function CreateTimetablePage() {
   }, [formData.lunch_break_enabled, formData.lunch_break_start, formData.lunch_break_end])
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 pb-6">
       <PageHeader
         title="Generate Timetable"
         parentLabel="Timetables"
@@ -173,156 +173,178 @@ export default function CreateTimetablePage() {
         }
       />
 
-      <form id="timetable-form" onSubmit={handleSubmit} className="space-y-4">
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Basic Information</h3>
-            <p className="card-description">Select the academic year and term for this timetable</p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="form-group">
-              <label htmlFor="academic-year" className="form-label">
-                Academic Year <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="academic-year"
-                className="input-primary"
-                value={formData.academic_year}
-                onChange={e => updateFormData({ academic_year: e.target.value })}
-                disabled={isGenerating}
-                required
-              >
-                <option value="2024-2025">2024-2025</option>
-                <option value="2025-2026">2025-2026</option>
-                <option value="2026-2027">2026-2027</option>
-              </select>
+      <form id="timetable-form" onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+        <div className="xl:col-span-7">
+          <div className="card border-l-[3px] border-l-[var(--color-primary)] shadow-[0_10px_28px_rgba(15,23,42,0.05)] h-full">
+            <div className="card-header">
+              <h3 className="card-title">Generation Inputs</h3>
+              <p className="card-description">Set term and scheduling capacity in one pass</p>
             </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="p-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-surface-2)]">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-text-muted)] mb-3">Academic Context</p>
+                <div className="space-y-3">
+                  <div className="form-group">
+                    <label htmlFor="academic-year" className="form-label">
+                      Academic Year <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="academic-year"
+                      className="input-primary"
+                      value={formData.academic_year}
+                      onChange={e => updateFormData({ academic_year: e.target.value })}
+                      disabled={isGenerating}
+                      required
+                    >
+                      <option value="2024-2025">2024-2025</option>
+                      <option value="2025-2026">2025-2026</option>
+                      <option value="2026-2027">2026-2027</option>
+                    </select>
+                  </div>
 
-            <div className="form-group">
-              <label htmlFor="semester" className="form-label">
-                Semester <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="semester"
-                className="input-primary"
-                value={formData.semester}
-                onChange={e => updateFormData({ semester: e.target.value })}
-                disabled={isGenerating}
-                required
-              >
-                <option value="odd">Odd Semester</option>
-                <option value="even">Even Semester</option>
-              </select>
+                  <div className="form-group">
+                    <label htmlFor="semester" className="form-label">
+                      Semester <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="semester"
+                      className="input-primary"
+                      value={formData.semester}
+                      onChange={e => updateFormData({ semester: e.target.value })}
+                      disabled={isGenerating}
+                      required
+                    >
+                      <option value="odd">Odd Semester</option>
+                      <option value="even">Even Semester</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-surface-2)]">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-text-muted)] mb-3">Capacity Controls</p>
+                <div className="space-y-3">
+                  <div className="form-group">
+                    <label htmlFor="working-days" className="form-label">Working Days</label>
+                    <input
+                      type="number"
+                      id="working-days"
+                      className="input-primary"
+                      value={formData.working_days}
+                      onChange={e => updateFormData({ working_days: parseInt(e.target.value) })}
+                      min="5"
+                      max="7"
+                      disabled={isGenerating}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="slots-per-day" className="form-label">
+                      Slots Per Day
+                      <span className={`ml-1.5 text-xs font-normal ${formData.slots_per_day >= maxSlotsPerDay ? 'text-[var(--color-warning-text)]' : 'text-[var(--color-text-muted)]'}`}>
+                        (max {maxSlotsPerDay})
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      id="slots-per-day"
+                      className="input-primary"
+                      value={formData.slots_per_day}
+                      onChange={e =>
+                        updateFormData({ slots_per_day: Math.min(parseInt(e.target.value) || 1, maxSlotsPerDay) })
+                      }
+                      min="1"
+                      max={maxSlotsPerDay}
+                      disabled={isGenerating}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
+            {formData.slots_per_day >= maxSlotsPerDay && (
+              <p className="form-help mt-2 text-[var(--color-warning-text)]">
+                Max for {formData.start_time}–{formData.end_time}
+                {formData.lunch_break_enabled ? `, −${lunchDurationMins} min lunch` : ''}
+              </p>
+            )}
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Schedule Configuration</h3>
-            <p className="card-description">Define working hours and daily slot structure</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            <div className="form-group">
-              <label htmlFor="working-days" className="form-label">Working Days</label>
-              <input
-                type="number"
-                id="working-days"
-                className="input-primary"
-                value={formData.working_days}
-                onChange={e => updateFormData({ working_days: parseInt(e.target.value) })}
-                min="5"
-                max="7"
-                disabled={isGenerating}
-              />
+        <div className="xl:col-span-5">
+          <div className="card border-l-[3px] border-l-[var(--color-border)] shadow-[0_10px_28px_rgba(15,23,42,0.05)] h-full">
+            <div className="card-header">
+              <h3 className="card-title">Daily Time Window</h3>
+              <p className="card-description">Define day boundaries and optional break</p>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="form-group">
+                <label htmlFor="start-time" className="form-label">Start Time</label>
+                <input
+                  type="time"
+                  id="start-time"
+                  className="input-primary"
+                  value={formData.start_time}
+                  onChange={e => updateFormData({ start_time: e.target.value })}
+                  disabled={isGenerating}
+                />
+              </div>
 
-            <div className="form-group">
-              <label htmlFor="slots-per-day" className="form-label">
-                Slots Per Day
-                <span className={`ml-1.5 text-xs font-normal ${formData.slots_per_day >= maxSlotsPerDay ? 'text-[var(--color-warning-text)]' : 'text-[var(--color-text-muted)]'}`}>
-                  (max {maxSlotsPerDay})
-                </span>
-              </label>
-              <input
-                type="number"
-                id="slots-per-day"
-                className="input-primary"
-                value={formData.slots_per_day}
-                onChange={e =>
-                  updateFormData({ slots_per_day: Math.min(parseInt(e.target.value) || 1, maxSlotsPerDay) })
-                }
-                min="1"
-                max={maxSlotsPerDay}
-                disabled={isGenerating}
-              />
-              {formData.slots_per_day >= maxSlotsPerDay && (
-                <p className="form-help text-[var(--color-warning-text)]">
-                  Max for {formData.start_time}–{formData.end_time}
-                  {formData.lunch_break_enabled ? `, −${lunchDurationMins} min lunch` : ''}
-                </p>
-              )}
-            </div>
+              <div className="form-group">
+                <label htmlFor="end-time" className="form-label">End Time</label>
+                <input
+                  type="time"
+                  id="end-time"
+                  className="input-primary"
+                  value={formData.end_time}
+                  onChange={e => updateFormData({ end_time: e.target.value })}
+                  disabled={isGenerating}
+                />
+              </div>
 
-            <div className="form-group">
-              <label htmlFor="start-time" className="form-label">Start Time</label>
-              <input
-                type="time"
-                id="start-time"
-                className="input-primary"
-                value={formData.start_time}
-                onChange={e => updateFormData({ start_time: e.target.value })}
-                disabled={isGenerating}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="end-time" className="form-label">End Time</label>
-              <input
-                type="time"
-                id="end-time"
-                className="input-primary"
-                value={formData.end_time}
-                onChange={e => updateFormData({ end_time: e.target.value })}
-                disabled={isGenerating}
-              />
-            </div>
-          </div>
-
-          <div className="mt-5 p-4 rounded-[var(--radius-lg)] bg-[var(--color-bg-surface-2)] border border-[var(--color-border)]">
-            <label className="flex items-center gap-3 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={formData.lunch_break_enabled}
-                onChange={e => updateFormData({ lunch_break_enabled: e.target.checked })}
-                disabled={isGenerating}
-                className="w-4 h-4 rounded accent-[var(--color-primary)]"
-              />
-              <span className="text-sm font-medium text-[var(--color-text-primary)]">Enable Lunch Break</span>
-            </label>
-            {formData.lunch_break_enabled && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-4">
-                <div className="form-group">
-                  <label htmlFor="lunch-start" className="form-label">Break Start Time</label>
+              <div className="form-group sm:col-span-2">
+                <label className="form-label">Lunch Break</label>
+                <div className="h-11 px-3 rounded-[var(--radius-md)] bg-[var(--color-bg-surface-2)] border border-[var(--color-border)] flex items-center gap-3">
                   <input
-                    type="time"
-                    id="lunch-start"
-                    className="input-primary"
-                    value={formData.lunch_break_start}
-                    onChange={e => updateFormData({ lunch_break_start: e.target.value })}
+                    type="checkbox"
+                    aria-label="Enable lunch break"
+                    checked={formData.lunch_break_enabled}
+                    onChange={e => updateFormData({ lunch_break_enabled: e.target.checked })}
                     disabled={isGenerating}
+                    className="w-4 h-4 rounded accent-[var(--color-primary)]"
                   />
+                  <span className="text-sm text-[var(--color-text-primary)]">Enable break</span>
+                  {formData.lunch_break_enabled && (
+                    <span className="text-xs text-[var(--color-text-secondary)]">{lunchDurationMins} min</span>
+                  )}
                 </div>
-                <div className="form-group">
-                  <label htmlFor="lunch-end" className="form-label">Break End Time</label>
-                  <input
-                    type="time"
-                    id="lunch-end"
-                    className="input-primary"
-                    value={formData.lunch_break_end}
-                    onChange={e => updateFormData({ lunch_break_end: e.target.value })}
-                    disabled={isGenerating}
-                  />
+              </div>
+            </div>
+
+            {formData.lunch_break_enabled && (
+              <div className="mt-4 p-3 rounded-[var(--radius-lg)] bg-[var(--color-bg-surface-2)] border border-[var(--color-border)]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="form-group">
+                    <label htmlFor="lunch-start" className="form-label">Break Start Time</label>
+                    <input
+                      type="time"
+                      id="lunch-start"
+                      className="input-primary"
+                      value={formData.lunch_break_start}
+                      onChange={e => updateFormData({ lunch_break_start: e.target.value })}
+                      disabled={isGenerating}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="lunch-end" className="form-label">Break End Time</label>
+                    <input
+                      type="time"
+                      id="lunch-end"
+                      className="input-primary"
+                      value={formData.lunch_break_end}
+                      onChange={e => updateFormData({ lunch_break_end: e.target.value })}
+                      disabled={isGenerating}
+                    />
+                  </div>
                 </div>
               </div>
             )}

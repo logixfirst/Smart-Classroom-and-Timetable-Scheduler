@@ -1,0 +1,8 @@
+runtimes:
+    - dart@3.7.2
+    - go@1.22.3
+tools:
+    - dartanalyzer@3.7.2
+    - opengrep@1.16.2
+    - revive@1.7.0
+    - trivy@0.69.3

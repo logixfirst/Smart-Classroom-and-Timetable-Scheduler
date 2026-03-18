@@ -19,6 +19,7 @@ interface VariantGridProps {
   variants: VariantSummary[]
   jobStatus?: string
   loading?: boolean
+  activeVariantId?: string | null
   onViewDetails: (variantId: string) => void
   onCompare: (variantIds: [string, string]) => void
   onPickVariant?: (variantId: string) => void
@@ -93,6 +94,7 @@ export function VariantGrid({
   variants,
   jobStatus = 'completed',
   loading = false,
+  activeVariantId = null,
   onViewDetails,
   onCompare,
   onPickVariant,
@@ -167,7 +169,8 @@ export function VariantGrid({
                   <VariantCard
                     variant={variant}
                     jobStatus={jobStatus}
-                    isSelected={selected.has(variant.id)}
+                    isActive={activeVariantId === variant.id}
+                    isCompareSelected={selected.has(variant.id)}
                     onSelect={handleSelect}
                     onViewDetails={onViewDetails}
                     onCompare={handleCompareOne}
@@ -176,8 +179,8 @@ export function VariantGrid({
               ))}
       </div>
 
-      {/* Floating compare pill — appears when 2 selected */}
-      {selected.size === 2 && (
+      {/* Floating compare pill — appears after first select/compare click */}
+      {selected.size >= 1 && (
         <div style={{
           position: 'fixed',
           bottom: 24,
@@ -199,10 +202,11 @@ export function VariantGrid({
               alignItems: 'center',
               gap: 8,
             }}
+            disabled={selected.size !== 2}
             onClick={handleCompareSelected}
           >
             <GitCompare size={16} />
-            Compare Selected →
+            {selected.size === 2 ? 'Compare Selected →' : 'Select one more variant'}
           </button>
         </div>
       )}

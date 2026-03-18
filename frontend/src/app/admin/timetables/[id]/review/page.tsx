@@ -15,7 +15,6 @@ import { TimetableGridSkeleton, VariantCardSkeleton, Skeleton } from '@/componen
 import PageHeader from '@/components/shared/PageHeader'
 import { CheckCircle, XCircle, Printer } from 'lucide-react'
 import { VariantGrid } from '@/components/timetables/VariantGrid'
-import { DepartmentTree } from '@/components/timetables/DepartmentTree'
 import { SlotDetailPanel } from '@/components/timetables/SlotDetailPanel'
 import { TimetableGridFiltered } from '@/components/timetables/TimetableGridFiltered'
 import { fetchDepartmentNames } from '@/lib/api/timetable-variants'
@@ -24,6 +23,8 @@ import type { VariantSummary, VariantScoreCard, TimetableSlotDetailed, Departmen
 // Backend types matching Django models
 interface TimetableEntry {
   day: number // 0-4 (Monday-Friday)
+  course_id?: string
+  offering_id?: string
   time_slot: string
   start_time?: string
   end_time?: string
@@ -33,7 +34,9 @@ interface TimetableEntry {
   faculty_id?: string
   faculty_name?: string
   batch_id?: string
+  batch_ids?: string[]
   batch_name?: string
+  student_ids?: string[]
   classroom_id?: string
   room_number?: string
   duration_minutes?: number
@@ -308,8 +311,34 @@ export default function TimetableReviewPage() {
   const [activeVariant, setActiveVariant] = useState<TimetableVariant | null>(null)
   const [activeDay, setActiveDay] = useState<number | 'all'>('all')
   const [departmentFilter, setDepartmentFilter] = useState<string>('all')
+  const [departmentScopeEntries, setDepartmentScopeEntries] = useState<TimetableEntry[] | null>(null)
+  const [viewScope, setViewScope] = useState<'department' | 'faculty' | 'student'>('department')
+  const [facultyLookup, setFacultyLookup] = useState('')
+  const [facultyLookupLoading, setFacultyLookupLoading] = useState(false)
+  const [facultyScopeEntries, setFacultyScopeEntries] = useState<TimetableEntry[] | null>(null)
+  const [resolvedFacultyId, setResolvedFacultyId] = useState<string | null>(null)
+  const [studentLookup, setStudentLookup] = useState('')
+  const [studentLookupLoading, setStudentLookupLoading] = useState(false)
+  const [studentScopeEntries, setStudentScopeEntries] = useState<TimetableEntry[] | null>(null)
+  const [resolvedStudentId, setResolvedStudentId] = useState<string | null>(null)
   // SlotDetailPanel state — open on cell click
   const [selectedSlot, setSelectedSlot] = useState<TimetableSlotDetailed | null>(null)
+
+  const handleSlotClick = useCallback((slot: TimetableSlotDetailed) => {
+    setSelectedSlot((prev) => {
+      if (
+        prev &&
+        prev.day === slot.day &&
+        prev.time_slot === slot.time_slot &&
+        prev.subject_code === slot.subject_code &&
+        prev.faculty_id === slot.faculty_id &&
+        prev.room_number === slot.room_number
+      ) {
+        return null
+      }
+      return slot
+    })
+  }, [])
   // Department display-name lookup (UUID → { name, code })
   const [deptNames, setDeptNames] = useState<Map<string, { name: string; code: string }>>(() => new Map())
 
@@ -334,7 +363,7 @@ export default function TimetableReviewPage() {
     }
   }, [workflowId])
 
-  // Load department names once on mount so DepartmentTree shows real names
+  // Load department names once on mount for department labels in the selector
   useEffect(() => {
     fetchDepartmentNames().then(setDeptNames).catch(() => {})
   }, [])
@@ -442,6 +471,13 @@ export default function TimetableReviewPage() {
       setSelectedVariantId(variantToLoad.id)
       // ── Show variant cards NOW – entries load in background ──────────────
       setActiveVariant(variantToLoad)
+      setDepartmentFilter('all')
+      setDepartmentScopeEntries(null)
+      setFacultyScopeEntries(null)
+      setResolvedFacultyId(null)
+      setStudentScopeEntries(null)
+      setResolvedStudentId(null)
+      setActiveDay('all')
       setLoadingMeta(false)  // ←← page is visible from this point on
 
       // ── Round 2: entries in background (non-blocking) ────────────────────
@@ -589,6 +625,106 @@ export default function TimetableReviewPage() {
     return map
   }, [activeVariant?.timetable_entries])
 
+  const baseScopedEntries = useMemo(() => {
+    if (viewScope === 'student') return studentScopeEntries ?? []
+    if (viewScope === 'faculty') return facultyScopeEntries ?? []
+    if (viewScope === 'department') return departmentScopeEntries ?? (activeVariant?.timetable_entries ?? [])
+    return activeVariant?.timetable_entries ?? []
+  }, [viewScope, studentScopeEntries, facultyScopeEntries, departmentScopeEntries, activeVariant?.timetable_entries])
+
+  const entriesForGrid = useMemo(() => baseScopedEntries, [baseScopedEntries])
+
+  const applyStudentScope = useCallback(async () => {
+    const lookup = studentLookup.trim()
+    if (!lookup || !activeVariant) return
+
+    setStudentLookupLoading(true)
+    setSelectedSlot(null)
+    try {
+      const params = new URLSearchParams({
+        job_id: activeVariant.job_id,
+        scope_type: 'student',
+        scope_value: lookup,
+      })
+      const res = await authenticatedFetch(
+        `${API_BASE}/timetable/variants/${activeVariant.id}/scope_view/?${params.toString()}`,
+        { credentials: 'include' },
+      )
+      if (!res.ok) throw new Error('Student scope lookup failed')
+      const data = await res.json()
+      setStudentScopeEntries(data.timetable_entries ?? [])
+      const resolved = data?.resolved_scope?.student_id
+      setResolvedStudentId(typeof resolved === 'string' ? resolved : null)
+      setDepartmentFilter('all')
+      setDepartmentScopeEntries(null)
+      setActiveDay('all')
+    } catch {
+      showErrorToast('Unable to load student schedule for this variant.')
+    } finally {
+      setStudentLookupLoading(false)
+    }
+  }, [studentLookup, activeVariant, API_BASE, showErrorToast])
+
+  const applyFacultyScope = useCallback(async () => {
+    const lookup = facultyLookup.trim()
+    if (!lookup || !activeVariant) return
+
+    setFacultyLookupLoading(true)
+    setSelectedSlot(null)
+    try {
+      const params = new URLSearchParams({
+        job_id: activeVariant.job_id,
+        scope_type: 'faculty',
+        scope_value: lookup,
+      })
+      const res = await authenticatedFetch(
+        `${API_BASE}/timetable/variants/${activeVariant.id}/scope_view/?${params.toString()}`,
+        { credentials: 'include' },
+      )
+      if (!res.ok) throw new Error('Faculty scope lookup failed')
+      const data = await res.json()
+      setFacultyScopeEntries(data.timetable_entries ?? [])
+      const resolved = data?.resolved_scope?.faculty_id
+      setResolvedFacultyId(typeof resolved === 'string' ? resolved : null)
+      setDepartmentFilter('all')
+      setDepartmentScopeEntries(null)
+      setActiveDay('all')
+    } catch {
+      showErrorToast('Unable to load faculty schedule for this variant.')
+    } finally {
+      setFacultyLookupLoading(false)
+    }
+  }, [facultyLookup, activeVariant, API_BASE, showErrorToast])
+
+  const applyDepartmentScope = useCallback(async (deptId: string) => {
+    if (!activeVariant) return
+    setDepartmentFilter(deptId)
+    setSelectedSlot(null)
+    setActiveDay('all')
+
+    if (deptId === 'all') {
+      setDepartmentScopeEntries(null)
+      return
+    }
+
+    try {
+      const params = new URLSearchParams({
+        job_id: activeVariant.job_id,
+        scope_type: 'department',
+        scope_value: deptId,
+      })
+      const res = await authenticatedFetch(
+        `${API_BASE}/timetable/variants/${activeVariant.id}/scope_view/?${params.toString()}`,
+        { credentials: 'include' },
+      )
+      if (!res.ok) throw new Error('Department scope lookup failed')
+      const data = await res.json()
+      setDepartmentScopeEntries(data.timetable_entries ?? [])
+    } catch {
+      showErrorToast('Unable to load department timetable for this variant.')
+    }
+  }, [activeVariant, API_BASE, showErrorToast])
+
   const loadVariantEntries = useCallback(async (variant: TimetableVariant) => {
     // ── Instant paint from in-memory cache ──────────────────────────────────
     const memCached = entryCache.current.get(variant.id)
@@ -596,6 +732,11 @@ export default function TimetableReviewPage() {
       setActiveVariant({ ...variant, timetable_entries: memCached })
       setActiveDay('all')
       setDepartmentFilter('all')
+      setDepartmentScopeEntries(null)
+      setFacultyScopeEntries(null)
+      setResolvedFacultyId(null)
+      setStudentScopeEntries(null)
+      setResolvedStudentId(null)
       setTimeout(() => {
         document.getElementById('timetable-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 80)
@@ -609,6 +750,11 @@ export default function TimetableReviewPage() {
       setActiveVariant({ ...variant, timetable_entries: lsCached })
       setActiveDay('all')
       setDepartmentFilter('all')
+      setDepartmentScopeEntries(null)
+      setFacultyScopeEntries(null)
+      setResolvedFacultyId(null)
+      setStudentScopeEntries(null)
+      setResolvedStudentId(null)
       setTimeout(() => {
         document.getElementById('timetable-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 80)
@@ -620,6 +766,11 @@ export default function TimetableReviewPage() {
     setLoadingVariantId(variant.id)
     setActiveDay('all')
     setDepartmentFilter('all')
+    setDepartmentScopeEntries(null)
+    setFacultyScopeEntries(null)
+    setResolvedFacultyId(null)
+    setStudentScopeEntries(null)
+    setResolvedStudentId(null)
 
     // Cancel any pending in-flight request for a different variant
     if (entryAbortRef.current) entryAbortRef.current.abort()
@@ -904,10 +1055,12 @@ export default function TimetableReviewPage() {
       if (e.department_id && !seen.has(e.department_id)) {
         seen.add(e.department_id)
         const resolved = deptNames.get(e.department_id)
+        const name = resolved?.name ?? e.department_name ?? e.department_id
+        const code = resolved?.code ?? e.department_code ?? e.department_id
         opts.push({
           id:   e.department_id,
-          name: resolved?.name ?? e.department_id,
-          code: resolved?.code ?? e.department_id,
+          name,
+          code,
         })
       }
     })
@@ -1026,6 +1179,7 @@ export default function TimetableReviewPage() {
             variants={variantSummaries}
             jobStatus={workflow?.status ?? 'draft'}
             loading={loadingMeta}
+            activeVariantId={activeVariant?.id ?? null}
             onViewDetails={(id) => {
               const v = variants.find(x => x.id === id)
               if (v) loadVariantEntries(v)
@@ -1044,24 +1198,165 @@ export default function TimetableReviewPage() {
             ref={gridSectionRef}
             className="card overflow-hidden"
           >
-            {/* Section header */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-[var(--color-border)]">
-              <div>
-                <h2 className="card-title">
-                  Variant {activeVariant.variant_number} — Timetable
-                </h2>
-                <p className="text-xs mt-0.5 capitalize text-[var(--color-text-muted)]">
-                  {activeVariant.optimization_priority?.replace(/_/g, ' ') ?? 'Standard'} &nbsp;·&nbsp;
-                  Generated {new Date(activeVariant.generated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </p>
+            {/* Audience scope controls */}
+            <div className="px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-bg-surface-2)] print:hidden">
+              <div className="flex flex-wrap lg:flex-nowrap items-end gap-3">
+                <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
+                  View Scope
+                  <select
+                    value={viewScope}
+                    onChange={(e) => {
+                      const next = e.target.value as 'department' | 'faculty' | 'student'
+                      setViewScope(next)
+                      setSelectedSlot(null)
+                      setDepartmentFilter('all')
+                      setDepartmentScopeEntries(null)
+                      setActiveDay('all')
+                      if (next !== 'faculty') {
+                        setFacultyScopeEntries(null)
+                        setResolvedFacultyId(null)
+                        setFacultyLookup('')
+                      }
+                      if (next !== 'student') {
+                        setStudentScopeEntries(null)
+                        setResolvedStudentId(null)
+                        setStudentLookup('')
+                      }
+                    }}
+                    className="input-primary h-9 min-w-[180px]"
+                    aria-label="Choose timetable scope"
+                  >
+                    <option value="department">Department View</option>
+                    <option value="faculty">Faculty View</option>
+                    <option value="student">Student View</option>
+                  </select>
+                </label>
+
+                {viewScope === 'department' && (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
+                      Select Department
+                      <select
+                        value={departmentFilter}
+                        onChange={(e) => { void applyDepartmentScope(e.target.value) }}
+                        className="input-primary h-9 w-[280px]"
+                        aria-label="Department dropdown"
+                      >
+                        <option value="all">All Departments</option>
+                        {departmentOptions.map(d => (
+                          <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <button
+                      onClick={() => { void applyDepartmentScope('all');
+                        setDepartmentScopeEntries(null)
+                      }}
+                      className="btn-secondary h-9 px-3 text-xs"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+
+                {viewScope === 'faculty' && (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
+                      Faculty (ID, Code, Username, or Email)
+                      <input
+                        value={facultyLookup}
+                        onChange={(e) => setFacultyLookup(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            void applyFacultyScope()
+                          }
+                        }}
+                        className="input-primary h-9 w-[280px]"
+                        placeholder="e.g. FAC-001 or UUID"
+                        aria-label="Faculty lookup"
+                      />
+                    </label>
+                    <button
+                      onClick={() => void applyFacultyScope()}
+                      disabled={facultyLookupLoading || !facultyLookup.trim()}
+                      className="btn-primary h-9 px-3 text-xs disabled:opacity-50"
+                    >
+                      {facultyLookupLoading ? 'Loading…' : 'Apply'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFacultyScopeEntries(null)
+                        setResolvedFacultyId(null)
+                        setFacultyLookup('')
+                        setDepartmentFilter('all')
+                        setActiveDay('all')
+                      }}
+                      className="btn-secondary h-9 px-3 text-xs"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+
+                {viewScope === 'faculty' && resolvedFacultyId && (
+                  <span className="badge badge-info">Resolved Faculty: {resolvedFacultyId}</span>
+                )}
+
+                {viewScope === 'student' && (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
+                      Student (ID, Enrollment No, Roll No, or Username)
+                      <input
+                        value={studentLookup}
+                        onChange={(e) => setStudentLookup(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            void applyStudentScope()
+                          }
+                        }}
+                        className="input-primary h-9 w-[280px]"
+                        placeholder="e.g. BT23CSE001"
+                        aria-label="Student lookup"
+                      />
+                    </label>
+                    <button
+                      onClick={() => void applyStudentScope()}
+                      disabled={studentLookupLoading || !studentLookup.trim()}
+                      className="btn-primary h-9 px-3 text-xs disabled:opacity-50"
+                    >
+                      {studentLookupLoading ? 'Loading…' : 'Apply'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setStudentScopeEntries(null)
+                        setResolvedStudentId(null)
+                        setStudentLookup('')
+                        setDepartmentFilter('all')
+                        setActiveDay('all')
+                      }}
+                      className="btn-secondary h-9 px-3 text-xs"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+
+                {viewScope === 'student' && resolvedStudentId && (
+                  <span className="badge badge-info">Resolved Student: {resolvedStudentId}</span>
+                )}
+
+                <button
+                  onClick={() => window.print()}
+                  className="btn-secondary flex items-center gap-1.5 h-9 px-3 text-xs print:hidden lg:ml-auto shrink-0"
+                >
+                  <Printer size={14} />
+                  Print
+                </button>
+
               </div>
-              <button
-                onClick={() => window.print()}
-                className="btn-secondary flex items-center gap-1.5 text-xs print:hidden"
-              >
-                <Printer size={14} />
-                Print
-              </button>
             </div>
 
             {/* Statistics strip */}
@@ -1102,49 +1397,19 @@ export default function TimetableReviewPage() {
               ))}
             </div>
 
-            {/* Body: DepartmentTree sidebar + grid */}
+            {/* Body: grid */}
             <div className="flex items-start">
-
-              {/* ─ Left: department filter sidebar ─ */}
-              {departmentOptions.length > 0 && (
-                <div className="w-[220px] shrink-0 border-r border-[var(--color-border)] p-3 self-stretch">
-                  <DepartmentTree
-                    departments={departmentOptions}
-                    selectedDeptId={departmentFilter}
-                    onSelect={async (deptId) => {
-                      setDepartmentFilter(deptId)
-                      setSelectedSlot(null)
-                      if (deptId !== 'all' && activeVariant) {
-                        try {
-                          const res = await authenticatedFetch(
-                            `${API_BASE}/timetable/variants/${activeVariant.id}/department_view/?department_id=${deptId}&job_id=${activeVariant.job_id}`,
-                            { credentials: 'include' },
-                          )
-                          if (res.ok) {
-                            const data = await res.json()
-                            setActiveVariant({ ...activeVariant, timetable_entries: data.timetable_entries })
-                          }
-                        } catch { /* keep current entries */ }
-                      } else {
-                        const cached = entryCache.current.get(activeVariant!.id)
-                        if (cached) setActiveVariant({ ...activeVariant!, timetable_entries: cached })
-                      }
-                    }}
-                  />
-                </div>
-              )}
-
-              {/* ─ Right: grid + SlotDetailPanel ─ */}
+              {/* ─ Grid + SlotDetailPanel ─ */}
               <div className="flex-1 min-w-0 relative">
                 <div className="px-4 py-4 sm:px-5 sm:py-5">
                   {gridInView
                     ? <TimetableGridFiltered
-                        entries={(activeVariant.timetable_entries ?? []) as BackendTimetableEntry[]}
+                        entries={entriesForGrid as BackendTimetableEntry[]}
                         departmentFilter={departmentFilter}
                         activeDay={activeDay}
                         onDayChange={setActiveDay}
                         isLoading={loadingVariantId === activeVariant.id && (activeVariant.timetable_entries ?? []).length === 0}
-                        onSlotClick={setSelectedSlot}
+                        onSlotClick={handleSlotClick}
                         onRetry={() => loadVariantEntries(activeVariant)}
                       />
                     : <TimetableGridSkeleton days={5} slots={8} />

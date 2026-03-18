@@ -5,6 +5,7 @@
  */
 
 import { X, User, MapPin, BookOpen, AlertCircle, CheckCircle, Users } from 'lucide-react'
+import { useEffect } from 'react'
 import Avatar from '@/components/shared/Avatar'
 import type { TimetableSlotDetailed } from '@/types/timetable'
 
@@ -43,33 +44,58 @@ function InfoRow({ icon, label, children }: { icon: React.ReactNode; label: stri
 export function SlotDetailPanel({ slot, onClose }: SlotDetailPanelProps) {
   const isOpen = slot !== null
 
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onClose])
+
   return (
-    <div
-      className={[
-        'fixed top-0 right-0 h-full flex flex-col z-[200] w-[320px]',
-        '[background:var(--color-bg-surface)] [border-left:1px_solid_var(--color-border)]',
-        'shadow-[-4px_0_24px_rgba(0,0,0,0.10)]',
-        'transition-transform duration-[280ms] [transition-timing-function:cubic-bezier(.4,0,.2,1)]',
-        isOpen ? 'translate-x-0' : 'translate-x-full',
-      ].join(' ')}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-[18px] py-4 [border-bottom:1px_solid_var(--color-border)]">
-        <p className="text-sm font-bold [color:var(--color-text-primary)]">Slot Details</p>
+    <>
+      {isOpen && (
         <button
           type="button"
-          onClick={onClose}
           aria-label="Close slot details"
-          title="Close"
-          className="flex items-center p-1 rounded border-0 bg-transparent cursor-pointer [color:var(--color-text-muted)]"
-        >
-          <X size={18} />
-        </button>
-      </div>
+          onClick={onClose}
+          className="fixed inset-0 z-[190] bg-black/20"
+        />
+      )}
 
-      {/* Body */}
-      {slot && (
-        <div className="flex-1 overflow-y-auto px-[18px] py-5 flex flex-col gap-5">
+      <div
+        className={[
+          'fixed top-0 right-0 h-full flex flex-col z-[200] w-[320px]',
+          '[background:var(--color-bg-surface)] [border-left:1px_solid_var(--color-border)]',
+          'shadow-[-4px_0_24px_rgba(0,0,0,0.10)]',
+          'transition-transform duration-[280ms] [transition-timing-function:cubic-bezier(.4,0,.2,1)]',
+          isOpen ? 'translate-x-0' : 'translate-x-full',
+        ].join(' ')}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-[18px] py-4 [border-bottom:1px_solid_var(--color-border)]">
+          <p className="text-sm font-bold [color:var(--color-text-primary)]">Slot Details</p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close slot details"
+            title="Close"
+            className="flex items-center p-1 rounded border-0 bg-transparent cursor-pointer [color:var(--color-text-muted)]"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        {slot && (
+          <div className="flex-1 overflow-y-auto px-[18px] py-5 flex flex-col gap-5">
 
           {/* Conflict banner */}
           {slot.has_conflict ? (
@@ -162,8 +188,9 @@ export function SlotDetailPanel({ slot, onClose }: SlotDetailPanelProps) {
               {slot.batch_name}
             </InfoRow>
           )}
-        </div>
-      )}
-    </div>
+          </div>
+        )}
+      </div>
+    </>
   )
 }
