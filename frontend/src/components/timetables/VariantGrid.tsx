@@ -102,15 +102,6 @@ export function VariantGrid({
     onCompare(ids)
   }, [selected, onCompare])
 
-  const handleCompareOne = useCallback(
-    (_id: string) => {
-      if (selected.size !== 2) return
-      const ids = [...selected] as [string, string]
-      onCompare(ids)
-    },
-    [selected, onCompare],
-  )
-
   return (
     <div className="relative">
       {selected.size > 0 && (
@@ -144,10 +135,9 @@ export function VariantGrid({
                     jobStatus={jobStatus}
                     isActive={activeVariantId === variant.id}
                     isCompareSelected={selected.has(variant.id)}
-                    compareEnabled={selected.size === 2}
                     onSelect={handleSelect}
                     onViewDetails={onViewDetails}
-                    onCompare={handleCompareOne}
+                    onPickVariant={onPickVariant}
                   />
                 </div>
               ))}

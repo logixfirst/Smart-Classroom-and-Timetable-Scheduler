@@ -278,6 +278,7 @@ export default function TimetableReviewPage() {
       return
     }
     setSubstitutionTargetSlot(slot)
+    setSelectedSlot(null)
     setSubstitutionResult(null)
     setShowSubstitutionModal(true)
   }, [showInfoToast])
@@ -1143,8 +1144,7 @@ export default function TimetableReviewPage() {
             
 
             {/* Body: grid */}
-            <div className="flex items-start">
-              {/* ─ Grid + SlotDetailPanel ─ */}
+            <div className="flex flex-col items-stretch">
               <div className="flex-1 min-w-0 relative">
                 <div className="px-4 py-4 sm:px-5 sm:py-5">
                   {gridInView
@@ -1160,22 +1160,22 @@ export default function TimetableReviewPage() {
                     : <TimetableGridSkeleton days={5} slots={8} />
                   }
                 </div>
-
-                {/* Slide-in detail panel */}
-                <SlotDetailPanel
-                  slot={selectedSlot}
-                  onClose={() => setSelectedSlot(null)}
-                  onRequestSubstitution={openSubstitutionModal}
-                  substitutionLoading={substitutionLoading || substitutionApplyLoading}
-                />
               </div>
             </div>
+
+            <SlotDetailPanel
+              slot={selectedSlot}
+              onClose={() => setSelectedSlot(null)}
+              onRequestSubstitution={openSubstitutionModal}
+              substitutionLoading={substitutionLoading || substitutionApplyLoading}
+              mode="dialog"
+            />
           </section>
         )}
 
         {showSubstitutionModal && (
-          <div className="fixed inset-0 bg-slate-900/45 backdrop-blur-[2px] flex items-center justify-center z-50 px-4">
-            <div className="card rounded-2xl p-6 max-w-2xl w-full max-h-[85vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-[#00000052] flex items-center justify-center z-[260] px-4">
+            <div className="bg-[#d3dbe5] rounded-[28px] border border-[var(--color-border)] shadow-2xl p-6 w-[560px] h-[560px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Quick Proxy Assignment</h3>
                 <button
@@ -1282,8 +1282,8 @@ export default function TimetableReviewPage() {
 
         {/* ── Approval Modal ── */}
         {showApprovalModal && (
-          <div className="fixed inset-0 bg-slate-900/45 backdrop-blur-[2px] flex items-center justify-center z-50 px-4">
-            <div className="card rounded-2xl p-6 max-w-md w-full">
+          <div className="fixed inset-0 bg-[#00000052] flex items-center justify-center z-50 px-4">
+            <div className="bg-[#d3dbe5] rounded-[28px] border border-[var(--color-border)] shadow-2xl p-6 max-w-md w-full">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-success-subtle)]">
                   <CheckCircle size={20} className="text-[var(--color-success-text)]" />
@@ -1312,8 +1312,8 @@ export default function TimetableReviewPage() {
 
         {/* ── Rejection Modal ── */}
         {showRejectionModal && (
-          <div className="fixed inset-0 bg-slate-900/45 backdrop-blur-[2px] flex items-center justify-center z-50 px-4">
-            <div className="card rounded-2xl p-6 max-w-md w-full">
+          <div className="fixed inset-0 bg-[#00000052] flex items-center justify-center z-50 px-4">
+            <div className="bg-[#d3dbe5] rounded-[28px] border border-[var(--color-border)] shadow-2xl p-6 max-w-md w-full">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-danger-subtle)]">
                   <XCircle size={20} className="text-[var(--color-danger-text)]" />

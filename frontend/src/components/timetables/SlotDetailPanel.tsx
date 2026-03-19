@@ -1,7 +1,7 @@
 'use client'
 
 /**
- * SlotDetailPanel - right slide-in panel showing full details for a timetable cell.
+ * SlotDetailPanel - slot details rendered as sidebar, inline card, or dialog.
  */
 
 import { X, User, MapPin, BookOpen, AlertCircle, CheckCircle, Users } from 'lucide-react'
@@ -14,6 +14,7 @@ interface SlotDetailPanelProps {
   onClose: () => void
   onRequestSubstitution?: (slot: TimetableSlotDetailed) => void
   substitutionLoading?: boolean
+  mode?: 'sidebar' | 'inline' | 'dialog'
 }
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -48,8 +49,13 @@ export function SlotDetailPanel({
   onClose,
   onRequestSubstitution,
   substitutionLoading = false,
+  mode = 'sidebar',
 }: SlotDetailPanelProps) {
   const isOpen = slot !== null
+  const isInline = mode === 'inline'
+  const isDialog = mode === 'dialog'
+
+  if ((isInline || isDialog) && !isOpen) return null
 
   useEffect(() => {
     if (!isOpen) return
@@ -73,17 +79,21 @@ export function SlotDetailPanel({
           type="button"
           aria-label="Close slot details"
           onClick={onClose}
-          className="fixed inset-0 z-[190] bg-black/20"
+          className={isInline ? 'hidden' : 'fixed inset-0 z-[230] bg-[#00000052]'}
         />
       )}
 
       <div
         className={[
-          'fixed top-0 right-0 h-full flex flex-col z-[200] w-[320px]',
-          '[background:var(--color-bg-surface)] [border-left:1px_solid_var(--color-border)]',
-          'shadow-[-4px_0_24px_rgba(0,0,0,0.10)]',
-          'transition-transform duration-[280ms] [transition-timing-function:cubic-bezier(.4,0,.2,1)]',
-          isOpen ? 'translate-x-0' : 'translate-x-full',
+          isDialog
+            ? 'fixed z-[240] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[560px] h-[560px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] flex flex-col bg-[#d3dbe5] rounded-[28px] border border-[var(--color-border)] shadow-2xl overflow-y-auto'
+            : '',
+          isDialog
+            ? ''
+            : isInline
+            ? 'w-full lg:w-[340px] min-h-[420px] flex flex-col [background:var(--color-bg-surface)] [border-left:1px_solid_var(--color-border)]'
+            : 'fixed top-0 right-0 h-full flex flex-col z-[200] w-[320px] [background:var(--color-bg-surface)] [border-left:1px_solid_var(--color-border)] shadow-[-4px_0_24px_rgba(0,0,0,0.10)] transition-transform duration-[280ms] [transition-timing-function:cubic-bezier(.4,0,.2,1)]',
+          isInline || isDialog ? '' : (isOpen ? 'translate-x-0' : 'translate-x-full'),
         ].join(' ')}
       >
         {/* Header */}

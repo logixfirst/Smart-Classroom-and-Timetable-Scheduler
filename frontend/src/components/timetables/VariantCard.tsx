@@ -16,7 +16,7 @@
  */
 
 import { useRef, useEffect, useState } from 'react'
-import { CheckCircle, AlertCircle, Eye, GitCompare } from 'lucide-react'
+import { CheckCircle, AlertCircle, Eye } from 'lucide-react'
 import { ScoreBar } from './ScoreBar'
 import { VariantStatusBadge } from './VariantStatusBadge'
 import type { VariantSummary } from '@/types/timetable'
@@ -26,10 +26,9 @@ interface VariantCardProps {
   jobStatus?: string
   isActive?: boolean
   isCompareSelected?: boolean
-  compareEnabled?: boolean
   onSelect?: (id: string, checked: boolean) => void
   onViewDetails?: (id: string) => void
-  onCompare?: (id: string) => void
+  onPickVariant?: (id: string) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -90,10 +89,9 @@ export function VariantCard({
   jobStatus = 'completed',
   isActive = false,
   isCompareSelected = false,
-  compareEnabled = false,
   onSelect,
   onViewDetails,
-  onCompare,
+  onPickVariant,
 }: VariantCardProps) {
   const [hovered, setHovered] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
@@ -210,11 +208,10 @@ export function VariantCard({
         <button
           type="button"
           className="btn-primary flex-1 text-xs h-8 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
-          onClick={() => onCompare?.(variant.id)}
-          disabled={!compareEnabled}
+          onClick={() => onPickVariant?.(variant.id)}
+          disabled={!onPickVariant}
         >
-          <GitCompare size={13} className="mr-1 inline" />
-          Compare
+          Select
         </button>
       </div>
     </div>
