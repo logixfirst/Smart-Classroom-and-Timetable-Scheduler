@@ -344,6 +344,11 @@ export default function TimetableReviewPage() {
   // Department display-name lookup (UUID → { name, code })
   const [deptNames, setDeptNames] = useState<Map<string, { name: string; code: string }>>(() => new Map())
 
+  const pickDefaultVariant = useCallback((list: TimetableVariant[]): TimetableVariant | undefined => {
+    if (!list.length) return undefined
+    return list.find(v => v.variant_number === 1) ?? list[0]
+  }, [])
+
   // Re-attach observer whenever the active variant changes (including null → first variant).
   // rootMargin 400px means the grid starts building before it even enters the viewport.
   useEffect(() => {
@@ -447,8 +452,7 @@ export default function TimetableReviewPage() {
       setWorkflow(workflowData)
       setVariants(variantsData)
 
-      const selected = variantsData.find((v: TimetableVariant) => v.is_selected)
-      const variantToLoad: TimetableVariant | undefined = selected ?? variantsData[0]
+      const variantToLoad = pickDefaultVariant(variantsData)
 
       if (!variantToLoad) {
         // If the job is in a terminal state but variants are empty, the Celery
@@ -473,7 +477,8 @@ export default function TimetableReviewPage() {
       setSelectedVariantId(variantToLoad.id)
       // ── Show variant cards NOW – entries load in background ──────────────
       setActiveVariant(variantToLoad)
-      setDepartmentFilter('all')
+      const firstDeptId = (variantToLoad.timetable_entries ?? []).find(e => !!e.department_id)?.department_id ?? 'all'
+      setDepartmentFilter(firstDeptId)
       setDepartmentScopeEntries(null)
       setFacultyScopeEntries(null)
       setResolvedFacultyId(null)
@@ -811,6 +816,22 @@ export default function TimetableReviewPage() {
     }
   }, [API_BASE])
 
+  useEffect(() => {
+    if (!activeVariant) return
+    const ids = Array.from(new Set(
+      (activeVariant.timetable_entries ?? [])
+        .map(e => e.department_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    ))
+    if (ids.length === 0) return
+    if (departmentFilter === 'all' || !ids.includes(departmentFilter)) {
+      setDepartmentFilter(ids[0])
+      if (viewScope === 'department') {
+        void applyDepartmentScope(ids[0])
+      }
+    }
+  }, [activeVariant, departmentFilter, viewScope, applyDepartmentScope])
+
   const renderTimetableGrid = (variant: TimetableVariant) => {
     const entries = variant.timetable_entries ?? []
 
@@ -1069,6 +1090,11 @@ export default function TimetableReviewPage() {
     return opts
   }, [activeVariant?.timetable_entries, deptNames])
 
+  const effectiveDepartmentFilter = useMemo(
+    () => (viewScope === 'department' ? departmentFilter : 'all'),
+    [viewScope, departmentFilter],
+  )
+
   // Block the full page ONLY while workflow metadata + variant list are loading.
   // Entries for the grid load in the background and show an inline skeleton.
   if (loadingMeta) {
@@ -1234,33 +1260,25 @@ export default function TimetableReviewPage() {
                   </select>
                 </label>
 
-                {viewScope === 'department' && (
-                  <div className="flex flex-wrap items-end gap-2">
-                    <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
-                      Select Department
-                      <select
-                        value={departmentFilter}
-                        onChange={(e) => { void applyDepartmentScope(e.target.value) }}
-                        className="input-primary h-9 w-[280px]"
-                        aria-label="Department dropdown"
-                      >
-                        <option value="all">All Departments</option>
-                        {departmentOptions.map(d => (
-                          <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <button
-                      onClick={() => { void applyDepartmentScope('all');
-                        setDepartmentScopeEntries(null)
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
+                    Select Department
+                    <select
+                      value={departmentFilter === 'all' && departmentOptions.length > 0 ? departmentOptions[0].id : departmentFilter}
+                      onChange={(e) => {
+                        setViewScope('department')
+                        void applyDepartmentScope(e.target.value)
                       }}
-                      className="btn-secondary h-9 px-3 text-xs"
+                      className="input-primary h-9 w-[280px]"
+                      aria-label="Department dropdown"
+                      disabled={departmentOptions.length === 0}
                     >
-                      Clear
-                    </button>
-                  </div>
-                )}
+                      {departmentOptions.map(d => (
+                        <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
 
                 {viewScope === 'faculty' && (
                   <div className="flex flex-wrap items-end gap-2">
@@ -1361,43 +1379,7 @@ export default function TimetableReviewPage() {
               </div>
             </div>
 
-            {/* Statistics strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 print:hidden border-b border-[var(--color-border)]">
-              {[
-                {
-                  icon: (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-                  ),
-                  label: 'Total Classes', val: activeStats?.total_classes ?? 0,
-                },
-                {
-                  icon: (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  ),
-                  label: 'Total Hours', val: activeStats?.total_hours ?? 0,
-                },
-                {
-                  icon: (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m7-10h.01M12 15h.01" /></svg>
-                  ),
-                  label: 'Unique Rooms', val: activeStats?.unique_rooms ?? 0,
-                },
-                {
-                  icon: (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  ),
-                  label: 'Faculty Members', val: activeStats?.unique_faculty ?? 0,
-                },
-              ].map(({ icon, label, val }) => (
-                <div key={label} className="px-5 py-3 text-center border-r border-[var(--color-border)] last:border-r-0">
-                  <div className="flex items-center justify-center gap-1.5 mb-0.5 text-[var(--color-text-muted)]">
-                    {icon}
-                    <p className="text-xs">{label}</p>
-                  </div>
-                  <p className="text-xl font-bold text-[var(--color-text-primary)]">{val}</p>
-                </div>
-              ))}
-            </div>
+            
 
             {/* Body: grid */}
             <div className="flex items-start">
@@ -1407,7 +1389,7 @@ export default function TimetableReviewPage() {
                   {gridInView
                     ? <TimetableGridFiltered
                         entries={entriesForGrid as BackendTimetableEntry[]}
-                        departmentFilter={departmentFilter}
+                        departmentFilter={effectiveDepartmentFilter}
                         activeDay={activeDay}
                         onDayChange={setActiveDay}
                         isLoading={loadingVariantId === activeVariant.id && (activeVariant.timetable_entries ?? []).length === 0}
