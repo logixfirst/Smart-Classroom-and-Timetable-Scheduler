@@ -138,6 +138,9 @@ class Student(models.Model):
                 fields=["organization", "is_active"],
                 name="idx_student_org_active",
             ),
+            models.Index(fields=["enrollment_number"], name="idx_stu_enrollment"),
+            models.Index(fields=["roll_number"], name="idx_stu_roll"),
+            models.Index(fields=["username"], name="idx_stu_username"),
         ]
 
     @property

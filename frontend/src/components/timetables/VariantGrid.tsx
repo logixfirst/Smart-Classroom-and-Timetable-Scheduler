@@ -11,7 +11,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import { CalendarDays, GitCompare, Loader2 } from 'lucide-react'
+import { CalendarDays, GitCompare } from 'lucide-react'
 import { VariantCard } from './VariantCard'
 import type { VariantSummary } from '@/types/timetable'
 
@@ -19,6 +19,8 @@ interface VariantGridProps {
   variants: VariantSummary[]
   jobStatus?: string
   loading?: boolean
+  activeVariantId?: string | null
+  selectedVariantId?: string | null
   onViewDetails: (variantId: string) => void
   onCompare: (variantIds: [string, string]) => void
   onPickVariant?: (variantId: string) => void
@@ -30,30 +32,22 @@ interface VariantGridProps {
 
 export function VariantCardSkeleton() {
   return (
-    <div style={{
-      background: 'var(--color-bg-surface)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 16,
-      padding: '20px 18px 16px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 14,
-    }}>
+    <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-2xl px-[18px] pt-5 pb-4 flex flex-col gap-3.5">
       {/* header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="flex items-center justify-between">
         <div>
-          <div className="animate-pulse" style={{ width: 80, height: 14, borderRadius: 4, background: 'var(--color-bg-surface-3)' }} />
-          <div className="animate-pulse" style={{ width: 120, height: 12, borderRadius: 4, background: 'var(--color-bg-surface-3)', marginTop: 6 }} />
+          <div className="animate-pulse w-20 h-3.5 rounded bg-[var(--color-bg-surface-3)]" />
+          <div className="animate-pulse w-[120px] h-3 rounded bg-[var(--color-bg-surface-3)] mt-1.5" />
         </div>
-        <div className="animate-pulse" style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--color-bg-surface-3)' }} />
+        <div className="animate-pulse w-[72px] h-[72px] rounded-full bg-[var(--color-bg-surface-3)]" />
       </div>
       {[1, 2, 3].map((i) => (
-        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <div className="animate-pulse" style={{ width: '100%', height: 10, borderRadius: 4, background: 'var(--color-bg-surface-3)' }} />
-          <div className="animate-pulse" style={{ width: '100%', height: 5, borderRadius: 999, background: 'var(--color-bg-surface-3)' }} />
+        <div key={i} className="flex flex-col gap-1">
+          <div className="animate-pulse w-full h-2.5 rounded bg-[var(--color-bg-surface-3)]" />
+          <div className="animate-pulse w-full h-1.5 rounded-full bg-[var(--color-bg-surface-3)]" />
         </div>
       ))}
-      <div className="animate-pulse" style={{ width: '100%', height: 32, borderRadius: 999, background: 'var(--color-bg-surface-3)' }} />
+      <div className="animate-pulse w-full h-8 rounded-full bg-[var(--color-bg-surface-3)]" />
     </div>
   )
 }
@@ -64,20 +58,12 @@ export function VariantCardSkeleton() {
 
 function EmptyState() {
   return (
-    <div style={{
-      gridColumn: '1 / -1',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '64px 24px',
-      gap: 12,
-    }}>
+    <div className="col-span-full flex flex-col items-center justify-center px-6 py-16 gap-3">
       <CalendarDays size={64} color="var(--color-text-muted)" />
-      <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+      <p className="text-base font-semibold text-[var(--color-text-primary)]">
         No timetables generated yet
       </p>
-      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center', maxWidth: 320 }}>
+      <p className="text-[13px] text-[var(--color-text-muted)] text-center max-w-[320px]">
         Generate a timetable to see variants here. Each variant represents a different
         optimisation strategy.
       </p>
@@ -93,6 +79,8 @@ export function VariantGrid({
   variants,
   jobStatus = 'completed',
   loading = false,
+  activeVariantId = null,
+  selectedVariantId = null,
   onViewDetails,
   onCompare,
   onPickVariant,
@@ -116,23 +104,10 @@ export function VariantGrid({
     onCompare(ids)
   }, [selected, onCompare])
 
-  const handleCompareOne = useCallback(
-    (id: string) => {
-      if (selected.size === 1 && !selected.has(id)) {
-        const other = [...selected][0]
-        onCompare([other, id] as [string, string])
-      } else {
-        // Select the card so user can pick a second
-        setSelected(new Set([id]))
-      }
-    },
-    [selected, onCompare],
-  )
-
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="relative">
       {selected.size > 0 && (
-        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 8 }}>
+        <p className="text-xs text-[var(--color-text-secondary)] mb-2">
           {selected.size === 1
             ? 'Select one more variant to compare'
             : '2 variants selected — ready to compare'}
@@ -140,16 +115,11 @@ export function VariantGrid({
       )}
 
       {/* Responsive grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: 16,
-      }}>
+      <div className="grid [grid-template-columns:repeat(auto-fill,minmax(280px,1fr))] gap-4">
         {loading
           ? [1, 2, 3].map((i) => (
               <div
                 key={i}
-                style={{ animationDelay: `${i * 50}ms` }}
                 className="animate-fade-in"
               >
                 <VariantCardSkeleton />
@@ -157,52 +127,35 @@ export function VariantGrid({
             ))
           : variants.length === 0
             ? <EmptyState />
-            : variants.map((variant, idx) => (
+            : variants.map((variant) => (
                 <div
                   key={variant.id}
-                  style={{
-                    animation: `fadeInUp 300ms ease ${idx * 50}ms both`,
-                  }}
+                  className="animate-fade-in"
                 >
                   <VariantCard
                     variant={variant}
                     jobStatus={jobStatus}
-                    isSelected={selected.has(variant.id)}
+                    isActive={activeVariantId === variant.id}
+                    isApproved={selectedVariantId === variant.id && jobStatus === 'approved'}
+                    isCompareSelected={selected.has(variant.id)}
                     onSelect={handleSelect}
                     onViewDetails={onViewDetails}
-                    onCompare={handleCompareOne}
+                    onPickVariant={onPickVariant}
                   />
                 </div>
               ))}
       </div>
 
-      {/* Floating compare pill — appears when 2 selected */}
-      {selected.size === 2 && (
-        <div style={{
-          position: 'fixed',
-          bottom: 24,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 100,
-          animation: 'fadeInUp 200ms ease',
-        }}>
+      {/* Floating compare pill — appears after first select/compare click */}
+      {selected.size >= 1 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] animate-fade-in">
           <button
-            className="btn-primary"
-            style={{
-              height: 44,
-              padding: '0 28px',
-              borderRadius: 999,
-              fontSize: 14,
-              fontWeight: 600,
-              boxShadow: '0 4px 20px rgba(26,115,232,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
+            className="btn-primary h-11 px-7 rounded-full text-sm font-semibold flex items-center gap-2 shadow-[0_4px_20px_rgba(26,115,232,0.4)]"
+            disabled={selected.size !== 2}
             onClick={handleCompareSelected}
           >
             <GitCompare size={16} />
-            Compare Selected →
+            {selected.size === 2 ? 'Compare Selected →' : 'Select one more variant'}
           </button>
         </div>
       )}

@@ -56,6 +56,7 @@ import { useEffect, useRef, useState, ReactNode, useCallback } from 'react'
 import { JetBrains_Mono } from 'next/font/google'
 import { GoogleSpinner } from '@/components/ui/GoogleSpinner'
 import { ArrowLeft, XCircle, AlertTriangle } from 'lucide-react'
+import PageHeader from '@/components/shared/PageHeader'
 
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], weight: ['400', '700'] })
 
@@ -568,138 +569,137 @@ export default function TimetableStatusPage() {
     : 'Timetable Generation in Progress'
 
   return (
-    <div ref={containerRef} className="status-page-bg">
+    <div ref={containerRef} className="space-y-5 pb-10">
+      <PageHeader
+        title="Generation Status"
+        parentLabel="Timetables"
+        parentHref="/admin/timetables"
+      />
 
-      {/* Top gradient fade — absolute so it stays within the AppShell content pane */}
-      <div className="absolute top-0 left-0 right-0 h-32 pointer-events-none status-top-gradient" />
-
-      {/* Main card */}
-      <div className="relative max-w-[680px] w-full status-modal-card status-modal-card--in1">
-
-        {/* Back navigation */}
-        <button onClick={() => router.push('/admin/timetables')} className="btn-text flex items-center gap-1.5 mb-5 fu-100">
-          <ArrowLeft size={15} />
-          Back to Timetables
-        </button>
-
-        {/* Institution badge */}
-        <p className="text-[11px] font-medium uppercase tracking-widest mb-2 fu-150 text-[var(--color-text-muted)]">
-          Banaras Hindu University
-        </p>
-
-        {/* Heading */}
-        <h1 className="text-[24px] font-bold mb-1 fu-200 text-[var(--color-text-primary)]">
-          Building Your Timetable
-        </h1>
-
-        {/* Subtitle */}
-        <p className="text-[15px] mb-5 fu-250 text-[var(--color-text-secondary)]">
-          {subtitle}
-        </p>
-
-        {/* Percentage number — key remount triggers scalePop on each integer change */}
-        <div className="text-right mb-2 fu-300">
-          <span
-            key={Math.floor(smoothOverallProgress)}
-            className={`${jetbrainsMono.className} status-pct-display`}
-          >
-            {smoothOverallProgress.toFixed(1)}%
-          </span>
-        </div>
-
-        {/* Progress bar */}
-        <div className="fu-350">
-          <div className="relative w-full status-progress-track">
-            {/* Coloured fill — width driven by CSS var (--progress-pct) set via DOM ref */}
-            <div className="status-progress-fill" />
-            {/* Shimmer overlay — clipped to fill width only */}
-            <div className="status-shimmer-overlay status-progress-shimmer-fill" />
-          </div>
-        </div>
-
-        {/* ETA + active stage description */}
-        <div className="mt-3 flex items-start justify-between gap-6 fu-400">
-          <p className="text-xs italic leading-snug text-[var(--color-text-secondary)]">
-            {activeStage.description}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 items-start">
+        <div className="card xl:col-span-2 status-modal-card--in1">
+          <p className="text-[11px] font-medium uppercase tracking-widest mb-2 text-[var(--color-text-muted)]">
+            Banaras Hindu University
           </p>
-          <p className="text-sm whitespace-nowrap shrink-0 text-[var(--color-text-secondary)]">
-            {formatETADisplay(smoothETA)}
+
+          <h2 className="text-[24px] font-bold mb-1 text-[var(--color-text-primary)]">
+            Building Your Timetable
+          </h2>
+
+          <p className="text-[15px] mb-5 text-[var(--color-text-secondary)]">
+            {subtitle}
           </p>
-        </div>
 
-        {/* Stage pipeline stepper */}
-        <div className="mt-6 mb-5 fu-450">
-          <div className="relative flex items-start">
-            {STAGES.map((stage, i) => {
-              const stageOrder  = getStageOrder(stage.key)
-              const isCompleted = currentStageOrder > stageOrder
-              const isActive    = progress.stage === stage.key
-              const isDone      = isCompleted || isActive
-
-              return (
-                <div key={stage.key} className="flex items-start flex-1 last:flex-none">
-                  {/* Node + label */}
-                  <div className="flex flex-col items-center min-w-0">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 ${isDone ? 'status-stage-node-fill' : 'status-stage-node-idle'}${isActive ? ' status-stage-node-pulse' : ''}`}
-                    >
-                      {isCompleted ? (
-                        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" className="status-small-icon">
-                          <path d="M2 6l3 3 5-5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      ) : (
-                        stage.icon
-                      )}
-                    </div>
-                    <span className={`mt-2 text-center leading-tight ${isDone ? 'status-stage-label-active' : 'status-stage-label-idle'}`}>
-                      {stage.label}
-                    </span>
-                  </div>
-
-                  {/* Connector line (not after last node) */}
-                  {i < STAGES.length - 1 && (
-                    <div className={`flex-1 self-start mt-4 mx-1 ${isCompleted ? 'status-connector-filled' : 'status-connector-dashed'}`} />
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Separator */}
-        <div className="h-px mb-6 bg-[var(--color-border)]" />
-
-        {/* Footer: connection dot + cancel */}
-        <div className="flex items-center justify-between flex-wrap gap-3 fu-500">
-          {/* Connection indicator */}
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? 'status-dot-live' : reconnectAttempt > 0 ? 'status-dot-warn' : 'status-dot-err'}`}
-            />
-            <span className="text-[11px] text-[var(--color-text-secondary)]">
-              {isConnected ? 'Live' : reconnectAttempt > 0 ? 'Reconnecting...' : 'Offline'}
+          <div className="text-right mb-2">
+            <span
+              key={Math.floor(smoothOverallProgress)}
+              className={`${jetbrainsMono.className} status-pct-display`}
+            >
+              {smoothOverallProgress.toFixed(1)}%
             </span>
           </div>
 
-          {/* Cancel / inline confirmation */}
-          {!showCancelConfirm ? (
-            <button onClick={() => setShowCancelConfirm(true)} className="btn-delete">
-              Cancel Generation
-            </button>
-          ) : (
-            <div className="flex items-center gap-3 flex-wrap justify-end">
-              <span className="text-xs text-[var(--color-text-secondary)]">Are you sure? This cannot be undone.</span>
-              <button onClick={handleCancel} disabled={isCancelling} className="btn-danger">
-                {isCancelling ? 'Stopping...' : 'Yes, stop'}
-              </button>
-              <button onClick={() => setShowCancelConfirm(false)} className="btn-ghost">
-                Keep going
-              </button>
+          <div>
+            <div className="relative w-full status-progress-track">
+              <div className="status-progress-fill" />
+              <div className="status-shimmer-overlay status-progress-shimmer-fill" />
             </div>
-          )}
+          </div>
+
+          <div className="mt-3 flex items-start justify-between gap-6">
+            <p className="text-xs italic leading-snug text-[var(--color-text-secondary)]">
+              {activeStage.description}
+            </p>
+            <p className="text-sm whitespace-nowrap shrink-0 text-[var(--color-text-secondary)]">
+              {formatETADisplay(smoothETA)}
+            </p>
+          </div>
+
+          <div className="mt-6 mb-1">
+            <div className="relative flex items-start">
+              {STAGES.map((stage, i) => {
+                const stageOrder = getStageOrder(stage.key)
+                const isCompleted = currentStageOrder > stageOrder
+                const isActive = progress.stage === stage.key
+                const isDone = isCompleted || isActive
+
+                return (
+                  <div key={stage.key} className="flex items-start flex-1 last:flex-none">
+                    <div className="flex flex-col items-center min-w-0">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 ${isDone ? 'status-stage-node-fill' : 'status-stage-node-idle'}${isActive ? ' status-stage-node-pulse' : ''}`}
+                      >
+                        {isCompleted ? (
+                          <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" className="status-small-icon">
+                            <path d="M2 6l3 3 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        ) : (
+                          stage.icon
+                        )}
+                      </div>
+                      <span className={`mt-2 text-center leading-tight ${isDone ? 'status-stage-label-active' : 'status-stage-label-idle'}`}>
+                        {stage.label}
+                      </span>
+                    </div>
+
+                    {i < STAGES.length - 1 && (
+                      <div className={`flex-1 self-start mt-4 mx-1 ${isCompleted ? 'status-connector-filled' : 'status-connector-dashed'}`} />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="card status-modal-card--in">
+          <h3 className="card-title mb-1">Job Health</h3>
+          <p className="card-description mb-4">Status signal and operator action for this generation run</p>
+
+          <div className="space-y-3 mb-5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[var(--color-text-secondary)]">Current Stage</span>
+              <span className="text-sm font-medium text-[var(--color-text-primary)]">{activeStage.label}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[var(--color-text-secondary)]">Connection</span>
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-2 h-2 rounded-full shrink-0 ${isConnected ? 'status-dot-live' : reconnectAttempt > 0 ? 'status-dot-warn' : 'status-dot-err'}`}
+                />
+                <span className="text-sm text-[var(--color-text-primary)]">
+                  {isConnected ? 'Live' : reconnectAttempt > 0 ? 'Reconnecting...' : 'Offline'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-[var(--color-border)]">
+            <p className="text-xs text-[var(--color-text-secondary)] mb-3">
+              Use cancel only when you need to stop this run immediately.
+            </p>
+            {!showCancelConfirm ? (
+              <button onClick={() => setShowCancelConfirm(true)} className="btn-delete w-full justify-center">
+                Cancel Generation
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  Are you sure? This cannot be undone.
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={handleCancel} disabled={isCancelling} className="btn-danger flex-1 justify-center">
+                    {isCancelling ? 'Stopping...' : 'Yes, stop'}
+                  </button>
+                  <button onClick={() => setShowCancelConfirm(false)} className="btn-ghost flex-1 justify-center">
+                    Keep going
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
     </div>
   )
 }

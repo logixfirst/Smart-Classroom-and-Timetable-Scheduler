@@ -7,67 +7,14 @@ export function ClashDetectionCard() {
             <h3 className="card-title text-sm sm:text-base">Course Clash Detection</h3>
             <p className="card-description text-xs sm:text-sm">Check for scheduling conflicts in your course selection</p>
           </div>
-          <button className="btn-primary text-xs sm:text-sm px-3 py-2 h-8 sm:h-10 w-full sm:w-auto">
-            <span className="mr-1 sm:mr-2">🔍</span>
-            Run Clash Check
+          <button className="btn-primary text-xs sm:text-sm px-3 py-2 h-8 sm:h-10 w-full sm:w-auto" disabled>
+            Coming Soon
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-        <div>
-          <h4 className="text-xs sm:text-sm font-medium mb-3" style={{ color: 'var(--color-text-primary)' }}>Current Conflicts</h4>
-          <div className="space-y-2">
-            <div className="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg">
-              <div className="flex items-start gap-2">
-                <span className="text-red-500 text-sm flex-shrink-0">\u26A0\uFE0F</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-red-700 dark:text-red-300">Time Conflict Detected</p>
-                  <p className="text-xs text-red-600 dark:text-red-400">Machine Learning (CS401) overlaps with Web Development (CS402)</p>
-                  <p className="text-xs text-red-500 dark:text-red-500">Monday 2:00-3:30 PM</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
-              <div className="flex items-start gap-2">
-                <span className="text-green-500 text-sm flex-shrink-0">\u2713</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-green-700 dark:text-green-300">No Conflicts</p>
-                  <p className="text-xs text-green-600 dark:text-green-400">Core courses are properly scheduled</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div>
-          <h4 className="text-xs sm:text-sm font-medium mb-3" style={{ color: 'var(--color-text-primary)' }}>Alternative Options</h4>
-          <div className="space-y-2">
-            {[
-              { course: 'Web Development', code: 'CS402', section: 'B', time: 'Tuesday 10:00-11:30 AM', available: true },
-              { course: 'Machine Learning', code: 'CS401', section: 'C', time: 'Wednesday 2:00-3:30 PM', available: false },
-              { course: 'Mobile App Development', code: 'CS403', section: 'A', time: 'Thursday 11:00-12:30 PM', available: true },
-            ].map((option, index) => (
-              <div
-                key={index}
-                className={`p-2 sm:p-3 rounded-lg border ${
-                  option.available
-                    ? '[background:var(--color-bg-surface-2)] [border-color:var(--color-border)]'
-                    : '[background:var(--color-bg-surface-3)] [border-color:var(--color-border-strong)] opacity-60'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs sm:text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{option.course}</p>
-                    <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{option.code} Section {option.section}</p>
-                    <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{option.time}</p>
-                  </div>
-                  <span className={`badge text-xs ${option.available ? 'badge-success' : 'badge-neutral'}`}>
-                    {option.available ? 'Available' : 'Full'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="text-center py-12">
+        <p className="font-medium mb-1 text-sm" style={{ color: 'var(--color-text-primary)' }}>Clash Detection</p>
+        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>This feature is coming soon. Your course schedule is automatically checked against the approved timetable.</p>
       </div>
     </div>
   )

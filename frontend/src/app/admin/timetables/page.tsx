@@ -236,7 +236,7 @@ export default function AdminTimetablesPage() {
       </div>
 
       {/* Active-jobs banner */}
-      {runningJobs.length > 0 && (
+      {runningJobs.length > 0 && activeTab === 'all' && (
         <div className="card border-l-[3px] border-l-[var(--color-primary)]">
           <div className="card-header pb-3 mb-4">
             <div className="flex items-center gap-2">

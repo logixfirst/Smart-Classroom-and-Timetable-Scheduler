@@ -1,0 +1,9 @@
+ARG DJANGO_IMAGE=my-project-django:dev
+FROM ${DJANGO_IMAGE}
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app/django
+
+CMD ["watchmedo", "auto-restart", "--patterns=*.py", "--recursive", "--", "celery", "-A", "core", "worker", "--loglevel=info"]

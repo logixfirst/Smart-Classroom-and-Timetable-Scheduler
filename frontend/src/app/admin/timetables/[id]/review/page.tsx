@@ -7,23 +7,34 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { authenticatedFetch } from '@/lib/auth'
 import { useToast } from '@/components/Toast'
-import { TimetableGridSkeleton, VariantCardSkeleton, Skeleton } from '@/components/LoadingSkeletons'
+import { TimetableGridSkeleton, VariantCardSkeleton } from '@/components/LoadingSkeletons'
 import PageHeader from '@/components/shared/PageHeader'
 import { CheckCircle, XCircle, Printer } from 'lucide-react'
 import { VariantGrid } from '@/components/timetables/VariantGrid'
-import { DepartmentTree } from '@/components/timetables/DepartmentTree'
 import { SlotDetailPanel } from '@/components/timetables/SlotDetailPanel'
 import { TimetableGridFiltered } from '@/components/timetables/TimetableGridFiltered'
 import { fetchDepartmentNames } from '@/lib/api/timetable-variants'
-import type { VariantSummary, VariantScoreCard, TimetableSlotDetailed, DepartmentOption, BackendTimetableEntry } from '@/types/timetable'
+import { applySubstitution, requestSubstitutionRecommendations } from '@/lib/api/substitution'
+import type {
+  VariantSummary,
+  VariantScoreCard,
+  TimetableSlotDetailed,
+  DepartmentOption,
+  BackendTimetableEntry,
+  SubstitutionRecommendationResponse,
+  SubstitutionUrgency,
+} from '@/types/timetable'
 
 // Backend types matching Django models
 interface TimetableEntry {
   day: number // 0-4 (Monday-Friday)
+  course_id?: string
+  offering_id?: string
   time_slot: string
   start_time?: string
   end_time?: string
@@ -33,11 +44,15 @@ interface TimetableEntry {
   faculty_id?: string
   faculty_name?: string
   batch_id?: string
+  batch_ids?: string[]
   batch_name?: string
+  student_ids?: string[]
   classroom_id?: string
   room_number?: string
   duration_minutes?: number
   department_id?: string
+  department_name?: string   // ← ye add karo
+  department_code?: string   // ← ye add karo
 }
 
 interface QualityMetrics {
@@ -95,68 +110,6 @@ interface TimetableWorkflow {
   timetable_entries: TimetableEntry[]
 }
 
-interface Review {
-  id: string
-  timetable: string
-  reviewer: number
-  reviewer_name: string
-  reviewer_username: string
-  action: 'approved' | 'rejected' | 'revision_requested'
-  comments: string
-  suggested_changes: any | null
-  reviewed_at: string
-}
-
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
-
-// Convert 24-hour time to 12-hour format with AM/PM
-function formatTime12Hour(time24: string): string {
-  if (!time24) return time24
-  const match = time24.match(/(\d{1,2}):(\d{2})/)
-  if (!match) return time24
-  
-  let hours = parseInt(match[1], 10)
-  const minutes = match[2]
-  const ampm = hours >= 12 ? 'PM' : 'AM'
-  
-  hours = hours % 12 || 12
-  return `${hours}:${minutes} ${ampm}`
-}
-
-// Format time range from start to end
-function formatTimeRange(start?: string, end?: string): string {
-  if (!start || !end) return start || end || ''
-  return `${formatTime12Hour(start)} - ${formatTime12Hour(end)}`
-}
-
-// 12 perceptually-distinct accent colours — Google Calendar style.
-// Each entry is just one saturated colour; the card itself stays neutral
-// (surface background + 3 px left border) so text is always legible.
-const SUBJECT_PALETTES: { accent: string }[] = [
-  { accent: '#4285f4' }, // blue
-  { accent: '#0f9d58' }, // green
-  { accent: '#9334e6' }, // purple
-  { accent: '#ea4335' }, // red
-  { accent: '#fa7b17' }, // orange
-  { accent: '#00897b' }, // teal
-  { accent: '#1e88e5' }, // indigo-blue
-  { accent: '#e91e63' }, // pink
-  { accent: '#7cb342' }, // lime-green
-  { accent: '#f9ab00' }, // amber
-  { accent: '#00acc1' }, // cyan
-  { accent: '#8d6e63' }, // warm brown
-]
-
-// Deterministic palette index from a string key
-function subjectPaletteIndex(key: string): number {
-  let h = 0
-  for (let i = 0; i < key.length; i++) {
-    h = (Math.imul(31, h) + key.charCodeAt(i)) | 0
-  }
-  return Math.abs(h) % SUBJECT_PALETTES.length
-}
-
 // ── Adapter: TimetableVariant → VariantSummary (for VariantGrid/VariantCard) ────────
 function toVariantSummary(
   v: TimetableVariant,
@@ -186,30 +139,6 @@ function toVariantSummary(
     quality_metrics: scoreCard,
     generated_at:    v.generated_at,
   }
-}
-
-// ── Adapter: TimetableEntry → TimetableSlotDetailed (for SlotDetailPanel) ─────
-function toSlotDetailed(e: TimetableEntry, day: number): TimetableSlotDetailed {
-  const timeKey = e.start_time && e.end_time
-    ? `${e.start_time}-${e.end_time}`
-    : e.time_slot
-  return {
-    day,
-    time_slot:           timeKey,
-    subject_code:        e.subject_code        ?? '',
-    subject_name:        e.subject_name        ?? e.subject_code ?? '',
-    faculty_id:          e.faculty_id          ?? '',
-    faculty_name:        e.faculty_name        ?? 'Unknown',
-    room_number:         e.room_number         ?? '',
-    batch_name:          e.batch_name          ?? '',
-    department_id:       e.department_id       ?? '',
-    year:                undefined,
-    section:             undefined,
-    has_conflict:        false,
-    conflict_description: undefined,
-    enrolled_count:      undefined,
-    room_capacity:       undefined,
-  } as unknown as TimetableSlotDetailed
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +174,7 @@ function lsWriteEntries(variantId: string, entries: TimetableEntry[]): void {
 export default function TimetableReviewPage() {
   const params = useParams()
   const router = useRouter()
-  const { user } = useAuth()
+  useAuth()
   const { showSuccessToast, showErrorToast, showInfoToast } = useToast()
   const workflowId = params.id as string
 
@@ -258,7 +187,6 @@ export default function TimetableReviewPage() {
   // loadingMeta: blocks full page (only until workflow + variants list arrive)
   // loadingEntries: inline skeleton inside the timetable grid area only
   const [loadingMeta, setLoadingMeta] = useState(true)
-  const [loading, setLoading] = useState(true) // keep for error/redirect guards
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [loadingVariantId, setLoadingVariantId] = useState<string | null>(null)
@@ -298,20 +226,132 @@ export default function TimetableReviewPage() {
   const gridSectionRef = useRef<HTMLElement>(null)
   const [gridInView, setGridInView] = useState(false)
 
-  // Modals
-  const [showApprovalModal, setShowApprovalModal] = useState(false)
-  const [showRejectionModal, setShowRejectionModal] = useState(false)
-  const [approvalComments, setApprovalComments] = useState('')
-  const [rejectionReason, setRejectionReason] = useState('')
-
   // View state
   const [activeVariant, setActiveVariant] = useState<TimetableVariant | null>(null)
   const [activeDay, setActiveDay] = useState<number | 'all'>('all')
   const [departmentFilter, setDepartmentFilter] = useState<string>('all')
+  const [departmentScopeEntries, setDepartmentScopeEntries] = useState<TimetableEntry[] | null>(null)
+  const [viewScope, setViewScope] = useState<'department' | 'faculty' | 'student'>('department')
+  const [facultyLookup, setFacultyLookup] = useState('')
+  const [facultyLookupLoading, setFacultyLookupLoading] = useState(false)
+  const [facultyScopeEntries, setFacultyScopeEntries] = useState<TimetableEntry[] | null>(null)
+  const [resolvedFacultyId, setResolvedFacultyId] = useState<string | null>(null)
+  const [studentLookup, setStudentLookup] = useState('')
+  const [studentLookupLoading, setStudentLookupLoading] = useState(false)
+  const [studentScopeEntries, setStudentScopeEntries] = useState<TimetableEntry[] | null>(null)
+  const [resolvedStudentId, setResolvedStudentId] = useState<string | null>(null)
   // SlotDetailPanel state — open on cell click
   const [selectedSlot, setSelectedSlot] = useState<TimetableSlotDetailed | null>(null)
+  const [substitutionTargetSlot, setSubstitutionTargetSlot] = useState<TimetableSlotDetailed | null>(null)
+  const [showSubstitutionModal, setShowSubstitutionModal] = useState(false)
+  const [substitutionDate, setSubstitutionDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [substitutionReason, setSubstitutionReason] = useState('')
+  const [substitutionUrgency, setSubstitutionUrgency] = useState<SubstitutionUrgency>('high')
+  const [substitutionLoading, setSubstitutionLoading] = useState(false)
+  const [substitutionApplyLoading, setSubstitutionApplyLoading] = useState(false)
+  const [substitutionResult, setSubstitutionResult] = useState<SubstitutionRecommendationResponse | null>(null)
+
+  const handleSlotClick = useCallback((slot: TimetableSlotDetailed) => {
+    setSelectedSlot((prev) => {
+      if (
+        prev &&
+        prev.day === slot.day &&
+        prev.time_slot === slot.time_slot &&
+        prev.subject_code === slot.subject_code &&
+        prev.faculty_id === slot.faculty_id &&
+        prev.room_number === slot.room_number
+      ) {
+        return null
+      }
+      return slot
+    })
+  }, [])
+
+  const openSubstitutionModal = useCallback((slot: TimetableSlotDetailed) => {
+    if (!slot) {
+      showInfoToast('Select a timetable slot first')
+      return
+    }
+    setSubstitutionTargetSlot(slot)
+    setSelectedSlot(null)
+    setSubstitutionResult(null)
+    setShowSubstitutionModal(true)
+  }, [showInfoToast])
+
+  const requestSubstitution = useCallback(async () => {
+    const targetSlot = substitutionTargetSlot ?? selectedSlot
+    if (!targetSlot || !activeVariant) {
+      showInfoToast('Select a timetable slot first')
+      return
+    }
+    if (!targetSlot.faculty_id) {
+      showErrorToast('Selected slot has no faculty to substitute')
+      return
+    }
+
+    setSubstitutionLoading(true)
+    try {
+      const response = await requestSubstitutionRecommendations({
+        job_id: activeVariant.job_id,
+        variant_id: activeVariant.id,
+        schedule_date: substitutionDate,
+        day_index: targetSlot.day,
+        time_slot: targetSlot.time_slot,
+        faculty_id: targetSlot.faculty_id,
+        subject_code: targetSlot.subject_code,
+        subject_name: targetSlot.subject_name,
+        reason: substitutionReason,
+        urgency: substitutionUrgency,
+      })
+      setSubstitutionResult(response)
+      if (!response.recommendations.length) {
+        showInfoToast('No eligible proxy found for this slot')
+      }
+    } catch (error) {
+      console.error('Failed to fetch substitution recommendations', error)
+      showErrorToast('Unable to fetch proxy recommendations')
+    } finally {
+      setSubstitutionLoading(false)
+    }
+  }, [
+    selectedSlot,
+    substitutionTargetSlot,
+    activeVariant,
+    substitutionDate,
+    substitutionReason,
+    substitutionUrgency,
+    showInfoToast,
+    showErrorToast,
+  ])
+
+  const applyRecommendedSubstitution = useCallback(async (proposalId: string) => {
+    if (!substitutionResult?.request_id) {
+      showErrorToast('No substitution request found to apply')
+      return
+    }
+
+    setSubstitutionApplyLoading(true)
+    try {
+      const response = await applySubstitution(substitutionResult.request_id, { proposal_id: proposalId })
+      showSuccessToast(`Proxy applied: ${response.substitute_faculty.name}`)
+      setShowSubstitutionModal(false)
+      setSubstitutionResult(null)
+      setSubstitutionTargetSlot(null)
+      setSubstitutionReason('')
+    } catch (error) {
+      console.error('Failed to apply substitution', error)
+      showErrorToast('Failed to apply proxy assignment')
+    } finally {
+      setSubstitutionApplyLoading(false)
+    }
+  }, [substitutionResult?.request_id, showSuccessToast, showErrorToast])
   // Department display-name lookup (UUID → { name, code })
   const [deptNames, setDeptNames] = useState<Map<string, { name: string; code: string }>>(() => new Map())
+
+  const pickDefaultVariant = useCallback((list: TimetableVariant[]): TimetableVariant | undefined => {
+    if (!list.length) return undefined
+    return list.find(v => v.variant_number === 1) ?? list[0]
+  }, [])
 
   // Re-attach observer whenever the active variant changes (including null → first variant).
   // rootMargin 400px means the grid starts building before it even enters the viewport.
@@ -334,7 +374,7 @@ export default function TimetableReviewPage() {
     }
   }, [workflowId])
 
-  // Load department names once on mount so DepartmentTree shows real names
+  // Load department names once on mount for department labels in the selector
   useEffect(() => {
     fetchDepartmentNames().then(setDeptNames).catch(() => {})
   }, [])
@@ -351,7 +391,6 @@ export default function TimetableReviewPage() {
    */
   const loadWorkflowData = async () => {
     try {
-      setLoading(true)
       setLoadingMeta(true)
       setError(null)
 
@@ -401,7 +440,6 @@ export default function TimetableReviewPage() {
         if (runningRetryRef.current < MAX_RUNNING_RETRIES) {
           runningRetryRef.current += 1
           setLoadingMeta(false)
-          setLoading(false)
           await new Promise(resolve => setTimeout(resolve, 1500))
           await loadWorkflowData()
           return
@@ -416,8 +454,7 @@ export default function TimetableReviewPage() {
       setWorkflow(workflowData)
       setVariants(variantsData)
 
-      const selected = variantsData.find((v: TimetableVariant) => v.is_selected)
-      const variantToLoad: TimetableVariant | undefined = selected ?? variantsData[0]
+      const variantToLoad = pickDefaultVariant(variantsData)
 
       if (!variantToLoad) {
         // If the job is in a terminal state but variants are empty, the Celery
@@ -442,6 +479,14 @@ export default function TimetableReviewPage() {
       setSelectedVariantId(variantToLoad.id)
       // ── Show variant cards NOW – entries load in background ──────────────
       setActiveVariant(variantToLoad)
+      const firstDeptId = (variantToLoad.timetable_entries ?? []).find(e => !!e.department_id)?.department_id ?? 'all'
+      setDepartmentFilter(firstDeptId)
+      setDepartmentScopeEntries(null)
+      setFacultyScopeEntries(null)
+      setResolvedFacultyId(null)
+      setStudentScopeEntries(null)
+      setResolvedStudentId(null)
+      setActiveDay('all')
       setLoadingMeta(false)  // ←← page is visible from this point on
 
       // ── Round 2: entries in background (non-blocking) ────────────────────
@@ -483,57 +528,40 @@ export default function TimetableReviewPage() {
       console.error('Failed to load workflow:', err)
       setError(err instanceof Error ? err.message : 'Failed to load timetable data')
       setLoadingMeta(false)
-    } finally {
-      setLoading(false)
     }
   }
 
-  const handleVariantSelect = async (variantId: string) => {
+  const handleVariantApprove = async (variantId: string) => {
     try {
       setActionLoading(true)
-      const response = await authenticatedFetch(
+      
+      // First select the variant
+      const selectResponse = await authenticatedFetch(
         `${API_BASE}/timetable/variants/${variantId}/select/`,
         { method: 'POST', credentials: 'include' }
       )
 
-      if (!response.ok) throw new Error('Failed to select variant')
+      if (!selectResponse.ok) throw new Error('Failed to select variant')
 
       setSelectedVariantId(variantId)
-      // ── Update local state only – no full reload needed ─────────────────
       setVariants(prev => prev.map(v => ({ ...v, is_selected: v.id === variantId })))
-      showSuccessToast('Variant selected successfully')
-    } catch (err) {
-      console.error('Failed to select variant:', err)
-      showErrorToast('Failed to select variant. Please try again.')
-    } finally {
-      setActionLoading(false)
-    }
-  }
 
-  const handleApprove = async () => {
-    if (!selectedVariantId) {
-      showInfoToast('Please select a variant first')
-      return
-    }
-
-    try {
-      setActionLoading(true)
-      const response = await authenticatedFetch(
+      // Then approve the workflow
+      const approveResponse = await authenticatedFetch(
         `${API_BASE}/timetable/workflows/${workflowId}/approve/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ comments: approvalComments }),
+          body: JSON.stringify({ comments: '' }),
         }
       )
 
-      if (!response.ok) {
+      if (!approveResponse.ok) {
         throw new Error('Failed to approve timetable')
       }
 
       showSuccessToast('Timetable approved successfully!')
-      setShowApprovalModal(false)
       router.push('/admin/timetables')
     } catch (err) {
       console.error('Failed to approve:', err)
@@ -543,51 +571,105 @@ export default function TimetableReviewPage() {
     }
   }
 
-  const handleReject = async () => {
-    if (!rejectionReason.trim()) {
-      showInfoToast('Please provide a reason for rejection')
+const baseScopedEntries = useMemo(() => {
+    if (viewScope === 'student') return studentScopeEntries ?? []
+    if (viewScope === 'faculty') return facultyScopeEntries ?? []
+    if (viewScope === 'department') return departmentScopeEntries ?? (activeVariant?.timetable_entries ?? [])
+    return activeVariant?.timetable_entries ?? []
+  }, [viewScope, studentScopeEntries, facultyScopeEntries, departmentScopeEntries, activeVariant?.timetable_entries])
+
+  const entriesForGrid = useMemo(() => baseScopedEntries, [baseScopedEntries])
+
+  const applyStudentScope = useCallback(async () => {
+    const lookup = studentLookup.trim()
+    if (!lookup || !activeVariant) return
+
+    setStudentLookupLoading(true)
+    setSelectedSlot(null)
+    try {
+      const params = new URLSearchParams({
+        job_id: activeVariant.job_id,
+        scope_type: 'student',
+        scope_value: lookup,
+      })
+      const res = await authenticatedFetch(
+        `${API_BASE}/timetable/variants/${activeVariant.id}/scope_view/?${params.toString()}`,
+        { credentials: 'include' },
+      )
+      if (!res.ok) throw new Error('Student scope lookup failed')
+      const data = await res.json()
+      setStudentScopeEntries(data.timetable_entries ?? [])
+      const resolved = data?.resolved_scope?.student_id
+      setResolvedStudentId(typeof resolved === 'string' ? resolved : null)
+      setDepartmentFilter('all')
+      setDepartmentScopeEntries(null)
+      setActiveDay('all')
+    } catch {
+      showErrorToast('Unable to load student schedule for this variant.')
+    } finally {
+      setStudentLookupLoading(false)
+    }
+  }, [studentLookup, activeVariant, API_BASE, showErrorToast])
+
+  const applyFacultyScope = useCallback(async () => {
+    const lookup = facultyLookup.trim()
+    if (!lookup || !activeVariant) return
+
+    setFacultyLookupLoading(true)
+    setSelectedSlot(null)
+    try {
+      const params = new URLSearchParams({
+        job_id: activeVariant.job_id,
+        scope_type: 'faculty',
+        scope_value: lookup,
+      })
+      const res = await authenticatedFetch(
+        `${API_BASE}/timetable/variants/${activeVariant.id}/scope_view/?${params.toString()}`,
+        { credentials: 'include' },
+      )
+      if (!res.ok) throw new Error('Faculty scope lookup failed')
+      const data = await res.json()
+      setFacultyScopeEntries(data.timetable_entries ?? [])
+      const resolved = data?.resolved_scope?.faculty_id
+      setResolvedFacultyId(typeof resolved === 'string' ? resolved : null)
+      setDepartmentFilter('all')
+      setDepartmentScopeEntries(null)
+      setActiveDay('all')
+    } catch {
+      showErrorToast('Unable to load faculty schedule for this variant.')
+    } finally {
+      setFacultyLookupLoading(false)
+    }
+  }, [facultyLookup, activeVariant, API_BASE, showErrorToast])
+
+  const applyDepartmentScope = useCallback(async (deptId: string) => {
+    if (!activeVariant) return
+    setDepartmentFilter(deptId)
+    setSelectedSlot(null)
+    setActiveDay('all')
+
+    if (deptId === 'all') {
+      setDepartmentScopeEntries(null)
       return
     }
 
     try {
-      setActionLoading(true)
-      const response = await authenticatedFetch(
-        `${API_BASE}/timetable/workflows/${workflowId}/reject/`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ comments: rejectionReason }),
-        }
+      const params = new URLSearchParams({
+        job_id: activeVariant.job_id,
+        scope_type: 'department',
+        scope_value: deptId,
+      })
+      const res = await authenticatedFetch(
+        `${API_BASE}/timetable/variants/${activeVariant.id}/scope_view/?${params.toString()}`,
+        { credentials: 'include' },
       )
-
-      if (!response.ok) {
-        throw new Error('Failed to reject timetable')
-      }
-
-      showInfoToast('Timetable rejected')
-      setShowRejectionModal(false)
-      router.push('/admin/timetables')
-    } catch (err) {
-      console.error('Failed to reject:', err)
-      showErrorToast('Failed to reject timetable. Please try again.')
-    } finally {
-      setActionLoading(false)
+      if (!res.ok) throw new Error('Department scope lookup failed')
+      const data = await res.json()
+      setDepartmentScopeEntries(data.timetable_entries ?? [])
+    } catch {
+      showErrorToast('Unable to load department timetable for this variant.')
     }
-  }
-
-// Build stable subject → accent colour mapping from the active variant's entries.
-  // (variants[] carries empty timetable_entries; actual entries are in activeVariant)
-  const subjectPaletteMap = useMemo(() => {
-    const map = new Map<string, string>() // key → accent hex
-    ;(activeVariant?.timetable_entries || []).forEach(e => {
-      const key = e.subject_id ?? e.subject_code ?? ''
-      if (key && !map.has(key)) {
-        map.set(key, SUBJECT_PALETTES[subjectPaletteIndex(key)].accent)
-      }
-    })
-    return map
-  }, [activeVariant?.timetable_entries])
+  }, [activeVariant, API_BASE, showErrorToast])
 
   const loadVariantEntries = useCallback(async (variant: TimetableVariant) => {
     // ── Instant paint from in-memory cache ──────────────────────────────────
@@ -596,6 +678,11 @@ export default function TimetableReviewPage() {
       setActiveVariant({ ...variant, timetable_entries: memCached })
       setActiveDay('all')
       setDepartmentFilter('all')
+      setDepartmentScopeEntries(null)
+      setFacultyScopeEntries(null)
+      setResolvedFacultyId(null)
+      setStudentScopeEntries(null)
+      setResolvedStudentId(null)
       setTimeout(() => {
         document.getElementById('timetable-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 80)
@@ -609,6 +696,11 @@ export default function TimetableReviewPage() {
       setActiveVariant({ ...variant, timetable_entries: lsCached })
       setActiveDay('all')
       setDepartmentFilter('all')
+      setDepartmentScopeEntries(null)
+      setFacultyScopeEntries(null)
+      setResolvedFacultyId(null)
+      setStudentScopeEntries(null)
+      setResolvedStudentId(null)
       setTimeout(() => {
         document.getElementById('timetable-view')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 80)
@@ -620,6 +712,11 @@ export default function TimetableReviewPage() {
     setLoadingVariantId(variant.id)
     setActiveDay('all')
     setDepartmentFilter('all')
+    setDepartmentScopeEntries(null)
+    setFacultyScopeEntries(null)
+    setResolvedFacultyId(null)
+    setStudentScopeEntries(null)
+    setResolvedStudentId(null)
 
     // Cancel any pending in-flight request for a different variant
     if (entryAbortRef.current) entryAbortRef.current.abort()
@@ -658,230 +755,21 @@ export default function TimetableReviewPage() {
     }
   }, [API_BASE])
 
-  const renderTimetableGrid = (variant: TimetableVariant) => {
-    const entries = variant.timetable_entries ?? []
-
-    // Show grid skeleton while entries are still loading for this variant
-    if (loadingVariantId === variant.id && entries.length === 0) {
-      return <TimetableGridSkeleton days={5} slots={8} />
-    }
-
-    if (entries.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-16 text-[var(--color-text-muted)]">
-          <svg className="w-12 h-12 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-          <p className="text-sm font-medium">No timetable entries loaded.</p>
-          <p className="text-xs mt-1 opacity-70">The server may be slow. Click retry to try again.</p>
-          <button onClick={() => loadVariantEntries(variant)} className="mt-4 btn-primary text-xs">
-            Retry
-          </button>
-        </div>
-      )
-    }
-
-    // Filter by department
-    const deptFiltered = departmentFilter === 'all'
-      ? entries
-      : entries.filter(e => e.department_id === departmentFilter)
-
-    // Filter by selected day
-    const dayFiltered = activeDay === 'all'
-      ? deptFiltered
-      : deptFiltered.filter(e => e.day === activeDay)
-
-    // Build grid: key = "dayIndex-timeSlot" using start_time-end_time range
-    const grid: Record<string, TimetableEntry[]> = {}
-    dayFiltered.forEach(entry => {
-      const timeKey = entry.start_time && entry.end_time 
-        ? `${entry.start_time}-${entry.end_time}` 
-        : entry.time_slot
-      const key = `${entry.day}-${timeKey}`
-      if (!grid[key]) grid[key] = []
-      grid[key].push(entry)
-    })
-
-    const timeSlots = Array.from(
-      new Set(deptFiltered.map(e => 
-        e.start_time && e.end_time ? `${e.start_time}-${e.end_time}` : e.time_slot
-      ).filter(Boolean))
-    ).sort()
-
-    const daysToShow = activeDay === 'all' ? DAYS.map((_, i) => i) : [activeDay as number]
-
-    // Build subject legend entries
-    const legendItems: Array<{ key: string; label: string; name: string; accent: string }> = []
-    const seenKeys = new Set<string>()
-    deptFiltered.forEach(e => {
-      const key = e.subject_id ?? e.subject_code ?? ''
-      if (key && !seenKeys.has(key)) {
-        seenKeys.add(key)
-        const accent = subjectPaletteMap.get(key) ?? SUBJECT_PALETTES[0].accent
-        legendItems.push({ key, label: e.subject_code ?? key, name: e.subject_name ?? e.subject_code ?? key, accent })
+  useEffect(() => {
+    if (!activeVariant) return
+    const ids = Array.from(new Set(
+      (activeVariant.timetable_entries ?? [])
+        .map(e => e.department_id)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    ))
+    if (ids.length === 0) return
+    if (departmentFilter === 'all' || !ids.includes(departmentFilter)) {
+      setDepartmentFilter(ids[0])
+      if (viewScope === 'department') {
+        void applyDepartmentScope(ids[0])
       }
-    })
-
-    return (
-      <div className="space-y-4">
-        {/* Day tabs */}
-        <div className="flex flex-wrap gap-1.5">
-          {(['all', 0, 1, 2, 3, 4] as const).map((d, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveDay(d)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                activeDay === d
-                  ? 'bg-[var(--color-primary)] text-white'
-                  : 'bg-[var(--color-bg-surface-2)] text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-subtle)]'
-              }`}
-            >
-              {d === 'all' ? 'All Days' : DAY_SHORT[d as number]}
-            </button>
-          ))}
-        </div>
-
-        {/* Grid */}
-        <div className="overflow-x-auto rounded-xl shadow-sm print:shadow-none border border-[var(--color-border)]">
-          <table className="min-w-full text-xs border-collapse">
-            <thead>
-              <tr className="bg-[var(--color-bg-surface-2)]">
-                <th className="sticky left-0 z-10 px-3 py-3 text-left font-semibold uppercase tracking-wider border-b border-r border-[var(--color-border)] w-24 min-w-[6rem] bg-[var(--color-bg-surface-2)] text-[var(--color-text-muted)]">
-                  Time
-                </th>
-                {daysToShow.map(di => (
-                  <th
-                    key={di}
-                    className="px-3 py-3 text-center font-semibold uppercase tracking-wider border-b border-r border-[var(--color-border)] min-w-[8rem] text-[var(--color-text-secondary)]"
-                  >
-                    {DAYS[di]}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {timeSlots.length === 0 ? (
-                <tr>
-                  <td colSpan={daysToShow.length + 1} className="py-10 text-center text-sm text-[var(--color-text-muted)]">
-                    No classes scheduled for this filter
-                  </td>
-                </tr>
-              ) : timeSlots.map(time => (
-                <tr key={time} className="group transition-colors border-b border-[var(--color-border)]">
-                  <td
-                    className="sticky left-0 z-10 px-3 py-3 font-medium border-r border-[var(--color-border)] whitespace-nowrap align-top bg-[var(--color-bg-surface)] text-[var(--color-text-secondary)]"
-                  >
-                    {time.includes('-') ? formatTimeRange(...time.split('-') as [string, string]) : time}
-                  </td>
-                  {daysToShow.map(di => {
-                    const cellEntries = grid[`${di}-${time}`] ?? []
-                    return (
-                      <td key={di} className="px-2 py-2 align-top border-r border-[var(--color-border)]">
-                        {cellEntries.length > 0 ? (
-                          <div className="space-y-1.5">
-                            {cellEntries.map((entry, idx) => {
-                              const key = entry.subject_id ?? entry.subject_code ?? ''
-                              const accent = subjectPaletteMap.get(key) ?? SUBJECT_PALETTES[0].accent
-                              // Hex alpha: 18 = ~10% for tint background
-                              const bgTint = `${accent}18`
-                              const slotDetailed = toSlotDetailed(entry, di)
-                              return (
-                                <div
-                                  key={idx}
-                                  className="rounded-md overflow-hidden cursor-pointer"
-                                  style={{
-                                    borderLeft: `3px solid ${accent}`,
-                                    background: bgTint,
-                                  }}
-                                  onClick={() => setSelectedSlot(slotDetailed)}
-                                  title="Click for details"
-                                >
-                                  <div className="px-2 pt-1.5 pb-1.5 space-y-0.5">
-                                    {/* Subject code — accent coloured, tight */}
-                                    <div className="text-[10px] font-bold leading-none tracking-wide uppercase truncate" style={{ color: accent }}>
-                                      {entry.subject_code ?? '—'}
-                                    </div>
-                                    {/* Subject name */}
-                                    <div className="font-semibold text-[11px] leading-tight truncate text-[var(--color-text-primary)]">
-                                      {entry.subject_name ?? entry.subject_code ?? '—'}
-                                    </div>
-                                    {/* Faculty */}
-                                    {entry.faculty_name && (
-                                      <div className="text-[10px] leading-tight truncate text-[var(--color-text-secondary)]">
-                                        {entry.faculty_name}
-                                      </div>
-                                    )}
-                                    {/* Room · Batch · Duration */}
-                                    {(entry.room_number || entry.batch_name || entry.duration_minutes) && (
-                                      <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                                        {entry.room_number && (
-                                          <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-[var(--color-text-muted)]">
-                                            <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5" />
-                                            </svg>
-                                            {entry.room_number}
-                                          </span>
-                                        )}
-                                        {entry.batch_name && (
-                                          <span className="inline-flex items-center gap-0.5 text-[9px] font-medium text-[var(--color-text-muted)]">
-                                            <svg className="w-2.5 h-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
-                                            </svg>
-                                            {entry.batch_name}
-                                          </span>
-                                        )}
-                                        {entry.duration_minutes && (
-                                          <span className="text-[9px] font-medium text-[var(--color-text-muted)]">
-                                            {entry.duration_minutes}m
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          <div className="h-full min-h-[2rem] flex items-center justify-center">
-                            <span className="w-1 h-1 rounded-full bg-[var(--color-border)]" />
-                          </div>
-                        )}
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Subject legend */}
-        {legendItems.length > 0 && (
-          <div className="pt-2 print:pt-4">
-            <p className="text-xs font-semibold uppercase tracking-wider mb-2 text-[var(--color-text-muted)]">
-              Subject Legend
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {legendItems.map(({ key, label, name, accent }) => (
-                <div
-                  key={key}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs"
-                  style={{ background: `${accent}18`, borderLeft: `3px solid ${accent}` }}
-                >
-                  <span className="font-bold text-[10px] uppercase tracking-wide leading-none" style={{ color: accent }}>
-                    {label}
-                  </span>
-                  <span className="font-medium text-[var(--color-text-secondary)]">{name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
+    }
+  }, [activeVariant, departmentFilter, viewScope, applyDepartmentScope])
 
   // Best variant = highest overall score
   const bestVariantId = variants.reduce<string | null>((best, v) => {
@@ -898,21 +786,21 @@ export default function TimetableReviewPage() {
   )
 
   const departmentOptions = useMemo((): DepartmentOption[] => {
-    const seen = new Set<string>()
     const opts: DepartmentOption[] = []
-    ;(activeVariant?.timetable_entries ?? []).forEach(e => {
-      if (e.department_id && !seen.has(e.department_id)) {
-        seen.add(e.department_id)
-        const resolved = deptNames.get(e.department_id)
-        opts.push({
-          id:   e.department_id,
-          name: resolved?.name ?? e.department_id,
-          code: resolved?.code ?? e.department_id,
-        })
-      }
+    deptNames.forEach((value, id) => {
+      opts.push({
+        id,
+        name: value.name,
+        code: value.code,
+      })
     })
-    return opts
-  }, [activeVariant?.timetable_entries, deptNames])
+    return opts.sort((a, b) => a.name.localeCompare(b.name))
+  }, [deptNames])
+
+  const effectiveDepartmentFilter = useMemo(
+    () => (viewScope === 'department' ? departmentFilter : 'all'),
+    [viewScope, departmentFilter],
+  )
 
   // Block the full page ONLY while workflow metadata + variant list are loading.
   // Entries for the grid load in the background and show an inline skeleton.
@@ -964,11 +852,6 @@ export default function TimetableReviewPage() {
   const statusInfo = statusConfig[status] ?? statusConfig.draft
 
   const activeStats = activeVariant?.statistics
-  const activeMetrics = activeVariant?.quality_metrics
-
-  const uniqueDepartments = Array.from(
-    new Set((activeVariant?.timetable_entries ?? []).map(e => e.department_id).filter(Boolean))
-  )
 
   return (
     <div className="space-y-6 print:bg-white">
@@ -981,37 +864,10 @@ export default function TimetableReviewPage() {
         secondaryActions={
           <div className="flex flex-wrap items-center gap-2">
             <span className={statusInfo.badge}>{statusInfo.label}</span>
-            {workflow?.status === 'draft' && (
-              <>
-                <button
-                  onClick={() => setShowApprovalModal(true)}
-                  disabled={!selectedVariantId || actionLoading}
-                  className="btn-success flex items-center gap-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <CheckCircle size={15} />
-                  Approve
-                </button>
-                <button
-                  onClick={() => setShowRejectionModal(true)}
-                  disabled={actionLoading}
-                  className="btn-danger flex items-center gap-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <XCircle size={15} />
-                  Reject
-                </button>
-              </>
-            )}
           </div>
         }
       />
-      {/* Subtitle: department · semester · year */}
-      {workflow && (
-        <p className="-mt-4 text-sm text-[var(--color-text-secondary)]">
-          {workflow.department_id && <span className="font-medium text-[var(--color-text-primary)]">{workflow.department_id}</span>}
-          {workflow.semester && <span> · Semester {workflow.semester}</span>}
-          {workflow.academic_year && <span> · {workflow.academic_year}</span>}
-        </p>
-      )}
+      
 
         {/* ── Variant Cards — powered by VariantGrid ── */}
         <section>
@@ -1026,6 +882,8 @@ export default function TimetableReviewPage() {
             variants={variantSummaries}
             jobStatus={workflow?.status ?? 'draft'}
             loading={loadingMeta}
+            activeVariantId={activeVariant?.id ?? null}
+            selectedVariantId={selectedVariantId}
             onViewDetails={(id) => {
               const v = variants.find(x => x.id === id)
               if (v) loadVariantEntries(v)
@@ -1033,7 +891,7 @@ export default function TimetableReviewPage() {
             onCompare={(ids) =>
               router.push(`/admin/timetables/${workflowId}/compare?a=${ids[0]}&b=${ids[1]}`)
             }
-            onPickVariant={(id) => handleVariantSelect(id)}
+            onPickVariant={workflow?.status === 'approved' ? undefined : handleVariantApprove}
           />
         </section>
 
@@ -1044,182 +902,291 @@ export default function TimetableReviewPage() {
             ref={gridSectionRef}
             className="card overflow-hidden"
           >
-            {/* Section header */}
-            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-[var(--color-border)]">
-              <div>
-                <h2 className="card-title">
-                  Variant {activeVariant.variant_number} — Timetable
-                </h2>
-                <p className="text-xs mt-0.5 capitalize text-[var(--color-text-muted)]">
-                  {activeVariant.optimization_priority?.replace(/_/g, ' ') ?? 'Standard'} &nbsp;·&nbsp;
-                  Generated {new Date(activeVariant.generated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </p>
-              </div>
-              <button
-                onClick={() => window.print()}
-                className="btn-secondary flex items-center gap-1.5 text-xs print:hidden"
-              >
-                <Printer size={14} />
-                Print
-              </button>
-            </div>
-
-            {/* Statistics strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 print:hidden border-b border-[var(--color-border)]">
-              {[
-                {
-                  icon: (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-                  ),
-                  label: 'Total Classes', val: activeStats?.total_classes ?? 0,
-                },
-                {
-                  icon: (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  ),
-                  label: 'Total Hours', val: activeStats?.total_hours ?? 0,
-                },
-                {
-                  icon: (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m7-10h.01M12 15h.01" /></svg>
-                  ),
-                  label: 'Unique Rooms', val: activeStats?.unique_rooms ?? 0,
-                },
-                {
-                  icon: (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  ),
-                  label: 'Faculty Members', val: activeStats?.unique_faculty ?? 0,
-                },
-              ].map(({ icon, label, val }) => (
-                <div key={label} className="px-5 py-3 text-center border-r border-[var(--color-border)] last:border-r-0">
-                  <div className="flex items-center justify-center gap-1.5 mb-0.5 text-[var(--color-text-muted)]">
-                    {icon}
-                    <p className="text-xs">{label}</p>
-                  </div>
-                  <p className="text-xl font-bold text-[var(--color-text-primary)]">{val}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Body: DepartmentTree sidebar + grid */}
-            <div className="flex items-start">
-
-              {/* ─ Left: department filter sidebar ─ */}
-              {departmentOptions.length > 0 && (
-                <div className="w-[220px] shrink-0 border-r border-[var(--color-border)] p-3 self-stretch">
-                  <DepartmentTree
-                    departments={departmentOptions}
-                    selectedDeptId={departmentFilter}
-                    onSelect={async (deptId) => {
-                      setDepartmentFilter(deptId)
+            {/* Audience scope controls */}
+            <div className="px-5 py-3 border-b border-[var(--color-border)] bg-[var(--color-bg-surface-2)] print:hidden">
+              <div className="flex flex-wrap lg:flex-nowrap items-end gap-3">
+                <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
+                  View Scope
+                  <select
+                    value={viewScope}
+                    onChange={(e) => {
+                      const next = e.target.value as 'department' | 'faculty' | 'student'
+                      setViewScope(next)
                       setSelectedSlot(null)
-                      if (deptId !== 'all' && activeVariant) {
-                        try {
-                          const res = await authenticatedFetch(
-                            `${API_BASE}/timetable/variants/${activeVariant.id}/department_view/?department_id=${deptId}&job_id=${activeVariant.job_id}`,
-                            { credentials: 'include' },
-                          )
-                          if (res.ok) {
-                            const data = await res.json()
-                            setActiveVariant({ ...activeVariant, timetable_entries: data.timetable_entries })
-                          }
-                        } catch { /* keep current entries */ }
-                      } else {
-                        const cached = entryCache.current.get(activeVariant!.id)
-                        if (cached) setActiveVariant({ ...activeVariant!, timetable_entries: cached })
+                      setDepartmentFilter('all')
+                      setDepartmentScopeEntries(null)
+                      setActiveDay('all')
+                      if (next !== 'faculty') {
+                        setFacultyScopeEntries(null)
+                        setResolvedFacultyId(null)
+                        setFacultyLookup('')
+                      }
+                      if (next !== 'student') {
+                        setStudentScopeEntries(null)
+                        setResolvedStudentId(null)
+                        setStudentLookup('')
                       }
                     }}
-                  />
-                </div>
-              )}
+                    className="input-primary h-9 min-w-[180px]"
+                    aria-label="Choose timetable scope"
+                  >
+                    <option value="department">Department View</option>
+                    <option value="faculty">Faculty View</option>
+                    <option value="student">Student View</option>
+                  </select>
+                </label>
 
-              {/* ─ Right: grid + SlotDetailPanel ─ */}
+                {viewScope === 'department' && (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
+                      Select Department
+                      <select
+                        value={departmentFilter}
+                        onChange={(e) => {
+                          setViewScope('department')
+                          void applyDepartmentScope(e.target.value)
+                        }}
+                        className="input-primary h-9 w-[280px]"
+                        aria-label="Department dropdown"
+                        disabled={departmentOptions.length === 0}
+                      >
+                        {departmentOptions.map(d => (
+                          <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                )}
+
+                {viewScope === 'faculty' && (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
+                      Faculty ID
+                      <input
+                        value={facultyLookup}
+                        onChange={(e) => setFacultyLookup(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            void applyFacultyScope()
+                          }
+                        }}
+                        className="input-primary h-9 w-[280px]"
+                        placeholder="e.g. bhuacc001 or username or email"
+                        aria-label="Faculty lookup"
+                      />
+                    </label>
+                    <button
+                      onClick={() => void applyFacultyScope()}
+                      disabled={facultyLookupLoading || !facultyLookup.trim()}
+                      className="btn-primary h-9 px-3 text-xs disabled:opacity-50"
+                    >
+                      {facultyLookupLoading ? 'Loading…' : 'Apply'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFacultyScopeEntries(null)
+                        setResolvedFacultyId(null)
+                        setFacultyLookup('')
+                        setDepartmentFilter('all')
+                        setActiveDay('all')
+                      }}
+                      className="btn-secondary h-9 px-3 text-xs"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+
+                {viewScope === 'student' && (
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
+                      Student ID
+                      <input
+                        value={studentLookup}
+                        onChange={(e) => setStudentLookup(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            void applyStudentScope()
+                          }
+                        }}
+                        className="input-primary h-9 w-[280px]"
+                        placeholder="e.g. 21acc001 or enrollment no or username"
+                        aria-label="Student lookup"
+                      />
+                    </label>
+                    <button
+                      onClick={() => void applyStudentScope()}
+                      disabled={studentLookupLoading || !studentLookup.trim()}
+                      className="btn-primary h-9 px-3 text-xs disabled:opacity-50"
+                    >
+                      {studentLookupLoading ? 'Loading…' : 'Apply'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setStudentScopeEntries(null)
+                        setResolvedStudentId(null)
+                        setStudentLookup('')
+                        setDepartmentFilter('all')
+                        setActiveDay('all')
+                      }}
+                      className="btn-secondary h-9 px-3 text-xs"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => window.print()}
+                  className="btn-secondary flex items-center gap-1.5 h-9 px-3 text-xs print:hidden lg:ml-auto shrink-0"
+                >
+                  <Printer size={14} />
+                  Print
+                </button>
+
+              </div>
+            </div>
+
+            
+
+            {/* Body: grid */}
+            <div className="flex flex-col items-stretch">
               <div className="flex-1 min-w-0 relative">
                 <div className="px-4 py-4 sm:px-5 sm:py-5">
                   {gridInView
                     ? <TimetableGridFiltered
-                        entries={(activeVariant.timetable_entries ?? []) as BackendTimetableEntry[]}
-                        departmentFilter={departmentFilter}
+                        entries={entriesForGrid as BackendTimetableEntry[]}
+                        departmentFilter={effectiveDepartmentFilter}
                         activeDay={activeDay}
                         onDayChange={setActiveDay}
                         isLoading={loadingVariantId === activeVariant.id && (activeVariant.timetable_entries ?? []).length === 0}
-                        onSlotClick={setSelectedSlot}
+                        onSlotClick={handleSlotClick}
                         onRetry={() => loadVariantEntries(activeVariant)}
                       />
                     : <TimetableGridSkeleton days={5} slots={8} />
                   }
                 </div>
-
-                {/* Slide-in detail panel */}
-                <SlotDetailPanel
-                  slot={selectedSlot}
-                  onClose={() => setSelectedSlot(null)}
-                />
               </div>
             </div>
+
+            <SlotDetailPanel
+              slot={selectedSlot}
+              onClose={() => setSelectedSlot(null)}
+              onRequestSubstitution={openSubstitutionModal}
+              substitutionLoading={substitutionLoading || substitutionApplyLoading}
+              mode="dialog"
+            />
           </section>
         )}
 
-        {/* ── Approval Modal ── */}
-        {showApprovalModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-            <div className="card rounded-2xl p-6 max-w-md w-full">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-success-subtle)]">
-                  <CheckCircle size={20} className="text-[var(--color-success-text)]" />
-                </div>
-                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Approve Timetable</h3>
-              </div>
-              <p className="text-sm mb-4 text-[var(--color-text-secondary)]">
-                This will approve the selected variant and make it available for publishing.
-              </p>
-              <textarea
-                value={approvalComments}
-                onChange={e => setApprovalComments(e.target.value)}
-                placeholder="Optional comments for approvers…"
-                className="input-primary w-full mb-4 resize-none"
-                rows={3}
-              />
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setShowApprovalModal(false)} disabled={actionLoading} className="btn-secondary text-sm">Cancel</button>
-                <button onClick={handleApprove} disabled={actionLoading} className="btn-success text-sm disabled:opacity-50">
-                  {actionLoading ? 'Approving…' : 'Approve'}
+        {showSubstitutionModal && typeof document !== 'undefined' && createPortal(
+          <div className="fixed top-0 left-0 w-screen h-screen bg-[#00000052] flex items-center justify-center z-[320] px-4">
+            <div className="bg-[#d3dbe5] rounded-[28px] border border-[var(--color-border)] shadow-2xl p-6 w-[560px] h-[560px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Quick Proxy Assignment</h3>
+                <button
+                  onClick={() => {
+                    setShowSubstitutionModal(false)
+                    setSubstitutionResult(null)
+                  }}
+                  className="btn-secondary text-xs"
+                >
+                  Close
                 </button>
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* ── Rejection Modal ── */}
-        {showRejectionModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-            <div className="card rounded-2xl p-6 max-w-md w-full">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-danger-subtle)]">
-                  <XCircle size={20} className="text-[var(--color-danger-text)]" />
+              {(substitutionTargetSlot ?? selectedSlot) && (
+                <div className="mb-4 text-xs text-[var(--color-text-secondary)] space-y-1">
+                  <p>
+                    Target: <span className="font-semibold text-[var(--color-text-primary)]">{(substitutionTargetSlot ?? selectedSlot)?.subject_code || (substitutionTargetSlot ?? selectedSlot)?.subject_name}</span>
+                    {' '}on day {((substitutionTargetSlot ?? selectedSlot)?.day ?? 0) + 1}, {(substitutionTargetSlot ?? selectedSlot)?.time_slot}
+                  </p>
+                  <p>
+                    Absent faculty: <span className="font-semibold text-[var(--color-text-primary)]">{(substitutionTargetSlot ?? selectedSlot)?.faculty_name || (substitutionTargetSlot ?? selectedSlot)?.faculty_id}</span>
+                  </p>
                 </div>
-                <h3 className="text-lg font-semibold text-[var(--color-text-primary)]">Reject Timetable</h3>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
+                  Date
+                  <input
+                    type="date"
+                    className="input-primary h-9"
+                    value={substitutionDate}
+                    onChange={(e) => setSubstitutionDate(e.target.value)}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)]">
+                  Urgency
+                  <select
+                    className="input-primary h-9"
+                    value={substitutionUrgency}
+                    onChange={(e) => setSubstitutionUrgency(e.target.value as SubstitutionUrgency)}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </label>
+                <div className="flex items-end">
+                  <button
+                    onClick={() => void requestSubstitution()}
+                    disabled={substitutionLoading || substitutionApplyLoading}
+                    className="btn-primary h-9 px-4 text-xs w-full disabled:opacity-50"
+                  >
+                    {substitutionLoading ? 'Finding…' : 'Get Proxy Options'}
+                  </button>
+                </div>
               </div>
-              <p className="text-sm mb-4 text-[var(--color-text-secondary)]">
-                Please provide a reason so the scheduling team can make improvements.
-              </p>
-              <textarea
-                value={rejectionReason}
-                onChange={e => setRejectionReason(e.target.value)}
-                placeholder="Reason for rejection (required)…"
-                className="input-primary w-full mb-4 resize-none"
-                rows={4}
-                required
-              />
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setShowRejectionModal(false)} disabled={actionLoading} className="btn-secondary text-sm">Cancel</button>
-                <button onClick={handleReject} disabled={actionLoading || !rejectionReason.trim()} className="btn-danger text-sm disabled:opacity-50">
-                  {actionLoading ? 'Rejecting…' : 'Reject'}
-                </button>
-              </div>
+
+              <label className="flex flex-col gap-1 text-xs text-[var(--color-text-secondary)] mb-4">
+                Reason (optional)
+                <textarea
+                  className="input-primary resize-none"
+                  rows={3}
+                  value={substitutionReason}
+                  onChange={(e) => setSubstitutionReason(e.target.value)}
+                  placeholder="e.g. Medical leave, urgent duty, conference"
+                />
+              </label>
+
+              {substitutionResult && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
+                    Top Proxy Recommendations
+                  </p>
+                  {substitutionResult.recommendations.length === 0 ? (
+                    <p className="text-sm text-[var(--color-text-secondary)]">No proxy candidates matched all hard constraints.</p>
+                  ) : (
+                    substitutionResult.recommendations.map((rec) => (
+                      <div key={rec.proposal_id} className="rounded-lg border border-[var(--color-border)] p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                              {rec.faculty_name} <span className="text-xs text-[var(--color-text-muted)]">({rec.faculty_code})</span>
+                            </p>
+                            <p className="text-xs text-[var(--color-text-secondary)]">Score: {Math.round(rec.score)}</p>
+                          </div>
+                          <button
+                            onClick={() => void applyRecommendedSubstitution(rec.proposal_id)}
+                            disabled={substitutionApplyLoading}
+                            className="btn-success text-xs px-3 h-8 disabled:opacity-50"
+                          >
+                            {substitutionApplyLoading ? 'Applying…' : 'Apply Proxy'}
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
 
     </div>

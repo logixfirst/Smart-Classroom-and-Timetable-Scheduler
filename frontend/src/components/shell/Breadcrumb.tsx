@@ -104,7 +104,6 @@ const ROUTES: Array<{ pattern: RegExp; crumbs: () => BreadcrumbItem[] }> = [
   { pattern: /^\/admin\/dashboard/,   crumbs: () => [{ label: 'Dashboard' }] },
   { pattern: /^\/admin\/faculty/,     crumbs: () => [{ label: 'Faculty' }] },
   { pattern: /^\/admin\/students/,    crumbs: () => [{ label: 'Students' }] },
-  { pattern: /^\/admin\/approvals/,   crumbs: () => [{ label: 'Approvals' }] },
   { pattern: /^\/admin\/admins/,      crumbs: () => [{ label: 'Admins' }] },
   { pattern: /^\/admin\/logs/,        crumbs: () => [{ label: 'Logs' }] },
 
@@ -137,10 +136,13 @@ const SUPPRESS_ROUTES: RegExp[] = [
   /^\/admin\/admins/,
   /^\/admin\/faculty/,
   /^\/admin\/students/,
-  /^\/admin\/approvals/,
   /^\/admin\/logs/,
   // Timetable pages — all render their own PageHeader or are full-screen overlays
   /^\/admin\/timetables/,
+  // Faculty pages — render their own titles
+  /^\/faculty\/dashboard/,
+  /^\/faculty\/schedule/,
+  /^\/faculty\/preferences/,
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────

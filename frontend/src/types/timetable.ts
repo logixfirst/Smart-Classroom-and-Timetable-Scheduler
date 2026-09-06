@@ -91,6 +91,8 @@ export interface TimetableEntry {
  */
 export interface BackendTimetableEntry {
   day: number          // 0 = Monday … 5 = Saturday
+  course_id?: string
+  offering_id?: string
   time_slot: string
   start_time?: string
   end_time?: string
@@ -100,11 +102,15 @@ export interface BackendTimetableEntry {
   faculty_id?: string
   faculty_name?: string
   batch_id?: string
+  batch_ids?: string[]
   batch_name?: string
+  student_ids?: string[]
   classroom_id?: string
   room_number?: string
   duration_minutes?: number
   department_id?: string
+  department_name?: string
+  department_code?: string
 }
 
 export interface TimetableReview {
@@ -378,4 +384,64 @@ export interface DepartmentOption {
   name: string
   code: string
   total_entries?: number
+}
+
+export type SubstitutionUrgency = 'low' | 'medium' | 'high' | 'critical'
+
+export interface SubstitutionRecommendationRequest {
+  job_id: string
+  variant_id: string
+  schedule_date: string
+  day_index: number
+  time_slot: string
+  faculty_id: string
+  subject_code?: string
+  subject_name?: string
+  reason?: string
+  urgency?: SubstitutionUrgency
+}
+
+export interface SubstitutionRecommendationItem {
+  proposal_id: string
+  faculty_id: string
+  faculty_name: string
+  faculty_code: string
+  department_id: string
+  score: number
+  score_breakdown: Record<string, number>
+}
+
+export interface SubstitutionRecommendationResponse {
+  request_id: string
+  status: string
+  target: {
+    variant_id: string
+    schedule_date: string
+    day_index: number
+    time_slot: string
+    subject_code: string
+    subject_name: string
+    original_faculty_id: string
+    original_faculty_name: string
+  }
+  recommendations: SubstitutionRecommendationItem[]
+}
+
+export interface SubstitutionApplyPayload {
+  proposal_id?: string
+  substitute_faculty_id?: string
+  notes?: string
+}
+
+export interface SubstitutionApplyResponse {
+  success: boolean
+  request_id: string
+  assignment_id: string
+  overlay_id: string
+  status: string
+  substitute_faculty: {
+    id: string
+    name: string
+    code: string
+  }
 }

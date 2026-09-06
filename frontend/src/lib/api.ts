@@ -33,11 +33,25 @@ class ApiClient {
   }
 
   private getHeaders(): HeadersInit {
-    return {
+    const headers: HeadersInit = {
       'Content-Type': 'application/json',
       // 🔐 NO Authorization header - JWT tokens in secure HttpOnly cookies
       // Backend reads from cookies automatically (Google-like security)
-    };
+    }
+
+    // 🔐 CSRF protection: read CSRF token from csrftoken cookie and add to X-CSRFToken header
+    if (typeof document !== 'undefined') {
+      const csrfToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrftoken='))
+        ?.split('=')[1]
+
+      if (csrfToken) {
+        headers['X-CSRFToken'] = decodeURIComponent(csrfToken)
+      }
+    }
+
+    return headers
   }
 
   /**
@@ -102,6 +116,28 @@ class ApiClient {
   }
 
   /**
+   * Ensure CSRF token is available by making a GET request to a safe endpoint
+   * if the csrftoken cookie hasn't been set yet
+   */
+  private async ensureCsrfToken(): Promise<void> {
+    // Check if csrftoken cookie already exists
+    const hasCsrfToken = document.cookie
+      .split('; ')
+      .some(row => row.startsWith('csrftoken='))
+
+    if (!hasCsrfToken) {
+      // Make a GET request to trigger CSRF token generation
+      try {
+        await fetch(`${this.baseUrl}/auth/me/`, {
+          credentials: 'include',
+        })
+      } catch {
+        // Silently fail - CSRF token generation is best-effort
+      }
+    }
+  }
+
+  /**
    * 🔐 Refresh JWT access token using refresh token from HttpOnly cookie
    */
   private async refreshToken(): Promise<boolean> {
@@ -118,6 +154,8 @@ class ApiClient {
 
   // Authentication
   async login(credentials: LoginCredentials) {
+    // Ensure CSRF token is available before login
+    await this.ensureCsrfToken()
     return this.request<{ message: string; user: any }>('/auth/login/', {
       method: 'POST',
       body: JSON.stringify(credentials),

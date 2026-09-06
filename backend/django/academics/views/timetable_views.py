@@ -112,7 +112,7 @@ def get_department_timetable(request, dept_id):
 @permission_classes([IsAuthenticated])
 def get_faculty_timetable(request):
     """
-    Faculty personal timetable — Redis-cached 3 min per faculty pk.
+    Faculty personal timetable from approved variant — Redis-cached 3 min per faculty pk.
     GET /api/timetable/faculty/me/
     """
     user = request.user
@@ -127,7 +127,7 @@ def get_faculty_timetable(request):
         faculty_profile = user.faculty_profile
     except Exception:
         return Response(
-            {"success": False, "error": "Faculty profile not found or error fetching timetable"},
+            {"success": False, "error": "Faculty profile not found"},
             status=status.HTTP_404_NOT_FOUND,
         )
 
@@ -136,13 +136,84 @@ def get_faculty_timetable(request):
     )
 
     def _fetch():
-        slots = (
-            TimetableSlot.objects.filter(
-                faculty=faculty_profile, timetable__is_active=True
-            )
-            .select_related("subject", "batch", "classroom", "timetable")
-            .order_by("day", "start_time")
-        )
+        from ..models import GenerationJob
+        import json
+        
+        # Get latest approved timetable for faculty's organization
+        approved_job = GenerationJob.objects.filter(
+            organization_id=faculty_profile.organization_id,
+            status='approved'
+        ).order_by('-created_at').first()
+        
+        if not approved_job or not approved_job.timetable_data:
+            return {
+                "success": True,
+                "faculty": {
+                    "faculty_id":   str(faculty_profile.faculty_id),
+                    "faculty_name": faculty_profile.faculty_name,
+                    "employee_id":  faculty_profile.employee_id,
+                    "designation":  faculty_profile.designation,
+                    "department":   faculty_profile.department.dept_name if faculty_profile.department else "N/A",
+                },
+                "total_classes": 0,
+                "slots": [],
+            }
+        
+        # Parse timetable_data JSON
+        try:
+            timetable_data = json.loads(approved_job.timetable_data) if isinstance(approved_job.timetable_data, str) else approved_job.timetable_data
+        except:
+            timetable_data = approved_job.timetable_data
+        
+        # Get selected variant or first variant
+        variants = timetable_data.get('variants', [])
+        selected_variant = None
+        for v in variants:
+            if v.get('is_selected'):
+                selected_variant = v
+                break
+        if not selected_variant and variants:
+            selected_variant = variants[0]
+        
+        if not selected_variant:
+            return {
+                "success": True,
+                "faculty": {
+                    "faculty_id":   str(faculty_profile.faculty_id),
+                    "faculty_name": faculty_profile.faculty_name,
+                    "employee_id":  faculty_profile.employee_id,
+                    "designation":  faculty_profile.designation,
+                    "department":   faculty_profile.department.dept_name if faculty_profile.department else "N/A",
+                },
+                "total_classes": 0,
+                "slots": [],
+            }
+        
+        # Filter entries for this faculty
+        entries = selected_variant.get('timetable_entries', [])
+        faculty_slots = []
+        
+        for entry in entries:
+            # Match by faculty_id or faculty_name
+            if (entry.get('faculty_id') == str(faculty_profile.faculty_id) or 
+                entry.get('faculty_name') == faculty_profile.faculty_name):
+                
+                # Convert day number to day name
+                day_map = {0: 'Monday', 1: 'Tuesday', 2: 'Wednesday', 3: 'Thursday', 4: 'Friday', 5: 'Saturday'}
+                day_name = day_map.get(entry.get('day', 0), 'Monday')
+                
+                faculty_slots.append({
+                    'day': day_name,
+                    'time_slot': entry.get('time_slot', ''),
+                    'start_time': entry.get('start_time', ''),
+                    'end_time': entry.get('end_time', ''),
+                    'subject_name': entry.get('subject_name', ''),
+                    'subject_code': entry.get('subject_code', ''),
+                    'classroom_number': entry.get('room_number', ''),
+                    'batch_id': entry.get('batch_id', ''),
+                    'batch_name': entry.get('batch_name', ''),
+                })
+        
         return {
             "success": True,
             "faculty": {
@@ -150,10 +221,10 @@ def get_faculty_timetable(request):
                 "faculty_name": faculty_profile.faculty_name,
                 "employee_id":  faculty_profile.employee_id,
                 "designation":  faculty_profile.designation,
-                "department":   faculty_profile.department.dept_name,
+                "department":   faculty_profile.department.dept_name if faculty_profile.department else "N/A",
             },
-            "total_classes": slots.count(),
-            "slots": TimetableSlotSerializer(slots, many=True).data,
+            "total_classes": len(faculty_slots),
+            "slots": faculty_slots,
         }
 
     try:
@@ -166,8 +237,8 @@ def get_faculty_timetable(request):
     except Exception as e:
         logger.error("Error fetching faculty timetable: %s", e)
         return Response(
-            {"success": False, "error": "Faculty profile not found or error fetching timetable"},
-            status=status.HTTP_404_NOT_FOUND,
+            {"success": False, "error": "Error fetching timetable"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 
@@ -175,7 +246,7 @@ def get_faculty_timetable(request):
 @permission_classes([IsAuthenticated])
 def get_student_timetable(request):
     """
-    Student personal schedule — Redis-cached 3 min per student pk + semester.
+    Student personal schedule from approved variant — Redis-cached 3 min per student pk + semester.
     GET /api/timetable/student/me/
     """
     user = request.user
@@ -187,11 +258,14 @@ def get_student_timetable(request):
         )
 
     from ..models import Student, Batch
-
+    import time
+    
+    start_time = time.time()
     try:
         student = Student.objects.select_related("department", "program").get(
             username=user.username
         )
+        logger.info(f"Student lookup took {(time.time() - start_time)*1000:.2f}ms")
     except Student.DoesNotExist:
         logger.error("Student with username %s not found", user.username)
         return Response(
@@ -206,25 +280,125 @@ def get_student_timetable(request):
     )
 
     def _fetch():
+        from ..models import GenerationJob
+        import json
+        import time
+        
+        fetch_start = time.time()
+        
         batch = None
         batch_name = "N/A"
         if student.batch_id:
             try:
+                batch_start = time.time()
                 batch = Batch.objects.get(batch_id=student.batch_id)
                 batch_name = batch.batch_name
+                logger.info(f"Batch lookup took {(time.time() - batch_start)*1000:.2f}ms")
             except Batch.DoesNotExist:
                 pass
-
-        slots = []
+        
+        # Get latest approved timetable for student's organization
+        job_start = time.time()
+        approved_job = GenerationJob.objects.filter(
+            organization_id=student.organization_id,
+            status='approved'
+        ).order_by('-created_at').first()
+        logger.info(f"GenerationJob query took {(time.time() - job_start)*1000:.2f}ms")
+        
+        if not approved_job or not approved_job.timetable_data:
+            logger.info(f"No approved job found, total _fetch time: {(time.time() - fetch_start)*1000:.2f}ms")
+            return {
+                "success": True,
+                "student": {
+                    "student_id":   str(student.student_id),
+                    "roll_number":  student.roll_number or student.enrollment_number,
+                    "student_name": f"{student.first_name} {student.middle_name or ''} {student.last_name}".strip(),
+                    "batch":        batch_name,
+                    "semester":     student.current_semester,
+                    "department":   student.department.dept_name if student.department else "N/A",
+                },
+                "total_classes": 0,
+                "slots": [],
+            }
+        
+        # Parse timetable_data JSON
+        parse_start = time.time()
+        try:
+            timetable_data = json.loads(approved_job.timetable_data) if isinstance(approved_job.timetable_data, str) else approved_job.timetable_data
+        except:
+            timetable_data = approved_job.timetable_data
+        logger.info(f"JSON parse took {(time.time() - parse_start)*1000:.2f}ms")
+        
+        # Get selected variant or first variant
+        variant_start = time.time()
+        variants = timetable_data.get('variants', [])
+        selected_variant = None
+        for v in variants:
+            if v.get('is_selected'):
+                selected_variant = v
+                break
+        if not selected_variant and variants:
+            selected_variant = variants[0]
+        logger.info(f"Variant selection took {(time.time() - variant_start)*1000:.2f}ms")
+        
+        if not selected_variant:
+            logger.info(f"No variant found, total _fetch time: {(time.time() - fetch_start)*1000:.2f}ms")
+            return {
+                "success": True,
+                "student": {
+                    "student_id":   str(student.student_id),
+                    "roll_number":  student.roll_number or student.enrollment_number,
+                    "student_name": f"{student.first_name} {student.middle_name or ''} {student.last_name}".strip(),
+                    "batch":        batch_name,
+                    "semester":     student.current_semester,
+                    "department":   student.department.dept_name if student.department else "N/A",
+                },
+                "total_classes": 0,
+                "slots": [],
+            }
+        
+        # Filter entries for this student's batch
+        filter_start = time.time()
+        entries = selected_variant.get('timetable_entries', [])
+        logger.info(f"Got {len(entries)} total entries")
+        student_slots = []
+        
         if batch:
-            slots = (
-                TimetableSlot.objects.filter(
-                    batch=batch, timetable__is_active=True
-                )
-                .select_related("subject", "faculty", "classroom", "timetable")
-                .order_by("day", "start_time")
-            )
-
+            batch_id_str = str(batch.batch_id)
+            student_id_str = str(student.student_id)
+            logger.info(f"Filtering for batch_id={batch_id_str}, student_id={student_id_str}")
+            
+            for entry in entries:
+                # Match by batch_id or check if student is in batch_ids/student_ids
+                batch_match = False
+                
+                if entry.get('batch_id') == batch_id_str:
+                    batch_match = True
+                elif entry.get('batch_ids') and batch_id_str in entry.get('batch_ids', []):
+                    batch_match = True
+                elif entry.get('student_ids') and student_id_str in entry.get('student_ids', []):
+                    batch_match = True
+                
+                if batch_match:
+                    # Convert day number to day name
+                    day_map = {0: 'Monday', 1: 'Tuesday', 2: 'Wednesday', 3: 'Thursday', 4: 'Friday', 5: 'Saturday'}
+                    day_name = day_map.get(entry.get('day', 0), 'Monday')
+                    
+                    student_slots.append({
+                        'day': day_name,
+                        'time_slot': entry.get('time_slot', ''),
+                        'start_time': entry.get('start_time', ''),
+                        'end_time': entry.get('end_time', ''),
+                        'subject_name': entry.get('subject_name', ''),
+                        'subject_code': entry.get('subject_code', ''),
+                        'faculty_name': entry.get('faculty_name', ''),
+                        'room_number': entry.get('room_number', ''),
+                        'classroom_number': entry.get('room_number', ''),
+                    })
+        
+        logger.info(f"Filtering took {(time.time() - filter_start)*1000:.2f}ms, found {len(student_slots)} slots")
+        logger.info(f"Total _fetch time: {(time.time() - fetch_start)*1000:.2f}ms")
+        
         return {
             "success": True,
             "student": {
@@ -235,8 +409,8 @@ def get_student_timetable(request):
                 "semester":     student.current_semester,
                 "department":   student.department.dept_name if student.department else "N/A",
             },
-            "total_classes": len(slots),
-            "slots": TimetableSlotSerializer(slots, many=True).data,
+            "total_classes": len(student_slots),
+            "slots": student_slots,
         }
 
     try:
@@ -249,8 +423,8 @@ def get_student_timetable(request):
     except Exception as e:
         logger.error("Error fetching student timetable: %s", e)
         return Response(
-            {"success": False, "error": "Student profile not found or error fetching timetable"},
-            status=status.HTTP_404_NOT_FOUND,
+            {"success": False, "error": "Error fetching timetable"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 

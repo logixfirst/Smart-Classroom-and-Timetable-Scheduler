@@ -13,11 +13,19 @@ from django.http import JsonResponse
 
 class Role:
     """Role constants"""
-    REGISTRAR = "registrar"
-    DEPT_HEAD = "dept_head"
-    COORDINATOR = "coordinator"
+    SUPER_ADMIN = "super_admin"
+    ORG_ADMIN = "org_admin"
+    DEAN = "dean"
+    HOD = "hod"
+    FACULTY = "faculty"
+    STUDENT = "student"
     
-    ALL_ROLES = [REGISTRAR, DEPT_HEAD, COORDINATOR]
+    # Legacy aliases for backward compatibility
+    REGISTRAR = ORG_ADMIN  # Registrar is now org_admin
+    DEPT_HEAD = HOD        # Department Head is now hod
+    COORDINATOR = FACULTY  # Coordinator is now faculty
+    
+    ALL_ROLES = [SUPER_ADMIN, ORG_ADMIN, DEAN, HOD, FACULTY, STUDENT]
 
 
 # ============================================
@@ -25,50 +33,50 @@ class Role:
 # ============================================
 
 class IsRegistrar(permissions.BasePermission):
-    """Only Registrar can access"""
-    message = "Only Registrar can perform this action."
+    """Only Admin (org_admin or super_admin) can access"""
+    message = "Only Admin can perform this action."
     
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == Role.REGISTRAR
+            and request.user.role in [Role.SUPER_ADMIN, Role.ORG_ADMIN]
         )
 
 
 class IsDepartmentHead(permissions.BasePermission):
-    """Only Department Head can access"""
-    message = "Only Department Head can perform this action."
+    """Only HOD can access"""
+    message = "Only Head of Department can perform this action."
     
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == Role.DEPT_HEAD
+            and request.user.role == Role.HOD
         )
 
 
 class IsCoordinator(permissions.BasePermission):
-    """Only Coordinator can access"""
-    message = "Only Coordinator can perform this action."
+    """Only Faculty can access"""
+    message = "Only Faculty can perform this action."
     
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == Role.COORDINATOR
+            and request.user.role == Role.FACULTY
         )
 
 
 class CanManageTimetable(permissions.BasePermission):
-    """Registrar and Dept Head can manage timetables"""
-    message = "Only Registrar and Department Head can manage timetables."
+    """Admin, Dean, and HOD can manage timetables"""
+    message = "Only Admin, Dean, and HOD can manage timetables."
     
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role in [Role.REGISTRAR, Role.DEPT_HEAD]
+            and request.user.role in [Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.DEAN, Role.HOD]
         )
 
 
@@ -81,14 +89,14 @@ class CanViewTimetable(permissions.BasePermission):
 
 
 class CanApproveTimetable(permissions.BasePermission):
-    """Only Registrar can approve timetables"""
-    message = "Only Registrar can approve timetables."
+    """Only Admin (super_admin or org_admin) can approve timetables"""
+    message = "Only Admin can approve timetables."
     
     def has_permission(self, request, view):
         return (
             request.user
             and request.user.is_authenticated
-            and request.user.role == Role.REGISTRAR
+            and request.user.role in [Role.SUPER_ADMIN, Role.ORG_ADMIN]
         )
 
 
@@ -100,8 +108,8 @@ class DepartmentAccessPermission(permissions.BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
         
-        # Registrar has access to all departments
-        if request.user.role == Role.REGISTRAR:
+        # Super Admin and Org Admin have access to all
+        if request.user.role in [Role.SUPER_ADMIN, Role.ORG_ADMIN]:
             return True
         
         # Dept Head and Coordinator need department_id
@@ -116,8 +124,8 @@ class DepartmentAccessPermission(permissions.BasePermission):
         if not request.user or not request.user.is_authenticated:
             return False
         
-        # Registrar has access to all
-        if request.user.role == Role.REGISTRAR:
+        # Super Admin and Org Admin have access to all
+        if request.user.role in [Role.SUPER_ADMIN, Role.ORG_ADMIN]:
             return True
         
         # Check department access
@@ -137,12 +145,12 @@ def has_department_access(user, department_id: str) -> bool:
     if not user or not user.is_authenticated:
         return False
     
-    # Registrar has access to all departments
-    if user.role == Role.REGISTRAR:
+    # Super Admin and Org Admin have access to all departments
+    if user.role in [Role.SUPER_ADMIN, Role.ORG_ADMIN]:
         return True
     
-    # Dept Head and Coordinator can only access their department
-    if user.role in [Role.DEPT_HEAD, Role.COORDINATOR]:
+    # Dean, HOD, and Faculty can only access their department
+    if user.role in [Role.DEAN, Role.HOD, Role.FACULTY]:
         return str(user.department) == str(department_id)
     
     return False
@@ -183,8 +191,8 @@ def require_department_access(view_func):
         if not request.user or not request.user.is_authenticated:
             return JsonResponse({'error': 'Authentication required'}, status=401)
         
-        # Registrar has access to all
-        if request.user.role == Role.REGISTRAR:
+        # Super Admin and Org Admin have access to all
+        if request.user.role in [Role.SUPER_ADMIN, Role.ORG_ADMIN]:
             return view_func(request, *args, **kwargs)
         
         # Get department_id from request
@@ -209,16 +217,16 @@ def require_department_access(view_func):
 # ============================================
 
 PERMISSION_MATRIX = {
-    'generate_timetable': [Role.REGISTRAR],
-    'approve_timetable': [Role.REGISTRAR],
-    'view_timetable': [Role.REGISTRAR, Role.DEPT_HEAD, Role.COORDINATOR],
-    'edit_timetable': [Role.REGISTRAR, Role.DEPT_HEAD],
-    'view_department_timetable': [Role.REGISTRAR, Role.DEPT_HEAD, Role.COORDINATOR],
-    'manage_faculty': [Role.REGISTRAR, Role.DEPT_HEAD],
-    'manage_courses': [Role.REGISTRAR, Role.DEPT_HEAD],
-    'manage_rooms': [Role.REGISTRAR],
-    'view_conflicts': [Role.REGISTRAR, Role.DEPT_HEAD, Role.COORDINATOR],
-    'resolve_conflicts': [Role.REGISTRAR, Role.DEPT_HEAD],
+    'generate_timetable': [Role.SUPER_ADMIN, Role.ORG_ADMIN],
+    'approve_timetable': [Role.SUPER_ADMIN, Role.ORG_ADMIN],
+    'view_timetable': [Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.DEAN, Role.HOD, Role.FACULTY],
+    'edit_timetable': [Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.DEAN, Role.HOD],
+    'view_department_timetable': [Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.DEAN, Role.HOD, Role.FACULTY],
+    'manage_faculty': [Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.DEAN, Role.HOD],
+    'manage_courses': [Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.DEAN, Role.HOD],
+    'manage_rooms': [Role.SUPER_ADMIN, Role.ORG_ADMIN],
+    'view_conflicts': [Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.DEAN, Role.HOD, Role.FACULTY],
+    'resolve_conflicts': [Role.SUPER_ADMIN, Role.ORG_ADMIN, Role.DEAN, Role.HOD],
 }
 
 

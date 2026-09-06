@@ -21,12 +21,10 @@ export function StudentWelcomeCard({ studentProfile }: Props) {
           </div>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
             <button className="btn-primary text-xs sm:text-sm px-4 py-3">
-              <span className="mr-1 sm:mr-2 text-lg">📅</span>
               <span className="hidden sm:inline">View Timetable</span>
               <span className="sm:hidden">Schedule</span>
             </button>
             <button className="btn-secondary text-xs sm:text-sm px-4 py-3">
-              <span className="mr-1 sm:mr-2 text-lg">📚</span>
               <span className="hidden sm:inline">My Courses</span>
               <span className="sm:hidden">Courses</span>
             </button>

@@ -21,7 +21,6 @@ interface TimetableSlot {
 }
 
 export default function StudentDashboard() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
   const PROFILE_CACHE_KEY = 'student_profile_cache'
   const PROFILE_CACHE_TTL = 5 * 60 * 1000
 
@@ -44,16 +43,13 @@ export default function StudentDashboard() {
 
   const loadStudentProfile = async () => {
     try {
-      const response = await fetch(`${API_BASE}/student/profile/`, {
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      if (!response.ok) throw new Error(`Failed to load student profile: ${response.status}`)
-      const data: StudentProfile = await response.json()
-      setStudentProfile(data)
-      try {
-        sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ data, ts: Date.now() }))
-      } catch { /* quota exceeded */ }
+      const response = await apiClient.request('/student/profile/')
+      if (response.data) {
+        setStudentProfile(response.data)
+        try {
+          sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ data: response.data, ts: Date.now() }))
+        } catch { /* quota exceeded */ }
+      }
     } catch (error) {
       console.error('Failed to load student profile:', error)
     }
@@ -112,20 +108,22 @@ export default function StudentDashboard() {
           <h3 className="card-title">Quick Actions</h3>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 lg:gap-4">
-          {[
-            { icon: '\u{1F4C5}', label: 'View Timetable', href: '/student/timetable' },
-            { icon: '\u{1F4E4}', label: 'Export Schedule', action: 'export' },
-            { icon: '\u{1F50D}', label: 'My Courses', action: 'courses' },
-          ].map((action, index) => (
-            <button
-              key={index}
-              onClick={() => action.href ? (window.location.href = action.href) : null}
-              className="btn-secondary flex flex-col items-center justify-center p-4 h-20 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
-            >
-              <span className="text-2xl mb-2">{action.icon}</span>
-              <span className="font-medium text-center">{action.label}</span>
-            </button>
-          ))}
+          <button
+            onClick={() => window.location.href = '/student/timetable'}
+            className="btn-secondary flex items-center justify-center p-4 h-20 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            <span className="font-medium text-center">View Timetable</span>
+          </button>
+          <button
+            className="btn-secondary flex items-center justify-center p-4 h-20 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            <span className="font-medium text-center">Export Schedule</span>
+          </button>
+          <button
+            className="btn-secondary flex items-center justify-center p-4 h-20 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            <span className="font-medium text-center">My Courses</span>
+          </button>
         </div>
       </div>
 

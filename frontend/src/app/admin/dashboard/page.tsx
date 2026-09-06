@@ -25,6 +25,7 @@ interface FacultyMember {
   name: string
   department: string | null
   isAvailable: boolean
+  assigned_courses?: Array<{ id: string; code: string; name: string }> | null
 }
 
 const DEFAULT_STATS: DashboardStats = { totalUsers: 0, activeCourses: 0, pendingApprovals: 0, systemHealth: 98 }
@@ -62,7 +63,7 @@ export default function AdminDashboard() {
       try {
         response = await apiClient.request<{
           stats?: { total_users?: number; active_courses?: number; pending_approvals?: number; system_health?: number }
-          faculty?: { id?: string; name?: string; department?: string | { dept_name?: string }; isAvailable?: boolean }[]
+          faculty?: { id?: string; name?: string; department?: string | { dept_name?: string }; isAvailable?: boolean; assigned_courses?: Array<{ id: string; code: string; name: string }> }[]
         }>('/dashboard/stats/', { signal: controller.signal } as Parameters<typeof apiClient.request>[1])
       } finally {
         clearTimeout(timeoutId)
@@ -87,6 +88,7 @@ export default function AdminDashboard() {
             name: (f.name as string) || 'Unknown Faculty',
             department: typeof f.department === 'string' ? f.department : (f.department as { dept_name?: string })?.dept_name ?? null,
             isAvailable: f.isAvailable !== undefined ? (f.isAvailable as boolean) : true,
+            assigned_courses: (f.assigned_courses as Array<{ id: string; code: string; name: string }>) || null,
           }))
         )
       }
@@ -125,7 +127,7 @@ export default function AdminDashboard() {
       <AdminStatsGrid
         stats={stats}
         loading={loading}
-        onApprovalsClick={() => router.push('/admin/approvals')}
+        onApprovalsClick={() => router.push('/admin/timetables')}
       />
 
       <FacultyAvailabilityCard faculty={faculty} loading={loading} />

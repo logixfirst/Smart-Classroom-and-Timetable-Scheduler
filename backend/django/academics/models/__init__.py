@@ -60,6 +60,15 @@ from .timetable import (
     TimetableSlot,
 )
 
+# Substitution / overlay models
+from .substitution import (
+    SubstitutionRequest,
+    SubstitutionProposal,
+    SubstitutionAssignment,
+    TimetableOverlayEntry,
+    ChangeAuditLog,
+)
+
 # User model
 from .user import User, UserSession
 
@@ -95,6 +104,11 @@ __all__ = [
     'GenerationJob',
     'Timetable',
     'TimetableSlot',
+    'SubstitutionRequest',
+    'SubstitutionProposal',
+    'SubstitutionAssignment',
+    'TimetableOverlayEntry',
+    'ChangeAuditLog',
     # User
     'User',
     'UserSession',

@@ -64,7 +64,7 @@ export default function Header({
   return (
     <header
       suppressHydrationWarning
-      className="fixed top-0 left-0 right-0 z-50 flex items-center h-14 md:h-16 bg-[#f6f8fc] dark:bg-[#111111]"
+      className="fixed top-0 left-0 right-0 z-50 flex items-center h-14 md:h-16 [background:var(--color-header-bg)]"
     >
       {/* ── Zone 1: Left — always 284px on desktop, natural width on mobile ── */}
       <div className="flex items-center gap-1 shrink-0 pl-2 md:pl-3 md:w-[284px]">

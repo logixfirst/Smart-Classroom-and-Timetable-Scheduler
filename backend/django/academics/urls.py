@@ -16,6 +16,8 @@ from .views import (
     dashboard_stats,
     faculty_profile_and_courses,
     student_profile_and_courses,
+    # Logs
+    get_audit_logs,
     # Core ViewSets
     UserViewSet,
     SchoolViewSet,
@@ -34,6 +36,7 @@ from .views import (
     GenerationJobViewSet,
     TimetableWorkflowViewSet,
     TimetableVariantViewSet,
+    SubstitutionViewSet,
     # Timetable display
     fastapi_callback,
     get_department_timetable,
@@ -74,6 +77,7 @@ router.register(r"timetable-slots", TimetableSlotViewSet)
 router.register(r"generation-jobs", GenerationJobViewSet, basename="generation-job")
 router.register(r"timetable/workflows", TimetableWorkflowViewSet, basename="workflow")
 router.register(r"timetable/variants", TimetableVariantViewSet, basename="variant")
+router.register(r"timetable/substitutions", SubstitutionViewSet, basename="substitution")
 router.register(r"timetable-configs", TimetableConfigurationViewSet, basename="timetable-config")
 router.register(r"conflicts", ConflictViewSet, basename="conflict")
 
@@ -114,6 +118,8 @@ urlpatterns = [
     path("auth/sessions/<str:jti>/", revoke_session_view, name="session-revoke"),
     # Dashboard stats
     path("dashboard/stats/", dashboard_stats, name="dashboard-stats"),
+    # Logs
+    path("logs/audit/", get_audit_logs, name="audit-logs"),
     # PERFORMANCE: Ultra-fast endpoints
     path("fast/jobs/", fast_generation_jobs, name="fast-jobs"),
     path("fast/faculty/", fast_faculty, name="fast-faculty"),

@@ -36,7 +36,7 @@ Faker==30.3.0                   # realistic fake data for fixtures
 # ── Security / lint (run in CI pre-test stage) ──────────────
 bandit==1.7.5                   # SAST security scanner
 safety==3.2.7                   # third-party CVE scanner
-trivy (managed by Codacy CI)    # container/SCA vulnerability scanning
+# trivy is managed by Codacy CI and is not a pip-installable requirement
 
 # ── Type checking ────────────────────────────────────────────
 mypy==1.11.2

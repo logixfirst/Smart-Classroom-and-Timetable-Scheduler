@@ -104,17 +104,39 @@ export async function pickVariant(variantId: string, jobId: string): Promise<voi
  * instead of raw UUIDs.
  */
 export async function fetchDepartmentNames(): Promise<Map<string, { name: string; code: string }>> {
-  const data = await apiFetch<unknown>('/departments/?is_active=true&page_size=500')
-  const items: any[] = Array.isArray(data) ? data : ((data as any).results ?? [])
   const map = new Map<string, { name: string; code: string }>()
-  items.forEach((d: any) => {
-    const id: string | undefined = d.dept_id ?? d.id
-    if (id) {
-      map.set(id, {
-        name: d.dept_name ?? d.name ?? id,
-        code: d.dept_short_name ?? d.dept_code ?? id,
-      })
+  let nextPath = '/departments/?page_size=500'
+  let pageCount = 0
+
+  while (nextPath && pageCount < 20) {
+    const data = await apiFetch<unknown>(nextPath)
+    const payload = data as any
+    const items: any[] = Array.isArray(payload) ? payload : (payload?.results ?? [])
+
+    items.forEach((d: any) => {
+      const id: string | undefined = d.dept_id ?? d.id
+      if (id) {
+        map.set(id, {
+          name: d.dept_name ?? d.name ?? id,
+          code: d.dept_short_name ?? d.dept_code ?? id,
+        })
+      }
+    })
+
+    const nextUrl: string | null = Array.isArray(payload) ? null : (payload?.next ?? null)
+    if (!nextUrl) {
+      nextPath = ''
+    } else {
+      try {
+        const parsed = new URL(nextUrl)
+        nextPath = `${parsed.pathname}${parsed.search}`.replace(/^\/api/, '')
+      } catch {
+        nextPath = nextUrl.startsWith('http') ? '' : nextUrl
+      }
     }
-  })
+
+    pageCount += 1
+  }
+
   return map
 }

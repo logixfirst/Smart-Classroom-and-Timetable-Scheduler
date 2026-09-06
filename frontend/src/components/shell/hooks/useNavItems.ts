@@ -5,7 +5,6 @@ import {
   BookOpen,
   Users,
   GraduationCap,
-  CheckCircle2,
   FileText,
   Calendar,
   SlidersHorizontal,
@@ -63,8 +62,7 @@ export const ADMIN_NAV: NavEntry[] = [
       { label: 'Rooms',       href: '/admin/academic/rooms',       icon: DoorOpen },
     ],
   },
-  { label: 'Timetables', href: '/admin/timetables', icon: CalendarDays },
-  { label: 'Approvals',  href: '/admin/approvals',  icon: CheckCircle2, badge: true },
+  { label: 'Timetables', href: '/admin/timetables', icon: CalendarDays, badge: true },
   { label: 'Logs',       href: '/admin/logs',       icon: FileText },
 ]
 

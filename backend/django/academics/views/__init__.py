@@ -46,6 +46,9 @@ from .dashboard_views import (
     student_profile_and_courses,
     faculty_profile_and_courses,
 )
+from .logs_views import (
+    get_audit_logs,
+)
 
 # ── Core ViewSets ─────────────────────────────────────────────────────────────
 from .user_viewset import UserViewSet
@@ -65,6 +68,7 @@ from .timetable_viewsets import TimetableViewSet, TimetableSlotViewSet
 from .generation_views import GenerationJobViewSet
 from .workflow_views import TimetableWorkflowViewSet
 from .timetable_variant_views import TimetableVariantViewSet
+from .substitution_views import SubstitutionViewSet
 
 # ── Timetable display ─────────────────────────────────────────────────────────
 from .timetable_views import (
@@ -99,7 +103,7 @@ __all__ = [
     'password_reset_request_view', 'password_reset_confirm_view', 'password_change_view',
     'list_sessions_view', 'revoke_session_view',
     # Dashboard
-    'dashboard_stats', 'student_profile_and_courses', 'faculty_profile_and_courses',
+    'dashboard_stats', 'student_profile_and_courses', 'faculty_profile_and_courses', 'get_audit_logs',
     # ViewSets
     'UserViewSet', 'SchoolViewSet', 'DepartmentViewSet', 'ProgramViewSet', 'BatchViewSet',
     'CourseViewSet', 'SubjectViewSet', 'FacultyViewSet', 'StudentViewSet',
@@ -107,6 +111,7 @@ __all__ = [
     'TimetableViewSet', 'TimetableSlotViewSet',
     # Generation & workflow
     'GenerationJobViewSet', 'TimetableWorkflowViewSet', 'TimetableVariantViewSet',
+    'SubstitutionViewSet',
     # Timetable display
     'fastapi_callback', 'get_department_timetable', 'get_faculty_timetable', 'get_student_timetable',
     # Progress

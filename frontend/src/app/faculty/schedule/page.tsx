@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import apiClient from '@/lib/api'
 import { TimetableGridSkeleton } from '@/components/LoadingSkeletons'
 
 export default function FacultySchedule() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
   const CACHE_KEY = 'faculty_schedule_cache'
   const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
 
@@ -27,15 +27,12 @@ export default function FacultySchedule() {
 
   const fetchSchedule = async () => {
     try {
-      const res = await fetch(`${API_BASE}/timetable/faculty/me/`, {
-        credentials: 'include',
-      })
-      const data = await res.json()
-      if (data.success) {
-        setSchedule(data.slots)
-        setFaculty(data.faculty)
+      const res = await apiClient.request('/timetable/faculty/me/')
+      if (res.data && res.data.success) {
+        setSchedule(res.data.slots)
+        setFaculty(res.data.faculty)
         try {
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: data.slots, ts: Date.now() }))
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: res.data.slots, ts: Date.now() }))
         } catch { /* quota exceeded */ }
       }
     } catch (error) {
@@ -69,11 +66,9 @@ export default function FacultySchedule() {
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <button className="btn-primary flex-1 sm:flex-none text-xs sm:text-sm">
-              <span className="mr-1 sm:mr-2 text-sm">📄</span>
               Export PDF
             </button>
             <button className="btn-secondary flex-1 sm:flex-none text-xs sm:text-sm">
-              <span className="mr-1 sm:mr-2 text-sm">🖨️</span>
               Print
             </button>
           </div>
@@ -169,62 +164,60 @@ export default function FacultySchedule() {
               <h3 className="card-title">Workload Distribution</h3>
               <p className="card-description">Hours per subject</p>
             </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Mathematics 101</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-20 rounded-full h-2" style={{ background: 'var(--color-bg-surface-3)' }}>
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '60%' }}></div>
-                  </div>
-                  <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>12h</span>
-                </div>
+            {schedule.length > 0 ? (
+              <div className="space-y-4">
+                {Array.from(new Set(schedule.map(s => s.subject_name))).map((subject, idx) => {
+                  const subjectSlots = schedule.filter(s => s.subject_name === subject)
+                  const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500']
+                  const percentage = (subjectSlots.length / schedule.length) * 100
+                  return (
+                    <div key={idx} className="flex items-center justify-between">
+                      <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{subject}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 rounded-full h-2" style={{ background: 'var(--color-bg-surface-3)' }}>
+                          <div className={`${colors[idx % colors.length]} h-2 rounded-full`} style={{ width: `${percentage}%` }}></div>
+                        </div>
+                        <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{subjectSlots.length} class{subjectSlots.length !== 1 ? 'es' : ''}</span>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Physics 201</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-20 rounded-full h-2" style={{ background: 'var(--color-bg-surface-3)' }}>
-                    <div className="bg-green-500 h-2 rounded-full" style={{ width: '40%' }}></div>
-                  </div>
-                  <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>8h</span>
-                </div>
+            ) : (
+              <div className="text-center py-8" style={{ color: 'var(--color-text-muted)' }}>
+                No workload data available
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Lab Sessions</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-20 rounded-full h-2" style={{ background: 'var(--color-bg-surface-3)' }}>
-                    <div className="bg-purple-500 h-2 rounded-full" style={{ width: '20%' }}></div>
-                  </div>
-                  <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>4h</span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title">Upcoming Events</h3>
-              <p className="card-description">Important dates</p>
+              <h3 className="card-title">Schedule Summary</h3>
+              <p className="card-description">Class distribution across days</p>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg border" style={{ background: 'var(--color-warning-subtle)', borderColor: 'var(--color-border)' }}>
-                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
-                    Faculty Meeting
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Tomorrow, 2:00 PM</p>
-                </div>
+            {schedule.length > 0 ? (
+              <div className="space-y-3">
+                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => {
+                  const dayClasses = schedule.filter(s => s.day === day)
+                  if (dayClasses.length === 0) return null
+                  return (
+                    <div key={day} className="flex items-center gap-3 p-3 rounded-lg border" style={{ background: 'var(--color-primary-subtle)', borderColor: 'var(--color-border)' }}>
+                      <div className="w-3 h-3 rounded-full" style={{ background: 'var(--color-primary)' }}></div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
+                          {day}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{dayClasses.length} class{dayClasses.length !== 1 ? 'es' : ''}</p>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg border" style={{ background: 'var(--color-primary-subtle)', borderColor: 'var(--color-border)' }}>
-                <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
-                    Exam Schedule Review
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Dec 20, 10:00 AM</p>
-                </div>
+            ) : (
+              <div className="text-center py-8" style={{ color: 'var(--color-text-muted)' }}>
+                No schedule data available
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

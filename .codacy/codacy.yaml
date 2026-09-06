@@ -1,0 +1,4 @@
+tools:
+    - trivy@0.69.3
+3.7.2
+    - opengrep@1.16.2

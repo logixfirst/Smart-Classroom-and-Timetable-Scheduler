@@ -40,7 +40,7 @@ export default function Sidebar({
         className={[
           'fixed left-0 top-0 h-full flex flex-col',
           mobileOpen ? 'z-[55]' : 'z-[45]',        /* above header (z-50) when drawer open */
-          'bg-[#f6f8fc] dark:bg-[#111111]',
+          '[background:var(--color-sidebar-bg)]',
           /* no pt-* — brand strip below acts as the top spacer */
           'transition-[width,transform] duration-100 ease-[cubic-bezier(0.4,0,0.2,1)]',
           mobileOpen ? 'translate-x-0 w-[284px]' : '-translate-x-full w-[284px] md:translate-x-0',

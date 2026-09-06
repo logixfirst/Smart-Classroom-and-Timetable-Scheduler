@@ -16,7 +16,7 @@
  */
 
 import { useRef, useEffect, useState } from 'react'
-import { CheckCircle, AlertCircle, Eye, GitCompare } from 'lucide-react'
+import { CheckCircle, AlertCircle, Eye } from 'lucide-react'
 import { ScoreBar } from './ScoreBar'
 import { VariantStatusBadge } from './VariantStatusBadge'
 import type { VariantSummary } from '@/types/timetable'
@@ -24,10 +24,12 @@ import type { VariantSummary } from '@/types/timetable'
 interface VariantCardProps {
   variant: VariantSummary
   jobStatus?: string
-  isSelected?: boolean
+  isActive?: boolean
+  isApproved?: boolean
+  isCompareSelected?: boolean
   onSelect?: (id: string, checked: boolean) => void
   onViewDetails?: (id: string) => void
-  onCompare?: (id: string) => void
+  onPickVariant?: (id: string) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -86,10 +88,12 @@ function ConflictIndicator({ count }: { count: number }) {
 export function VariantCard({
   variant,
   jobStatus = 'completed',
-  isSelected = false,
+  isActive = false,
+  isApproved = false,
+  isCompareSelected = false,
   onSelect,
   onViewDetails,
-  onCompare,
+  onPickVariant,
 }: VariantCardProps) {
   const [hovered, setHovered] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
@@ -105,12 +109,12 @@ export function VariantCard({
   useEffect(() => {
     const el = cardRef.current
     if (!el) return
-    const elevated = hovered || isSelected
+    const elevated = hovered || isActive || isCompareSelected
     el.style.setProperty('--card-shadow',
       elevated ? '0 4px 16px rgba(0,0,0,0.12)' : '0 1px 3px rgba(0,0,0,0.06)')
     el.style.setProperty('--card-translate', hovered ? 'translateY(-1px)' : 'none')
-    el.style.setProperty('--card-outline', isSelected ? '2px solid #1a73e8' : 'none')
-  }, [hovered, isSelected])
+    el.style.setProperty('--card-outline', isActive ? '2px solid #1a73e8' : 'none')
+  }, [hovered, isActive, isCompareSelected])
 
   return (
     <div
@@ -128,26 +132,26 @@ export function VariantCard({
         '[outline:var(--card-outline)]',
         'transition-[box-shadow,transform] duration-150',
       ].join(' ')}
-      onClick={() => onSelect?.(variant.id, !isSelected)}
+      onClick={() => onViewDetails?.(variant.id)}
     >
-      {/* Hover checkbox (multi-select) */}
-      {(hovered || isSelected) && onSelect && (
+      {/* Multi-select checkbox: always visible to avoid accidental hover-triggered selection */}
+      {onSelect && (
         <button
           type="button"
-          aria-label={isSelected ? 'Deselect variant' : 'Select variant'}
+          aria-label={isCompareSelected ? 'Deselect variant' : 'Select variant'}
           onClick={(e) => {
             e.stopPropagation()
-            onSelect(variant.id, !isSelected)
+            onSelect(variant.id, !isCompareSelected)
           }}
           className={[
             'absolute top-2.5 left-2.5 w-[18px] h-[18px] rounded-[4px] cursor-pointer',
             'flex items-center justify-center border-2 transition-colors',
-            isSelected
+            isCompareSelected
               ? 'bg-[#1a73e8] border-[#1a73e8]'
               : 'border-[var(--color-border)] bg-[var(--color-bg-surface)]',
           ].join(' ')}
         >
-          {isSelected && (
+          {isCompareSelected && (
             <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
               <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -203,14 +207,26 @@ export function VariantCard({
           <Eye size={13} className="mr-1 inline" />
           View
         </button>
-        <button
-          type="button"
-          className="btn-primary flex-1 text-xs h-8 rounded-full"
-          onClick={() => onCompare?.(variant.id)}
-        >
-          <GitCompare size={13} className="mr-1 inline" />
-          Compare
-        </button>
+        {isApproved ? (
+          <div className="flex-1 flex items-center justify-center text-xs h-8 rounded-full bg-[var(--color-success-subtle)] text-[var(--color-success-text)] font-semibold">
+            <CheckCircle size={13} className="mr-1" />
+            Approved
+          </div>
+        ) : jobStatus === 'approved' ? (
+          <div className="flex-1 flex items-center justify-center text-xs h-8 rounded-full bg-[var(--color-bg-surface-2)] text-[var(--color-text-muted)] font-medium">
+            View Only
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="btn-success flex-1 text-xs h-8 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => onPickVariant?.(variant.id)}
+            disabled={!onPickVariant}
+          >
+            <CheckCircle size={13} className="mr-1 inline" />
+            Approve
+          </button>
+        )}
       </div>
     </div>
   )

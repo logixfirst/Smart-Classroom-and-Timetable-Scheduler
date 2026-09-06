@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.cache import cache
 import requests
 import logging
+import re
 
 # Day-name → int mapping shared by the cache-warmer and TimetableVariantViewSet.
 _DAY_STR_MAP: dict[str, int] = {
@@ -181,19 +182,26 @@ def _convert_entries_for_cache(entries: list) -> list:
     """
     result = []
     for e in entries[:500]:
+        course_id = e.get('course_id', '')
+        offering_match = re.search(r"_off_([0-9a-fA-F\-]{36})", str(course_id))
         day_raw = e.get('day', 0)
         day = day_raw if isinstance(day_raw, int) else _DAY_STR_MAP.get(day_raw, 0)
         start_t = e.get('start_time', '')
         end_t = e.get('end_time', '')
         result.append({
             'day': day,
+            'course_id': course_id,
+            'offering_id': e.get('offering_id', offering_match.group(1) if offering_match else ''),
             'time_slot': f"{start_t}-{end_t}" if start_t else e.get('time_slot', ''),
             'subject_code': e.get('course_code', e.get('subject_code', '')),
             'subject_name': e.get('subject_name', e.get('course_name', '')),
             'faculty_id': e.get('faculty_id', ''),
             'faculty_name': e.get('faculty_name', ''),
             'room_number': e.get('room_code', e.get('room_number', '')),
+            'batch_id': e.get('batch_id', ''),
+            'batch_ids': e.get('batch_ids', []),
             'batch_name': e.get('batch_name', ''),
+            'student_ids': e.get('student_ids', []),
             'department_id': e.get('department_id', ''),
         })
     return result

@@ -82,6 +82,9 @@ class Faculty(models.Model):
                 name="fac_org_dept_avail_idx",
             ),
             models.Index(fields=["designation"], name="fac_desig_idx"),
+            models.Index(fields=["faculty_code"], name="idx_fac_code"),
+            models.Index(fields=["username"], name="idx_fac_username"),
+            models.Index(fields=["email"], name="idx_fac_email"),
         ]
 
     @property

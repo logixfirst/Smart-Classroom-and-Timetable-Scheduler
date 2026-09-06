@@ -1,0 +1,150 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: my-project-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dbname}
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: my-project-redis
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - app-network
+
+  django:
+    container_name: my-project-django
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.django
+    image: my-project-django:dev
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-replace-with-a-secure-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@postgres:5432/dbname}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    working_dir: /app/django
+    command: python manage.py runserver 0.0.0.0:8000 --settings=settings.dev
+    volumes:
+      - ./backend/django:/app/django
+      - /app/django/__pycache__
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - app-network
+
+  fastapi:
+    container_name: my-project-fastapi
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.fastapi
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@postgres:5432/dbname}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      FASTAPI_HOST: ${FASTAPI_HOST:-0.0.0.0}
+      FASTAPI_PORT: ${FASTAPI_PORT:-8001}
+    working_dir: /app/fastapi
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+    volumes:
+      - ./backend/fastapi:/app/fastapi
+      - /app/fastapi/__pycache__
+    ports:
+      - "8001:8001"
+    depends_on:
+      django:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8001/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - app-network
+
+  celery:
+    container_name: my-project-celery
+    image: my-project-django:dev
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-replace-with-a-secure-key}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@postgres:5432/dbname}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    working_dir: /app/django
+    command: >-
+      watchmedo auto-restart --patterns="*.py" --recursive --
+      celery -A core worker --loglevel=info
+    volumes:
+      - ./backend/django:/app/django
+      - /app/django/__pycache__
+    depends_on:
+      django:
+        condition: service_healthy
+      fastapi:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  frontend:
+    container_name: my-project-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_DJANGO_API_URL: ${NEXT_PUBLIC_DJANGO_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_FASTAPI_URL: ${NEXT_PUBLIC_FASTAPI_URL:-http://localhost:8001}
+    working_dir: /app/frontend
+    command: npm run dev -- --hostname 0.0.0.0 --port 3000
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      celery:
+        condition: service_started
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge

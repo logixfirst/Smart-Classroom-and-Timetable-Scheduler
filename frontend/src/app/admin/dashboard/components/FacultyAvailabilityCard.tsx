@@ -3,6 +3,7 @@ interface FacultyMember {
   name: string
   department: string | null
   isAvailable: boolean
+  assigned_courses?: Array<{ id: string; code: string; name: string }> | null
 }
 
 interface FacultyAvailabilityCardProps {
@@ -32,31 +33,49 @@ export default function FacultyAvailabilityCard({ faculty, loading }: FacultyAva
           faculty.map((member) => (
             <div
               key={member.id}
-              className="flex items-center justify-between p-3 rounded-lg border"
+              className="flex flex-col gap-2 p-3 rounded-lg border"
               style={{ background: 'var(--color-bg-surface-2)', borderColor: 'var(--color-border)' }}
             >
-              <div className="flex-1 min-w-0 mr-3">
-                <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
-                  {member.name}
-                </p>
-                <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
-                  {member.department || 'N/A'}
-                </p>
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0 mr-3">
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
+                    {member.name}
+                  </p>
+                  <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                    {member.department || 'N/A'}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    defaultChecked={member.isAvailable}
+                    onChange={(e) => {
+                      console.log(`Faculty ${member.id} availability:`, e.target.checked)
+                    }}
+                  />
+                  <div className="w-9 h-5 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600" style={{ background: 'var(--color-bg-surface-3)' }} />
+                  <span className="ml-2 text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+                    {member.isAvailable ? 'Available' : 'Unavailable'}
+                  </span>
+                </label>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  defaultChecked={member.isAvailable}
-                  onChange={(e) => {
-                    console.log(`Faculty ${member.id} availability:`, e.target.checked)
-                  }}
-                />
-                <div className="w-9 h-5 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600" style={{ background: 'var(--color-bg-surface-3)' }} />
-                <span className="ml-2 text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-                  {member.isAvailable ? 'Available' : 'Unavailable'}
-                </span>
-              </label>
+              {member.assigned_courses && member.assigned_courses.length > 0 && (
+                <div className="text-xs space-y-1">
+                  <p style={{ color: 'var(--color-text-muted)' }} className="font-semibold">Subjects:</p>
+                  <div className="flex flex-wrap gap-1">
+                    {member.assigned_courses.map((course) => (
+                      <span
+                        key={course.id}
+                        className="px-2 py-1 rounded text-xs font-medium"
+                        style={{ background: 'var(--color-primary-subtle)', color: 'var(--color-primary)' }}
+                      >
+                        {course.code}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}

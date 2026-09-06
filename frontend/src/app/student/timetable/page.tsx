@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import apiClient from '@/lib/api'
 import { TimetableGridSkeleton } from '@/components/LoadingSkeletons'
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -55,9 +56,9 @@ function TimetableGrid({ schedule }: { schedule: any[] }) {
                   <td key={`${day}-${time}`} className="border border-gray-300 dark:border-gray-700 p-2">
                     {slot ? (
                       <div className="text-xs space-y-1">
-                        <div className="font-medium text-gray-800 dark:text-gray-200">{slot.subject_code}</div>
+                        <div className="font-medium text-gray-800 dark:text-gray-200">{slot.subject_code || slot.subject_name}</div>
                         <div className="text-gray-600 dark:text-gray-400">{slot.faculty_name}</div>
-                        <div className="text-gray-500 dark:text-gray-500">{slot.room_number}</div>
+                        <div className="text-gray-500 dark:text-gray-500">{slot.room_number || slot.classroom_number}</div>
                       </div>
                     ) : null}
                   </td>
@@ -73,7 +74,6 @@ function TimetableGrid({ schedule }: { schedule: any[] }) {
 }
 
 export default function StudentTimetable() {
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
   const SCHEDULE_CACHE_KEY = 'student_schedule_cache'
   const SCHEDULE_CACHE_TTL = 10 * 60 * 1000 // 10 minutes
 
@@ -99,23 +99,16 @@ export default function StudentTimetable() {
     try {
       setLoading(true)
       setError(null)
-      const res = await fetch(`${API_BASE}/timetable/student/me/`, {
-        credentials: 'include',
-      })
+      const res = await apiClient.request('/timetable/student/me/')
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-      }
-
-      const data = await res.json()
-      if (data.success) {
-        setSchedule(data.slots || [])
-        setStudent(data.student)
+      if (res.data && res.data.success) {
+        setSchedule(res.data.slots || [])
+        setStudent(res.data.student)
         try {
-          sessionStorage.setItem(SCHEDULE_CACHE_KEY, JSON.stringify({ data: data.slots || [], ts: Date.now() }))
+          sessionStorage.setItem(SCHEDULE_CACHE_KEY, JSON.stringify({ data: res.data.slots || [], ts: Date.now() }))
         } catch { /* quota exceeded */ }
       } else {
-        setError(data.message || 'Failed to load timetable')
+        setError(res.data?.message || 'Failed to load timetable')
       }
     } catch (error: any) {
       console.error('Failed to fetch schedule:', error)
@@ -137,7 +130,6 @@ export default function StudentTimetable() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
-            <div className="text-red-600 dark:text-red-400 mb-4">⚠️</div>
             <p className="text-gray-800 dark:text-gray-200 font-medium mb-2">Failed to load timetable</p>
             <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">{error}</p>
             <button onClick={fetchSchedule} className="btn-primary">Retry</button>
@@ -160,11 +152,9 @@ export default function StudentTimetable() {
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <button className="btn-secondary flex-1 sm:flex-none text-xs sm:text-sm">
-              <span className="mr-1 sm:mr-2 text-sm">📤</span>
               Export
             </button>
             <button className="btn-primary flex-1 sm:flex-none text-xs sm:text-sm">
-              <span className="mr-1 sm:mr-2 text-sm">📅</span>
               Sync Calendar
             </button>
           </div>
@@ -248,10 +238,10 @@ export default function StudentTimetable() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
-                        {slot.subject_code}
+                        {slot.subject_code || slot.subject_name}
                       </h4>
                       <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                        {slot.faculty_name} • {slot.room_number}
+                        {slot.faculty_name} • {slot.room_number || slot.classroom_number}
                       </p>
                     </div>
                     <div className={`text-xs text-${color}-600 dark:text-${color}-400 font-medium`}>

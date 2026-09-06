@@ -19,7 +19,6 @@ export function EnrollmentCard({ studentProfile }: Props) {
             </p>
           </div>
           <button className="btn-primary text-xs px-3 py-2 w-full sm:w-auto">
-            <span className="mr-1">🔍</span>
             Check Clashes
           </button>
         </div>
@@ -29,7 +28,6 @@ export function EnrollmentCard({ studentProfile }: Props) {
         <TableSkeleton rows={4} columns={3} />
       ) : studentProfile.enrolled_courses.length === 0 ? (
         <div className="text-center py-8">
-          <div className="text-4xl mb-4">📚</div>
           <h4 className="text-lg font-medium mb-2" style={{ color: 'var(--color-text-primary)' }}>
             No Courses Enrolled
           </h4>

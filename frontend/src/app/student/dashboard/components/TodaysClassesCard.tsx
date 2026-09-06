@@ -21,11 +21,10 @@ export function TodaysClassesCard({ todaysClasses, loading }: Props) {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <h3 className="card-title">Today&apos;s Classes</h3>
-            <p className="card-description">Monday, March 18, 2024</p>
+            <p className="card-description">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
           </div>
           <div className="flex gap-2">
             <button className="btn-secondary text-xs px-3 py-2">
-              <span className="mr-1">&#x1F4C5;</span>
               <span className="hidden sm:inline">Calendar View</span>
               <span className="sm:hidden">Calendar</span>
             </button>
@@ -56,7 +55,6 @@ export function TodaysClassesCard({ todaysClasses, loading }: Props) {
         <ListSkeleton items={3} />
       ) : todaysClasses.length === 0 ? (
         <div className="text-center py-8">
-          <div className="text-4xl mb-4">&#x1F4C5;</div>
           <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-2">
             No Classes Today
           </h3>
